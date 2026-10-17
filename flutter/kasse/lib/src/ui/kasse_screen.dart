@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../kacheln.dart';
 import '../kasse_api.dart';
 import 'anmeldung.dart' show knopfRot;
+import '../updater.dart';
 import 'tische_screen.dart';
 import 'zahlung.dart';
 
@@ -42,6 +43,10 @@ class _KasseScreenState extends State<KasseScreen> {
   bool _tischModus = false;
   int? _tischNr;
   int _offeneTische = 0;
+  // Updater (lib/src/updater.dart): Banner, wenn eine neuere Kasse bereitliegt
+  NeueVersion? _update;
+  String? _version;
+  bool _updateLaeuft = false;
   bool get _tischeSichtbar => (_anlass?.hatService ?? false) || _offeneTische > 0;
 
   @override
@@ -61,6 +66,50 @@ class _KasseScreenState extends State<KasseScreen> {
     api.pufferSenden();
     api.ortPruefen().then((_) => _laden());
     api.erneuern();
+    eigeneVersion().then((v) => mounted ? setState(() => _version = v) : null);
+    _updateSuchen();
+    _takte.add(Timer.periodic(const Duration(minutes: 30), (_) => _updateSuchen()));
+  }
+
+  Future<void> _updateSuchen({bool melden = false}) async {
+    final u = await updatePruefen();
+    if (!mounted) return;
+    setState(() => _update = u);
+    if (melden && u == null) _meldung('Kassen-App ${_version ?? ''} ist aktuell');
+  }
+
+  Future<void> _updateInstallieren() async {
+    final u = _update;
+    if (u == null || _updateLaeuft) return;
+    if (_korb.isNotEmpty) {
+      _meldung('Erst die laufende Bestellung abschliessen, dann aktualisieren', fehler: true);
+      return;
+    }
+    if (!await darfInstallieren()) {
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Installieren erlauben'),
+          content: const Text('Damit sich die Kasse selbst aktualisieren kann, im nächsten Fenster '
+              '«Aus dieser Quelle zulassen» einschalten und dann zurück in die Kasse.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Abbrechen')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Einstellungen öffnen')),
+          ],
+        ),
+      );
+      if (ok == true) await erlaubnisOeffnen();
+      return;
+    }
+    setState(() => _updateLaeuft = true);
+    try {
+      await installieren(u);
+    } catch (e) {
+      _meldung('Update fehlgeschlagen: ${e.toString().replaceFirst('Exception: ', '')}', fehler: true);
+    } finally {
+      if (mounted) setState(() => _updateLaeuft = false);
+    }
   }
 
   @override
@@ -283,6 +332,29 @@ class _KasseScreenState extends State<KasseScreen> {
       appBar: _kopf(),
       body: Column(children: [
         _reiterLeiste(),
+        if (_update != null)
+          Material(
+            color: const Color(0xFF2563EB),
+            child: InkWell(
+              onTap: _updateInstallieren,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(children: [
+                  const Icon(Icons.system_update, color: Colors.white),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _updateLaeuft
+                          ? 'Kassen-App ${_update!.version} wird geladen…'
+                          : 'Neue Kassen-App ${_update!.version} – tippen zum Installieren',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                  if (_updateLaeuft) const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)),
+                ]),
+              ),
+            ),
+          ),
         if (_druckWarnung != null)
           Material(
             color: _rot,
@@ -387,9 +459,10 @@ class _KasseScreenState extends State<KasseScreen> {
         ]),
         actions: [
           PopupMenuButton<String>(
-            onSelected: (w) => w == 'neu' ? _laden() : w == 'ab' ? _abmelden() : null,
+            onSelected: (w) => switch (w) { 'neu' => _laden(), 'ab' => _abmelden(), 'update' => _updateSuchen(melden: true), _ => null },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'neu', child: Text('Artikel neu laden')),
+              PopupMenuItem(value: 'update', child: Text('Auf Update prüfen${_version != null ? ' (jetzt $_version)' : ''}')),
               const PopupMenuItem(value: 'ab', child: Text('Abmelden')),
               PopupMenuItem(enabled: false, value: 'code', child: Text('Gerätecode ${api.geraetCode}')),
             ],
