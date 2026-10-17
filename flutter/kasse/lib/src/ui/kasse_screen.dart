@@ -322,10 +322,11 @@ class _KasseScreenState extends State<KasseScreen> {
               icon: Badge(isLabelVisible: _offeneTische > 0, label: Text('$_offeneTische'), child: const Icon(Icons.table_restaurant)),
             ),
           PopupMenuButton<String>(
-            onSelected: (w) => w == 'neu' ? _laden() : _abmelden(),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'neu', child: Text('Artikel neu laden')),
-              PopupMenuItem(value: 'ab', child: Text('Abmelden')),
+            onSelected: (w) => w == 'neu' ? _laden() : w == 'ab' ? _abmelden() : null,
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'neu', child: Text('Artikel neu laden')),
+              const PopupMenuItem(value: 'ab', child: Text('Abmelden')),
+              PopupMenuItem(enabled: false, value: 'code', child: Text('Gerätecode ${api.geraetCode}')),
             ],
           ),
         ],

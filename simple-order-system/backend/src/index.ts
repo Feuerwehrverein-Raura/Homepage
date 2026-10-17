@@ -15,6 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
+import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
 import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml } from './kassenbon.js';
 import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, signMitgliedPosToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
@@ -141,6 +142,9 @@ app.use('/api', (req: AuthenticatedRequest, res, next) => {
   if (OPEN_API_PATHS.some((re) => re.test(req.path))) return next();
   return (authenticateToken as express.RequestHandler)(req, res, next);
 });
+// Geraete-Freigabe der Kasse (src/geraete.ts): erfasst jedes Geraet, sperrt
+// Buchen/Bezahlen fuer nicht freigegebene, wenn eingeschaltet
+geraeteSchranke({ app, pool: () => pool, getSetting });
 
 // Auth routes
 app.get('/api/auth/mode', (req, res) => {
@@ -542,6 +546,7 @@ async function initDB() {
 
   await vorOrtSchema(pool);
   await kassenbonSchema(pool);
+  await geraeteSchema(pool);
 
   console.log('Database initialized');
 }
@@ -821,6 +826,11 @@ if (!ORDER_API_KEY) {
   console.error('FATAL: ORDER_API_KEY nicht gesetzt — interne API-Authentifizierung waere unsicher. Abbruch.');
   process.exit(1);
 }
+
+geraeteEinrichten({
+  app, pool, orderApiKey: ORDER_API_KEY, getSetting, setSetting, vorOrt: VOR_ORT,
+  cloudUrl: (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, ''),
+});
 
 // Kasse vor Ort (T400) und Annahme ihrer Bestellungen in der Cloud - src/vorort.ts
 vorOrtEinrichten({

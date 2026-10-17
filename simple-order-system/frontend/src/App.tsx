@@ -111,19 +111,46 @@ const vorOrtTokenRestTage = (): number => {
     return (exp * 1000 - Date.now()) / 86400000;
   } catch { return 0; }
 };
+// Geraete-Freigabe (backend src/geraete.ts): feste Kennung je Browser, geht
+// mit jeder API-Anfrage mit. Der Vorstand gibt Geraete anhand des Kurzcodes frei.
+const GERAET_KEY = 'kasse_geraet';
+const geraetKennung: string = (() => {
+  try {
+    const alt = localStorage.getItem(GERAET_KEY);
+    if (alt && /^[A-Za-z0-9_-]{8,64}$/.test(alt)) return alt;
+    const neu = 'p' + Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 20);
+    localStorage.setItem(GERAET_KEY, neu);
+    return neu;
+  } catch {
+    return '';
+  }
+})();
+export const geraetKurzcode = (): string => {
+  const s = geraetKennung.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return s ? `${s.slice(0, 4)}-${s.slice(4, 8)}` : '';
+};
+const geraetName = (): string => {
+  const ua = navigator.userAgent;
+  const m = ua.match(/Android [\d.]+; ([^;)]+)/);
+  return `Web-Kasse ${m ? m[1].trim() : /iPhone|iPad/.test(ua) ? 'iOS' : 'Browser'}`.slice(0, 80);
+};
 // Anfragen an den T400 tragen das Kassen-Token statt des Authentik-Tokens.
 const echtesFetch = window.fetch.bind(window);
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const istApi = url.startsWith(VOR_ORT_BASIS) || url.startsWith(CLOUD_API) || url.startsWith('/api');
+  if (!istApi) return echtesFetch(input, init);
+  const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+  if (geraetKennung) {
+    h.set('X-Kasse-Geraet', geraetKennung);
+    h.set('X-Kasse-Geraet-Name', geraetName());
+    h.set('X-Kasse-Geraet-Typ', 'pwa');
+  }
   if (url.startsWith(VOR_ORT_BASIS)) {
     const t = vorOrtTokenLesen();
-    const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-    if (t && h.has('Authorization')) {
-      h.set('Authorization', `Bearer ${t}`);
-      return echtesFetch(input, { ...init, headers: h });
-    }
+    if (t && h.has('Authorization')) h.set('Authorization', `Bearer ${t}`);
   }
-  return echtesFetch(input, init);
+  return echtesFetch(input, { ...init, headers: h });
 };
 type KasseOrt = 'cloud' | 'lokal';
 let kasseOrt: KasseOrt = 'cloud';
@@ -302,6 +329,8 @@ const bestellNr = (id: number | string) => {
 function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  // main.tsx laedt eine neue Fassung erst, wenn nichts im Warenkorb liegt
+  useEffect(() => { (window as any).__kasseBeschaeftigt = cart.length > 0; }, [cart]);
   const [orderType, setOrderType] = useState<OrderType>('bar');
   const [tableNumber, setTableNumber] = useState<string>('');
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
@@ -3332,6 +3361,13 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
     <div className="max-w-7xl mx-auto p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold mb-6">Einstellungen</h2>
+
+        {/* Geraete-Freigabe: diesen Code gibt der Vorstand frei */}
+        {geraetKurzcode() && (
+          <p className="mb-6 text-sm text-gray-600">
+            Gerätecode dieser Kasse: <span className="font-mono font-bold text-gray-900 text-base">{geraetKurzcode()}</span>
+          </p>
+        )}
 
         {/* Kassen-Anmeldebon: QR-Bon, der ein Geraet einmal (1 h) als Kasse anmeldet */}
         <div className="mb-8 border-2 border-red-100 bg-red-50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">

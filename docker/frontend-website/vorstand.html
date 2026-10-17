@@ -409,6 +409,18 @@
                     </div>
                 </div>
 
+                <!-- Geraete-Freigabe der Kasse: GET/PUT /vorstand/kassen-geraete -> order-backend
+                     src/geraete.ts. Ist die Freigabe an, buchen/bezahlen nur freigegebene Geraete. -->
+                <details id="kassen-geraete" class="mb-4 p-3 rounded-lg border-2 border-gray-200 bg-gray-50 print:hidden">
+                    <summary class="font-semibold text-gray-800 cursor-pointer">📱 Kassen-Geräte freigeben</summary>
+                    <div class="text-sm text-gray-600 mt-2">Jede Kasse (App und Web) meldet sich hier mit einem Gerätecode (in der App im Menü ⋮, in der Web-Kasse unter Einstellungen). Ist die Freigabe eingeschaltet, können nur freigegebene Geräte buchen und bezahlen. Die Küche ist nicht betroffen.</div>
+                    <label class="flex items-center gap-2 mt-3 text-sm font-semibold">
+                        <input type="checkbox" id="kassen-geraete-modus" class="w-4 h-4"> Freigabe durchsetzen
+                    </label>
+                    <div id="kassen-geraete-meldung" class="text-sm mt-1 hidden"></div>
+                    <div id="kassen-geraete-liste" class="mt-3 space-y-2 text-sm"></div>
+                </details>
+
                 <!-- Tab-Auswahl: Vorstand vs Mitglied -->
                 <div id="app-qr-tabs" class="flex border-b border-gray-200 mb-3 print:hidden">
                     <button data-tab="vorstand" class="app-qr-tab px-4 py-2 text-sm font-medium border-b-2 border-fire-500 text-fire-600">Vorstand-App</button>
@@ -10493,6 +10505,88 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             } finally {
                 knopf.disabled = false;
                 knopf.textContent = '🖨️ Anmeldebon drucken';
+            }
+        });
+        // Geraete-Freigabe der Kasse
+        async function kassenGeraete(methode = 'GET', pfad = '', daten) {
+            const r = await fetch(`${API_BASE}/vorstand/kassen-geraete${pfad}`, {
+                method: methode,
+                headers: { 'Authorization': `Bearer ${authToken}`, ...(daten ? { 'Content-Type': 'application/json' } : {}) },
+                body: daten ? JSON.stringify(daten) : undefined,
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.error || `Fehler (${r.status})`);
+            return d;
+        }
+        function kassenGeraeteMeldung(text, ok) {
+            const m = document.getElementById('kassen-geraete-meldung');
+            m.textContent = text;
+            m.className = `text-sm mt-1 ${ok ? 'text-green-700' : 'text-red-700'}`;
+        }
+        async function kassenGeraeteLaden() {
+            const liste = document.getElementById('kassen-geraete-liste');
+            try {
+                const d = await kassenGeraete();
+                document.getElementById('kassen-geraete-modus').checked = d.modus === 'an';
+                liste.replaceChildren();
+                if (!d.geraete.length) liste.textContent = 'Noch keine Geräte gemeldet.';
+                for (const g of d.geraete) {
+                    const zeile = document.createElement('div');
+                    zeile.className = 'flex flex-wrap items-center gap-2 p-2 bg-white rounded border';
+                    const text = document.createElement('div');
+                    text.className = 'flex-1 min-w-[12rem]';
+                    const titel = document.createElement('div');
+                    titel.className = 'font-semibold';
+                    titel.textContent = `${g.code} · ${g.name || 'Gerät'}`;
+                    const info = document.createElement('div');
+                    info.className = 'text-xs text-gray-500';
+                    const zuletzt = g.zuletzt ? new Date(g.zuletzt).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–';
+                    info.textContent = `${g.typ === 'app' ? 'App' : g.typ === 'pwa' ? 'Web-Kasse' : ''} · zuletzt ${zuletzt}`;
+                    const stand = document.createElement('span');
+                    stand.className = `px-2 py-0.5 rounded text-xs font-semibold ${g.gesperrt ? 'bg-red-100 text-red-800' : g.freigegeben ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`;
+                    stand.textContent = g.gesperrt ? 'gesperrt' : g.freigegeben ? 'freigegeben' : 'neu';
+                    text.append(titel, info);
+                    zeile.append(text, stand);
+                    const knopf = (beschriftung, daten, klasse) => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = `px-3 py-1 rounded text-xs text-white ${klasse}`;
+                        b.textContent = beschriftung;
+                        b.addEventListener('click', async () => {
+                            const werte = typeof daten === 'function' ? daten() : daten;
+                            if (!werte) return;
+                            try { await kassenGeraete('PUT', `/${encodeURIComponent(g.id)}`, werte); await kassenGeraeteLaden(); }
+                            catch (e) { kassenGeraeteMeldung(e.message, false); }
+                        });
+                        zeile.append(b);
+                    };
+                    if (!g.freigegeben || g.gesperrt) knopf('Freigeben', { freigegeben: true, gesperrt: false }, 'bg-green-600 hover:bg-green-700');
+                    if (!g.gesperrt) knopf('Sperren', { gesperrt: true }, 'bg-fire-600 hover:bg-fire-700');
+                    knopf('Umbenennen', () => {
+                        const name = prompt('Name des Geräts (z.B. «Kassen-Handy 1»)', g.name || '');
+                        return name ? { name } : null;
+                    }, 'bg-gray-500 hover:bg-gray-600');
+                    liste.append(zeile);
+                }
+            } catch (e) {
+                kassenGeraeteMeldung(e.message, false);
+            }
+        }
+        document.getElementById('kassen-geraete').addEventListener('toggle', (ev) => {
+            if (ev.target.open) kassenGeraeteLaden();
+        });
+        document.getElementById('kassen-geraete-modus').addEventListener('change', async (ev) => {
+            const an = ev.target.checked;
+            if (an && !confirm('Freigabe einschalten? Danach können nur freigegebene Geräte buchen und bezahlen.')) {
+                ev.target.checked = false;
+                return;
+            }
+            try {
+                await kassenGeraete('PUT', '/modus', { an });
+                kassenGeraeteMeldung(an ? 'Freigabe ist eingeschaltet.' : 'Freigabe ist ausgeschaltet - alle Geräte dürfen buchen.', true);
+            } catch (e) {
+                ev.target.checked = !an;
+                kassenGeraeteMeldung(e.message, false);
             }
         });
         document.getElementById('set-password-btn').addEventListener('click', () => {

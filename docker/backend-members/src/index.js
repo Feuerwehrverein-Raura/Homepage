@@ -4048,6 +4048,35 @@ app.post('/vorstand/kassenbon', authenticateAny, requireRole('vorstand', 'admin'
     }
 });
 
+// Geraete-Freigabe der Kasse (order-backend src/geraete.ts): Liste, freigeben,
+// sperren, Durchsetzung ein/aus. Nur Vorstand/Admin.
+async function kassenGeraeteProxy(req, res, methode, pfad, daten) {
+    try {
+        const ORDER_INTERNAL_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+        const r = await axios({ method: methode, url: `${ORDER_INTERNAL_URL}/api/internal${pfad}`, data: daten,
+            headers: { 'X-Order-API-Key': process.env.ORDER_API_KEY }, timeout: 15000, validateStatus: () => true });
+        if (methode !== 'get') {
+            await logAudit(pool, 'KASSEN_GERAET', null, req.user.email, getClientIp(req), { pfad, daten, status: r.status });
+        }
+        res.status(r.status).json(r.data);
+    } catch (error) {
+        console.error(`${methode} /vorstand/kassen-geraete:`, error.message);
+        res.status(502).json({ error: 'Kasse nicht erreichbar.' });
+    }
+}
+app.get('/vorstand/kassen-geraete', authenticateAny, requireRole('vorstand', 'admin'),
+    (req, res) => kassenGeraeteProxy(req, res, 'get', '/geraete'));
+app.put('/vorstand/kassen-geraete/modus', authenticateAny, requireRole('vorstand', 'admin'),
+    (req, res) => kassenGeraeteProxy(req, res, 'put', '/geraete-modus', { an: req.body?.an === true }));
+app.put('/vorstand/kassen-geraete/:id', authenticateAny, requireRole('vorstand', 'admin'), (req, res) => {
+    const b = req.body || {};
+    const daten = { von: req.user.name || req.user.email || 'Vorstand' };
+    if (typeof b.freigegeben === 'boolean') daten.freigegeben = b.freigegeben;
+    if (typeof b.gesperrt === 'boolean') daten.gesperrt = b.gesperrt;
+    if (typeof b.name === 'string') daten.name = b.name;
+    kassenGeraeteProxy(req, res, 'put', `/geraete/${encodeURIComponent(req.params.id)}`, daten);
+});
+
 // Anmeldebon fuer ein Mitglied drucken.
 app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {

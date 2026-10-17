@@ -120,6 +120,24 @@ class KasseApi {
   final ortGeaendert = StreamController<bool>.broadcast();
 
   bool get lokal => basis == lokalBasis;
+
+  /// Geraete-Freigabe (backend src/geraete.ts): feste Kennung dieses Geraets,
+  /// geht mit jeder Anfrage mit; der Vorstand gibt sie per Kurzcode frei.
+  String get geraet {
+    final alt = _prefs.getString('kasse_geraet');
+    if (alt != null && RegExp(r'^[A-Za-z0-9_-]{8,64}$').hasMatch(alt)) return alt;
+    final z = Random.secure();
+    const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final neu = 'a${List.generate(19, (_) => abc[z.nextInt(abc.length)]).join()}';
+    _prefs.setString('kasse_geraet', neu);
+    return neu;
+  }
+
+  String get geraetCode {
+    final s = geraet.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    return '${s.substring(0, 4)}-${s.substring(4, 8)}';
+  }
+
   String? get token => _prefs.getString('kasse_token');
   String? get name => _prefs.getString('kasse_name');
   bool get angemeldet => token != null && !_abgelaufen(token!);
@@ -154,6 +172,9 @@ class KasseApi {
       'Accept': 'application/json',
       if (daten != null) 'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+      'X-Kasse-Geraet': geraet,
+      'X-Kasse-Geraet-Name': 'Kassen-App',
+      'X-Kasse-Geraet-Typ': 'app',
     };
     http.Response r;
     try {

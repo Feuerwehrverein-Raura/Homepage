@@ -4,13 +4,23 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import './index.css';
 
-// Register service worker for PWA
+// Register service worker for PWA. Eine Kiosk-Kasse laedt die Seite nie neu
+// und blieb so auf alten Fassungen (Chilbi 2026: Tischzahlung ohne Anmeldung).
+// Deshalb alle 10 min nach einer neuen Fassung fragen - nur bei leerem
+// Warenkorb, denn autoUpdate laedt die Seite gleich danach neu.
 registerSW({
+  immediate: true,
   onNeedRefresh() {
     window.location.reload();
   },
   onOfflineReady() {
     console.log('Order System ready for offline use');
+  },
+  onRegisteredSW(_url, reg) {
+    if (!reg) return;
+    setInterval(() => {
+      if (!(window as any).__kasseBeschaeftigt) reg.update().catch(() => {});
+    }, 10 * 60 * 1000);
   },
 });
 
