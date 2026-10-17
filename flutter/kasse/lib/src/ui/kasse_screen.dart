@@ -1,6 +1,6 @@
-// Kassen-Bildschirm (Grundbetrieb Bar): Kopf mit Logo, Anlass, Ort
-// (Schopf/Cloud) und laufender Uhr; Reiter je Kategorie mit Kacheln
-// (Gruppen oeffnen ihre Varianten); Warenkorb unten mit Bar/TWINT/Karte.
+// Kassen-Bildschirm im Aufbau der Web-Kasse: Kopf mit Logo, Anlass, Ort
+// (Schopf/Cloud) und laufender Uhr; Reiter Kasse | Tische; Bestellung oben
+// (Tablet: rechts), Menue mit allen Kategorien darunter.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -24,7 +24,6 @@ class _KasseScreenState extends State<KasseScreen> {
   KasseApi get api => widget.api;
   List<Artikel> _artikel = [];
   List<String> _kategorien = [];
-  String _kategorie = '';
   Anlass? _anlass;
   String? _twintQr;
   final List<Position> _korb = [];
@@ -71,6 +70,7 @@ class _KasseScreenState extends State<KasseScreen> {
     }
     _ortAbo?.cancel();
     _pufferAbo?.cancel();
+    _tischFeld.dispose();
     super.dispose();
   }
 
@@ -83,7 +83,6 @@ class _KasseScreenState extends State<KasseScreen> {
       setState(() {
         _artikel = artikel;
         _kategorien = kats;
-        if (!kats.contains(_kategorie)) _kategorie = kats.isEmpty ? '' : kats.first;
         _fehler = null;
       });
       await _nebendaten();
@@ -127,7 +126,6 @@ class _KasseScreenState extends State<KasseScreen> {
       });
 
   double get _total => _korb.fold(0, (s, p) => s + p.summe);
-  int get _stueck => _korb.fold(0, (s, p) => s + p.menge);
 
   Future<void> _gruppeOeffnen(Kachel k) async {
     final a = await showModalBottomSheet<Artikel>(
@@ -189,42 +187,73 @@ class _KasseScreenState extends State<KasseScreen> {
     if (_korb.isEmpty || _sendet) return;
     final nr = _tischNr;
     if (nr == null || nr <= 0) {
-      await _tischWaehlen();
-      if (_tischNr == null) return;
-      return _anTischSenden();
+      _meldung('Bitte zuerst die Tischnummer eingeben', fehler: true);
+      return;
     }
     setState(() => _sendet = true);
+    AngelegteBestellung b;
     try {
-      final b = await api.bestellen(List.of(_korb), tisch: nr);
+      b = await api.bestellen(List.of(_korb), tisch: nr);
       setState(() {
         _korb.clear();
         _tischNr = null;
+        _tischFeld.clear();
       });
-      _meldung('An Tisch $nr gesendet (${bestellNr(b.id)})');
       if (b.druckfehler.isNotEmpty) setState(() => _druckWarnung = 'Tisch $nr, ${bestellNr(b.id)}: ${b.druckfehler.join(' · ')}');
       _nebendaten();
     } on KasseFehler catch (e) {
       if (e.status == 401) return _abmelden();
       _meldung('Nicht gesendet: ${e.meldung} – Warenkorb bleibt.', fehler: true);
+      return;
     } finally {
       if (mounted) setState(() => _sendet = false);
     }
-  }
-
-  Future<void> _tischWaehlen() async {
-    final c = TextEditingController(text: _tischNr?.toString() ?? '');
-    final nr = await showDialog<int>(
+    if (!mounted) return;
+    // Wie die Web-Kasse: gleich bezahlen oder Tisch offen lassen
+    final art = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tischnummer'),
-        content: TextField(controller: c, autofocus: true, keyboardType: TextInputType.number, style: const TextStyle(fontSize: 28)),
+      builder: (c) => AlertDialog(
+        title: Text('Tisch $nr', textAlign: TextAlign.center),
+        content: Text('CHF ${b.total.toStringAsFixed(2)}',
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(c.text.trim())), child: const Text('OK')),
+          for (final (wert, text, farbe) in [
+            ('spaeter', '🪑 Später bezahlen (Tisch offen lassen)', const Color(0xFFEAB308)),
+            ('card', '💳 Karte', const Color(0xFF2563EB)),
+            ('cash', '💵 Barzahlung', const Color(0xFF16A34A)),
+            ('twint', 'TWINT', Colors.black),
+          ])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: farbe, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () => Navigator.pop(c, wert),
+                  child: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
         ],
       ),
     );
-    if (nr != null && nr > 0) setState(() => _tischNr = nr);
+    if (!mounted) return;
+    if (art == null || art == 'spaeter') {
+      _meldung('An Tisch $nr gesendet (${bestellNr(b.id)}) – Bezahlung später');
+      return;
+    }
+    final zahlung = await zahlungAbfragen(context, bestellung: b.id, betrag: b.total, art: art, twintQr: _twintQr, titel: 'Tisch $nr');
+    if (zahlung == null) {
+      _meldung('Tisch $nr offen gelassen');
+      return;
+    }
+    if (!await api.bezahltOderPuffern(b.id, zahlung)) {
+      _meldung('Zahlung vom Server abgelehnt - bitte bei den Tischen prüfen.', fehler: true);
+      return;
+    }
+    _meldung('Tisch $nr: CHF ${b.total.toStringAsFixed(2)} bezahlt');
+    _nebendaten();
   }
 
   void _meldung(String text, {bool fehler = false}) {
@@ -237,17 +266,26 @@ class _KasseScreenState extends State<KasseScreen> {
   }
 
   // ---- Oberflaeche ---------------------------------------------------------
+  // Aufbau wie die Web-Kasse (order.fwv-raura.ch), die sich an der Chilbi
+  // bewaehrt hat: Reiter Kasse | Tische, Karte "Bestellung" (Bestellart,
+  // Tischnummer, Positionen, Total, Bezahlen mit), darunter "Menue" mit allen
+  // Kategorien untereinander. Ab 900 px Menue links, Bestellung rechts.
+  static const _rot = Color(0xFFDC2626);
+  static const _rotHell = Color(0xFFFEF2F2);
+  int _reiter = 0;
+  final _tischFeld = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     final breit = MediaQuery.sizeOf(context).width >= 900;
-    final kacheln = kachelnBilden(_artikel.where((a) => a.kategorie == _kategorie).toList());
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: _kopf(),
       body: Column(children: [
+        _reiterLeiste(),
         if (_druckWarnung != null)
           Material(
-            color: const Color(0xFFDC2626),
+            color: _rot,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
               child: Row(children: [
@@ -270,25 +308,61 @@ class _KasseScreenState extends State<KasseScreen> {
               ),
             ),
           ),
-        Expanded(child: _inhalt(breit, kacheln)),
+        Expanded(child: _inhalt(breit)),
       ]),
-      bottomNavigationBar: breit ? null : _korbLeiste(),
     );
   }
 
-  Widget _inhalt(bool breit, List<Kachel> kacheln) {
-    return _laedt && _artikel.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : _fehler != null && _artikel.isEmpty
-              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_fehler!, textAlign: TextAlign.center)))
-              : Row(children: [
-                  Expanded(child: Column(children: [_kategorieLeiste(), Expanded(child: _raster(kacheln))])),
-                  if (breit) SizedBox(width: 380, child: _korbAnsicht()),
-                ]);
+  Widget _inhalt(bool breit) {
+    if (_reiter == 1) return TischeScreen(api: api, twintQr: _twintQr, eingebettet: true);
+    if (_laedt && _artikel.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (_fehler != null && _artikel.isEmpty) {
+      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_fehler!, textAlign: TextAlign.center)));
+    }
+    if (breit) {
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(flex: 2, child: ListView(padding: const EdgeInsets.all(12), children: [_menueKarte()])),
+        Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(0, 12, 12, 12), children: [_bestellKarte()])),
+      ]);
+    }
+    return ListView(padding: const EdgeInsets.all(8), children: [_bestellKarte(), const SizedBox(height: 12), _menueKarte()]);
+  }
+
+  Widget _reiterLeiste() => Container(
+        color: _rot,
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        child: Row(children: [
+          _reiterKnopf(0, '🛒 Kasse'),
+          if (_tischeSichtbar) ...[
+            const SizedBox(width: 8),
+            _reiterKnopf(1, '🪑 Tische${_offeneTische > 0 ? ' ($_offeneTische)' : ''}'),
+          ],
+        ]),
+      );
+
+  Widget _reiterKnopf(int nr, String text) {
+    final aktiv = _reiter == nr;
+    return Expanded(
+      child: SizedBox(
+        height: 48,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: aktiv ? Colors.white : const Color(0xFFB91C1C),
+            foregroundColor: aktiv ? _rot : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () {
+            setState(() => _reiter = nr);
+            _nebendaten();
+          },
+          child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        ),
+      ),
+    );
   }
 
   PreferredSizeWidget _kopf() => AppBar(
-        backgroundColor: const Color(0xFFDC2626),
+        backgroundColor: _rot,
         foregroundColor: Colors.white,
         titleSpacing: 8,
         title: Row(children: [
@@ -312,15 +386,6 @@ class _KasseScreenState extends State<KasseScreen> {
           ),
         ]),
         actions: [
-          if (_tischeSichtbar)
-            IconButton(
-              tooltip: 'Tische',
-              onPressed: () async {
-                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TischeScreen(api: api, twintQr: _twintQr)));
-                _nebendaten();
-              },
-              icon: Badge(isLabelVisible: _offeneTische > 0, label: Text('$_offeneTische'), child: const Icon(Icons.table_restaurant)),
-            ),
           PopupMenuButton<String>(
             onSelected: (w) => w == 'neu' ? _laden() : w == 'ab' ? _abmelden() : null,
             itemBuilder: (_) => [
@@ -332,199 +397,236 @@ class _KasseScreenState extends State<KasseScreen> {
         ],
       );
 
-  Widget _kategorieLeiste() => SizedBox(
-        height: 56,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          children: [
-            for (final k in _kategorien)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: ChoiceChip(
-                  label: Text(k, style: const TextStyle(fontSize: 15)),
-                  selected: k == _kategorie,
-                  selectedColor: const Color(0xFFFECACA),
-                  onSelected: (_) => setState(() => _kategorie = k),
-                ),
-              ),
-          ],
+  Widget _karte(List<Widget> kinder) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))],
         ),
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: kinder),
       );
 
-  Widget _raster(List<Kachel> kacheln) => GridView.builder(
-        padding: const EdgeInsets.all(10),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, mainAxisExtent: 110, crossAxisSpacing: 10, mainAxisSpacing: 10),
-        itemCount: kacheln.length,
-        itemBuilder: (_, i) {
-          final k = kacheln[i];
-          final imKorb = k.istGruppe
-              ? _korb.where((p) => k.varianten.any((v) => v.id == p.artikel.id)).fold(0, (s, p) => s + p.menge)
-              : _korb.where((p) => p.artikel.id == k.artikel!.id).fold(0, (s, p) => s + p.menge);
-          return Material(
-            color: imKorb > 0 ? const Color(0xFFFEE2E2) : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFDC2626), width: 1.5)),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => k.istGruppe ? _gruppeOeffnen(k) : _hinzu(k.artikel!),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(child: Text(k.titel, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
-                    if (imKorb > 0)
-                      CircleAvatar(radius: 13, backgroundColor: const Color(0xFFDC2626), child: Text('$imKorb', style: const TextStyle(color: Colors.white, fontSize: 13))),
-                  ]),
-                  const Spacer(),
-                  Row(children: [
-                    Text(k.preisText, style: const TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.bold, fontSize: 15)),
-                    const Spacer(),
-                    if (k.istGruppe) Text('${k.varianten.length} ▸', style: const TextStyle(color: Color(0xFFB91C1C))),
-                  ]),
-                ]),
+  // ---- Bestellung (Warenkorb) ----------------------------------------------
+  Widget _bestellKarte() => _karte([
+        const Text('Bestellung', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        if (_tischeSichtbar) ...[
+          const SizedBox(height: 12),
+          const Text('Bestellart', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Row(children: [
+            _artKnopf(false, '🍺 Bar'),
+            const SizedBox(width: 8),
+            _artKnopf(true, '🪑 Tisch'),
+          ]),
+          if (_tischModus) ...[
+            const SizedBox(height: 12),
+            const Text('Tischnummer', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _tischFeld,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                hintText: 'Tisch…',
+                hintStyle: const TextStyle(color: Colors.black26),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
+              // Tipp ins Menue schliesst die Tastatur (sonst tippt man Ziffern statt Artikel)
+              onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+              onChanged: (t) => setState(() => _tischNr = int.tryParse(t.trim())),
             ),
-          );
-        },
-      );
-
-  Widget _bestellart() => !_tischeSichtbar
-      ? const SizedBox.shrink()
-      : Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Bar'), icon: Icon(Icons.local_bar)),
-              ButtonSegment(value: true, label: Text('Tisch'), icon: Icon(Icons.table_restaurant)),
-            ],
-            selected: {_tischModus},
-            onSelectionChanged: (w) => setState(() => _tischModus = w.first),
-          ),
-        );
-
-  Widget _zahlKnoepfe() => _tischModus
-      ? Row(children: [
+          ],
+        ],
+        const SizedBox(height: 8),
+        if (_korb.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Text('Warenkorb ist leer', textAlign: TextAlign.center, style: TextStyle(color: Colors.black45, fontSize: 16)),
+          )
+        else
+          for (final p in _korb) _positionZeile(p),
+        const Divider(height: 20, thickness: 2),
+        Row(children: [
+          const Text('Total:', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const Spacer(),
+          Text('CHF ${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+        ]),
+        const SizedBox(height: 12),
+        if (_tischModus)
           SizedBox(
-            height: 56,
-            child: OutlinedButton(onPressed: _tischWaehlen, child: Text(_tischNr == null ? 'Tisch ?' : 'Tisch $_tischNr', style: const TextStyle(fontSize: 18))),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SizedBox(
-              height: 56,
-              child: FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                onPressed: _korb.isEmpty || _sendet ? null : _anTischSenden,
-                child: const Text('An Tisch senden', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            height: 60,
+            child: FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              onPressed: _korb.isEmpty || _sendet ? null : _anTischSenden,
+              child: const Text('✅ Bestellung senden', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+          )
+        else ...[
+          const Text('Bezahlen mit:', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Row(children: [
+            _zahlKnopf('💵\nBar', const Color(0xFF16A34A), 'cash'),
+            const SizedBox(width: 8),
+            _zahlKnopf('TWINT', Colors.black, 'twint'),
+            const SizedBox(width: 8),
+            _zahlKnopf('💳\nKarte', const Color(0xFF2563EB), 'card'),
+          ]),
+        ],
+        if (_korb.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 48,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFEE2E2),
+                foregroundColor: knopfRot,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              onPressed: () => setState(_korb.clear),
+              child: const Text('🗑️ Warenkorb leeren', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
             ),
           ),
-        ])
-      : _barKnoepfe();
-
-  Widget _barKnoepfe() => Row(children: [
-        _zahlKnopf('Bar', const Color(0xFF16A34A), 'cash'),
-        const SizedBox(width: 8),
-        _zahlKnopf('TWINT', Colors.black, 'twint'),
-        const SizedBox(width: 8),
-        _zahlKnopf('Karte', const Color(0xFF2563EB), 'card'),
+        ],
       ]);
 
-  Widget _zahlKnopf(String text, Color farbe, String art) => Expanded(
-        child: SizedBox(
-          height: 56,
-          child: FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: farbe, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            onPressed: _korb.isEmpty || _sendet ? null : () => _bezahlen(art),
-            child: Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+  Widget _artKnopf(bool tisch, String text) {
+    final aktiv = _tischModus == tisch;
+    return Expanded(
+      child: SizedBox(
+        height: 52,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: aktiv ? _rot : const Color(0xFFF3F4F6),
+            foregroundColor: aktiv ? Colors.white : Colors.black87,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          onPressed: () => setState(() => _tischModus = tisch),
+          child: Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         ),
-      );
-
-  /// Schmal (Handy): Leiste unten, Tipp oeffnet den Warenkorb.
-  Widget _korbLeiste() => SafeArea(
-        child: Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            InkWell(
-              onTap: _korb.isEmpty ? null : () => showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => StatefulBuilder(builder: (c, s) => SizedBox(height: MediaQuery.sizeOf(c).height * 0.7, child: _korbAnsicht(neuZeichnen: () { s(() {}); setState(() {}); })))),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(children: [
-                  const Icon(Icons.shopping_basket_outlined),
-                  const SizedBox(width: 8),
-                  Text(_korb.isEmpty ? 'Warenkorb leer' : '$_stueck Artikel ▴', style: const TextStyle(fontSize: 16)),
-                  const Spacer(),
-                  Text('CHF ${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
-                ]),
-              ),
-            ),
-            _bestellart(),
-            _zahlKnoepfe(),
-          ]),
-        ),
-      );
-
-  Widget _korbAnsicht({VoidCallback? neuZeichnen}) {
-    void neu(VoidCallback f) {
-      setState(f);
-      neuZeichnen?.call();
-    }
-
-    return Container(
-      color: Colors.white,
-      child: Column(children: [
-        const Padding(padding: EdgeInsets.all(14), child: Align(alignment: Alignment.centerLeft, child: Text('Bestellung', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)))),
-        Expanded(
-          child: _korb.isEmpty
-              ? const Center(child: Text('Warenkorb ist leer', style: TextStyle(color: Colors.black45)))
-              : ListView(children: [
-                  for (final p in _korb)
-                    ListTile(
-                      title: Text(p.artikel.anzeige, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text('CHF ${p.preis.toStringAsFixed(2)}${p.notiz.isEmpty ? '' : ' · ${p.notiz}'}'),
-                      onLongPress: () async {
-                        final n = await _notizFragen(p.notiz);
-                        if (n != null) neu(() => p.notiz = n);
-                      },
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(onPressed: () => neu(() => p.menge > 1 ? p.menge-- : _korb.remove(p)), icon: const Icon(Icons.remove_circle_outline)),
-                        Text('${p.menge}', style: const TextStyle(fontSize: 18)),
-                        IconButton(onPressed: () => neu(() => p.menge++), icon: const Icon(Icons.add_circle_outline)),
-                      ]),
-                    ),
-                ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(children: [
-            Row(children: [
-              const Text('Total', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text('CHF ${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
-            ]),
-            const SizedBox(height: 10),
-            if (neuZeichnen == null) ...[_bestellart(), _zahlKnoepfe()],
-            if (_korb.isNotEmpty)
-              TextButton(onPressed: () => neu(_korb.clear), child: const Text('Warenkorb leeren', style: TextStyle(color: knopfRot))),
-          ]),
-        ),
-      ]),
+      ),
     );
   }
 
-  Future<String?> _notizFragen(String alt) {
-    final c = TextEditingController(text: alt);
-    return showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Notiz'),
-        content: TextField(controller: c, autofocus: true, decoration: const InputDecoration(hintText: 'z.B. ohne Zwiebeln')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.pop(context, c.text.trim()), child: const Text('OK')),
+  Widget _positionZeile(Position p) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(p.artikel.anzeige, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                Text('CHF ${p.preis.toStringAsFixed(2)}', style: const TextStyle(color: Colors.black54)),
+              ]),
+            ),
+            _mengeKnopf('–', () => setState(() => p.menge > 1 ? p.menge-- : _korb.remove(p))),
+            SizedBox(width: 40, child: Text('${p.menge}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            _mengeKnopf('+', () => setState(() => p.menge++)),
+          ]),
+          const SizedBox(height: 6),
+          TextFormField(
+            key: ObjectKey(p),
+            initialValue: p.notiz,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Notiz…',
+              hintStyle: const TextStyle(color: Colors.black26),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+            onChanged: (t) => p.notiz = t.trim(),
+          ),
+        ]),
+      );
+
+  Widget _mengeKnopf(String text, VoidCallback tap) => SizedBox(
+        width: 48,
+        height: 44,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            padding: EdgeInsets.zero,
+            backgroundColor: const Color(0xFFE5E7EB),
+            foregroundColor: Colors.black87,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: tap,
+          child: Text(text, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        ),
+      );
+
+  Widget _zahlKnopf(String text, Color farbe, String art) => Expanded(
+        child: SizedBox(
+          height: 72,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: farbe,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _korb.isEmpty || _sendet ? null : () => _bezahlen(art),
+            child: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.2)),
+          ),
+        ),
+      );
+
+  // ---- Menue ---------------------------------------------------------------
+  Widget _menueKarte() => _karte([
+        const Text('Menü', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        for (final kat in _kategorien) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(kat, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black54)),
+          ),
+          GridView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 240, mainAxisExtent: 104, crossAxisSpacing: 8, mainAxisSpacing: 8),
+            children: [for (final k in kachelnBilden(_artikel.where((a) => a.kategorie == kat).toList())) _kachel(k)],
+          ),
         ],
+      ]);
+
+  Widget _kachel(Kachel k) {
+    final imKorb = k.istGruppe
+        ? _korb.where((p) => k.varianten.any((v) => v.id == p.artikel.id)).fold(0, (s, p) => s + p.menge)
+        : _korb.where((p) => p.artikel.id == k.artikel!.id).fold(0, (s, p) => s + p.menge);
+    return Material(
+      color: imKorb > 0 ? const Color(0xFFFEE2E2) : _rotHell,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: _rot, width: 2)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => k.istGruppe ? _gruppeOeffnen(k) : _hinzu(k.artikel!),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Text(k.titel, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, height: 1.15)),
+              ),
+              if (imKorb > 0)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 30),
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: _rot, borderRadius: BorderRadius.circular(15)),
+                  child: Text('$imKorb', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                ),
+            ]),
+            const Spacer(),
+            Row(children: [
+              Text(k.preisText, style: const TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.bold, fontSize: 16)),
+              const Spacer(),
+              if (k.istGruppe)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _rot), borderRadius: BorderRadius.circular(12)),
+                  child: Text('${k.varianten.length} ▸', style: const TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.bold)),
+                ),
+            ]),
+          ]),
+        ),
       ),
     );
   }

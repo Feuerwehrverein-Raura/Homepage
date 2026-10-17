@@ -12,9 +12,11 @@ import 'anmeldung.dart' show knopfRot;
 import 'zahlung.dart';
 
 class TischeScreen extends StatefulWidget {
-  const TischeScreen({super.key, required this.api, this.twintQr});
+  const TischeScreen({super.key, required this.api, this.twintQr, this.eingebettet = false});
   final KasseApi api;
   final String? twintQr;
+  /// Als Reiter in der Kasse: ohne eigene Kopfzeile
+  final bool eingebettet;
   @override
   State<TischeScreen> createState() => _TischeScreenState();
 }
@@ -65,7 +67,7 @@ class _TischeScreenState extends State<TischeScreen> {
   Widget build(BuildContext context) {
     final tische = _nachTisch;
     return Scaffold(
-      appBar: AppBar(title: const Text('Offene Tische'), backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+      appBar: widget.eingebettet ? null : AppBar(title: const Text('Offene Tische'), backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
       backgroundColor: const Color(0xFFF3F4F6),
       body: _laedt
           ? const Center(child: CircularProgressIndicator())
