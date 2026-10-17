@@ -19,8 +19,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'kacheln.dart';
 
-const cloudBasis = 'https://order.fwv-raura.ch';
-const lokalBasis = 'https://kasse-lokal.fwv-raura.ch';
+// Zum Testen gegen ein lokales Backend: --dart-define=KASSE_CLOUD=http://localhost:3999
+const cloudBasis = String.fromEnvironment('KASSE_CLOUD', defaultValue: 'https://order.fwv-raura.ch');
+const lokalBasis = String.fromEnvironment('KASSE_LOKAL', defaultValue: 'https://kasse-lokal.fwv-raura.ch');
 
 class KasseFehler implements Exception {
   KasseFehler(this.meldung, {this.status});

@@ -131,9 +131,12 @@ class _ZahlungState extends State<_Zahlung> {
         child: SizedBox(
           height: 52,
           child: FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: farbe, foregroundColor: Colors.black87, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: FilledButton.styleFrom(
+                backgroundColor: farbe, foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             onPressed: tap,
-            child: Text(text, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            // FittedBox: "Passend" und "100" brachen auf schmalen Handys um
+            child: FittedBox(fit: BoxFit.scaleDown, child: Text(text, maxLines: 1, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600))),
           ),
         ),
       );

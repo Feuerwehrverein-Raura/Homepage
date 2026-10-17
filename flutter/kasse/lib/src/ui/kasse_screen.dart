@@ -172,7 +172,7 @@ class _KasseScreenState extends State<KasseScreen> {
           builder: (_) => AlertDialog(
             icon: const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 64),
             title: Text('Bestellung ${bestellNr(b.id)}'),
-            content: Text('CHF ${b.total.toStringAsFixed(2)} · ${korbVorher.length} Positionen', textAlign: TextAlign.center),
+            content: Text('CHF ${b.total.toStringAsFixed(2)} · ${korbVorher.length} ${korbVorher.length == 1 ? 'Position' : 'Positionen'}', textAlign: TextAlign.center),
             actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
           ),
         );
