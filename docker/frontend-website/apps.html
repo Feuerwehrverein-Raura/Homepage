@@ -192,7 +192,7 @@
                                 </div>
                                 <h4 class="font-semibold text-gray-800 mb-2">Datei direkt laden</h4>
                                 <p class="text-sm text-gray-600 mb-4">Braucht keine Freischaltung, hat aber ein paar Rückfragen mehr. Einfacher bleibt der Weg über den Play Store.</p>
-                                <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.apk"
+                                <a href="/download/mitglieder.apk"
                                    class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
                                     <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -819,12 +819,30 @@
             }
         }
 
-        // DEUTSCH: Beim Seitenaufruf beide Release-Versionen parallel laden
+        // DEUTSCH: Mitglieder- und Kuechen-App liegen auf der eigenen Website
+        // (/download/, abgelegt vom Vereinsserver, docker/app-downloads/holen.sh).
+        // Version und Link kommen aus /download/versionen.json - kein GitHub
+        // mehr im Browser (Weiterleitung machte auf manchen Handys Probleme).
+        async function eigeneDownloads() {
+            try {
+                const v = await (await fetch('/download/versionen.json', { cache: 'no-store' })).json();
+                const setzen = (id, eintrag) => {
+                    if (!eintrag) return;
+                    const knopf = document.getElementById(`${id}-download`);
+                    const label = document.getElementById(`${id}-version`);
+                    if (knopf) knopf.href = `/download/${eintrag.datei}`;
+                    if (label) label.textContent = `v${eintrag.version}`;
+                };
+                setzen('kds', v.kueche);
+                setzen('members', v.mitglieder);
+            } catch {
+                // Fallback: GitHub wie bisher
+                loadLatestRelease('kds');
+                loadLatestRelease('members');
+            }
+        }
         loadLatestRelease('vorstand');
-        loadLatestRelease('kds');
-        // DEUTSCH: Bei der Mitglieder-App nur die Versionsnummer — der
-        // Download-Knopf zeigt fest auf den rollenden Tag members-latest.
-        loadLatestRelease('members');
+        eigeneDownloads();
 
         // DEUTSCH: Das Desktop-Programm braucht eine eigene Funktion.
         //

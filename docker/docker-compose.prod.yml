@@ -348,6 +348,10 @@ services:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-frontend:latest
     container_name: fwv-frontend-website
     restart: unless-stopped
+    # App-Downloads (www.fwv-raura.ch/download/), abgelegt von
+    # /opt/app-downloads/holen.sh (docker/app-downloads/, Timer 15 min)
+    volumes:
+      - /opt/app-downloads/dateien:/usr/share/nginx/html/download:ro
     networks:
       - proxy
     labels:
