@@ -42,6 +42,8 @@ ssh stefan@docker.fwv-raura.ch 'sudo systemctl start app-downloads.service; jq -
   (Workflow `build-android-kds.yml`, versionCode = X*1000+Y*100+Z).
 - **Kasse:** `git tag kasse-vX.Y && git push origin kasse-vX.Y`
   (Workflow `build-android-kasse.yml`, gleiche Signatur wie die Kueche).
+  Vorher und nachher Skill `fwv-kasse-testen` (Emulator, Website-APK starten).
+  **Nie auf einen `[skip ci]`-Commit taggen**: dort laeuft der Build nicht.
 - **Mitglieder:** Skill `fwv-members-release` (Tag `members-vX.Y.Z`; der
   Workflow verschiebt `members-latest`).
 
@@ -58,7 +60,10 @@ curl -sI https://www.fwv-raura.ch/download/kasse.apk | grep -i content-type
 Kuechen-Schluessel signiert: Secrets `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`,
 Alias `kds`). versionCode = X*1000+Y*100+Z - die fruehere TWA-Huelle war
 kasse-v1.0 (Code 1000), deshalb installiert sich 2.x direkt darueber.
-Eine einzige App, laeuft im Single-App-Kiosk (Fully). Die Datei
+Eine einzige App, laeuft im Single-App-Kiosk (Fully). Ab 2.3 aktualisiert
+sie sich selbst: `lib/src/updater.dart` liest `/download/versionen.json`
+(Version + SHA-256), `MainActivity.kt` laedt, prueft und oeffnet den
+Installer (Banner, nur bei leerem Warenkorb). Die Datei
 `order.fwv-raura.ch/.well-known/assetlinks.json` stammt noch von der
 TWA-Huelle und schadet nicht.
 
