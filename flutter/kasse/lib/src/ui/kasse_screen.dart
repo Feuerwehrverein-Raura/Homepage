@@ -33,6 +33,8 @@ class _KasseScreenState extends State<KasseScreen> {
   DateTime _jetzt = DateTime.now();
   final List<Timer> _takte = [];
   StreamSubscription<bool>? _ortAbo;
+  StreamSubscription<int>? _pufferAbo;
+  int _puffer = 0;
 
   @override
   void initState() {
@@ -41,7 +43,14 @@ class _KasseScreenState extends State<KasseScreen> {
     _takte.add(Timer.periodic(const Duration(seconds: 20), (_) => api.ortPruefen()));
     _takte.add(Timer.periodic(const Duration(minutes: 1), (_) => _nebendaten()));
     _takte.add(Timer.periodic(const Duration(hours: 12), (_) => api.erneuern()));
-    _ortAbo = api.ortGeaendert.stream.listen((_) => _laden());
+    _ortAbo = api.ortGeaendert.stream.listen((_) {
+      _laden();
+      api.pufferSenden();
+    });
+    _puffer = api.pufferOffen;
+    _pufferAbo = api.pufferGeaendert.stream.listen((n) => setState(() => _puffer = n));
+    _takte.add(Timer.periodic(const Duration(seconds: 15), (_) => api.pufferSenden()));
+    api.pufferSenden();
     api.ortPruefen().then((_) => _laden());
     api.erneuern();
   }
@@ -52,6 +61,7 @@ class _KasseScreenState extends State<KasseScreen> {
       t.cancel();
     }
     _ortAbo?.cancel();
+    _pufferAbo?.cancel();
     super.dispose();
   }
 
@@ -127,7 +137,7 @@ class _KasseScreenState extends State<KasseScreen> {
     if (_korb.isEmpty || _sendet) return;
     setState(() => _sendet = true);
     try {
-      final b = await api.bestellen(List.of(_korb));
+      final b = await api.bestellenOderPuffern(List.of(_korb));
       if (!mounted) return;
       final korbVorher = List.of(_korb);
       setState(_korb.clear);
@@ -137,7 +147,10 @@ class _KasseScreenState extends State<KasseScreen> {
         _meldung('Bestellung ${bestellNr(b.id)} offen gelassen');
         return;
       }
-      await api.bezahlt(b.id, zahlung);
+      if (!await api.bezahltOderPuffern(b.id, zahlung)) {
+        _meldung('Zahlung vom Server abgelehnt - bitte in der Web-Kasse prüfen.', fehler: true);
+        return;
+      }
       if (mounted) {
         await showDialog<void>(
           context: context,
@@ -174,16 +187,34 @@ class _KasseScreenState extends State<KasseScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: _kopf(),
-      body: _laedt && _artikel.isEmpty
+      body: Column(children: [
+        if (_puffer > 0)
+          Material(
+            color: const Color(0xFFF59E0B),
+            child: InkWell(
+              onTap: api.pufferSenden,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text('⏳ $_puffer ${_puffer == 1 ? 'Buchung wartet' : 'Buchungen warten'} auf Verbindung – weiter kassieren, wird nachgesendet (tippen: jetzt senden)',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ),
+        Expanded(child: _inhalt(breit, kacheln)),
+      ]),
+      bottomNavigationBar: breit ? null : _korbLeiste(),
+    );
+  }
+
+  Widget _inhalt(bool breit, List<Kachel> kacheln) {
+    return _laedt && _artikel.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : _fehler != null && _artikel.isEmpty
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_fehler!, textAlign: TextAlign.center)))
               : Row(children: [
                   Expanded(child: Column(children: [_kategorieLeiste(), Expanded(child: _raster(kacheln))])),
                   if (breit) SizedBox(width: 380, child: _korbAnsicht()),
-                ]),
-      bottomNavigationBar: breit ? null : _korbLeiste(),
-    );
+                ]);
   }
 
   PreferredSizeWidget _kopf() => AppBar(

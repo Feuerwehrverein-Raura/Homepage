@@ -1,17 +1,19 @@
 name: Build Android Kasse
 
-# Kassen-App (Trusted Web Activity um order.fwv-raura.ch), Oktober 2026.
+# Native Kassen-App (Flutter, flutter/kasse), Oktober 2026.
 # Release: Tag kasse-vX.Y[.Z] pushen -> signiertes APK am GitHub-Release; der
-# Vereinsserver legt es unter www.fwv-raura.ch/download/kasse.apk ab.
+# Vereinsserver legt es unter www.fwv-raura.ch/download/kasse.apk ab
+# (docker/app-downloads/holen.sh, Skill fwv-app-downloads).
+#
 # Signiert mit demselben Schluessel wie die Kuechen-App (Secrets
-# KEYSTORE_BASE64/KEYSTORE_PASSWORD, Alias kds). Dessen Fingerabdruck steht in
-# order.fwv-raura.ch/.well-known/assetlinks.json - sonst zeigt Chrome in der
-# App eine Adressleiste.
+# KEYSTORE_BASE64/KEYSTORE_PASSWORD, Alias kds) - gleiche Paket-ID
+# ch.fwvraura.kasse wie die fruehere Huelle kasse-v1.0, deshalb laesst sich
+# 2.x direkt darueber installieren. versionCode = X*1000 + Y*100 + Z.
 
 on:
   push:
     paths:
-      - 'simple-order-system/kasse-android/**'
+      - 'flutter/kasse/**'
       - '.github/workflows/build-android-kasse.yml'
     branches:
       - main
@@ -19,143 +21,104 @@ on:
       - 'kasse-v*'
   pull_request:
     paths:
-      - 'simple-order-system/kasse-android/**'
+      - 'flutter/kasse/**'
       - '.github/workflows/build-android-kasse.yml'
   workflow_dispatch:
-    inputs:
-      create_release:
-        description: 'Create a release'
-        required: false
-        default: false
-        type: boolean
-      version:
-        description: 'Version number (e.g. 3.0)'
-        required: false
-        default: ''
-        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: flutter/kasse
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # Android-SDK ist auf ubuntu-latest vorinstalliert (wie bei
-      # build-android-vorstand.yml). android-actions/setup-android@v3 wollte
-      # das abgeschaffte Paket 'tools' installieren und brach ab (kds-v3.0).
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: subosito/flutter-action@v2
         with:
-          gradle-version: '8.12'
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
 
       - name: Version bestimmen
         shell: bash
         run: |
-          GRADLE_FILE="simple-order-system/kasse-android/app/build.gradle.kts"
           if [[ "${{ github.ref }}" == refs/tags/kasse-v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#kasse-v}"
-          elif [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
+            VERSION="${{ github.ref_name }}"; VERSION="${VERSION#kasse-v}"
           else
-            VERSION=$(grep -oP 'versionName = "\K[^"]+' "$GRADLE_FILE")
+            VERSION=$(grep -oP '^version: \K[0-9.]+' pubspec.yaml)
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # versionCode = major*1000 + minor*100 + patch (2.6.1 -> 2601, 3.0 -> 3000)
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
           VCODE=$(( ${MAJOR:-0} * 1000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
-          [ "$VCODE" -lt 1 ] && VCODE=1
-          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/" "$GRADLE_FILE"
-          sed -i "s/versionCode = [0-9]*/versionCode = $VCODE/" "$GRADLE_FILE"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VCODE=$VCODE" >> $GITHUB_ENV
           echo "Version: $VERSION (code: $VCODE)"
-          grep -E "version(Code|Name)" "$GRADLE_FILE"
 
-      - name: Build Debug APK
-        working-directory: simple-order-system/kasse-android
-        run: gradle assembleDebug --stacktrace
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
 
-      - name: Build Release APK
-        working-directory: simple-order-system/kasse-android
-        run: gradle assembleRelease --stacktrace
+      - name: Release-APK bauen
+        run: flutter build apk --release --build-name="$VERSION" --build-number="$VCODE"
 
       - name: Release-APK signieren
+        shell: bash
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/kasse-v') || inputs.create_release == true }}
-        shell: bash
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/kasse-v') }}
         run: |
-          UNSIGNED_APK=simple-order-system/kasse-android/app/build/outputs/apk/release/app-release-unsigned.apk
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          mkdir -p "$GITHUB_WORKSPACE/out"
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
             if [ "$IS_RELEASE" = "true" ]; then
-              echo "::error::KEYSTORE_BASE64/KEYSTORE_PASSWORD fehlen — kein unsigniertes Release."
+              echo "::error::KEYSTORE_BASE64/KEYSTORE_PASSWORD fehlen - kein unsigniertes Release."
               exit 1
             fi
-            echo "Keine Signatur-Secrets (z.B. PR aus Fork) — Release-APK bleibt unsigniert."
+            echo "Keine Signatur-Secrets - nur Testbuild."
             exit 0
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kds.jks"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/zipalign" -f -p 4 "$UNSIGNED_APK" "$RUNNER_TEMP/aligned.apk"
+          "$BT/zipalign" -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
           "$BT/apksigner" sign --ks "$RUNNER_TEMP/kds.jks" \
-            --ks-pass "pass:$KEYSTORE_PASSWORD" \
-            --ks-key-alias kds \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" --ks-key-alias kds \
             --key-pass "pass:$KEYSTORE_PASSWORD" \
-            --out "$RUNNER_TEMP/signed.apk" "$RUNNER_TEMP/aligned.apk"
-          "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/signed.apk" | head -3
+            --out "$GITHUB_WORKSPACE/out/kasse-${VERSION}-release.apk" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --print-certs "$GITHUB_WORKSPACE/out/kasse-${VERSION}-release.apk" | head -3
           rm -f "$RUNNER_TEMP/kds.jks"
-          echo "SIGNED_APK=$RUNNER_TEMP/signed.apk" >> $GITHUB_ENV
 
-      - name: APKs benennen
-        shell: bash
-        run: |
-          mkdir -p out
-          cp simple-order-system/kasse-android/app/build/outputs/apk/debug/app-debug.apk \
-             "out/kasse-${VERSION}-debug.apk"
-          if [ -n "$SIGNED_APK" ]; then
-            cp "$SIGNED_APK" "out/kasse-${VERSION}-release.apk"
-          else
-            cp simple-order-system/kasse-android/app/build/outputs/apk/release/app-release-unsigned.apk \
-               "out/kasse-${VERSION}-release-unsigned.apk"
-          fi
-          ls -la out
-
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: kasse-${{ env.VERSION }}
           path: out/*.apk
           retention-days: 30
+          if-no-files-found: ignore
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/kasse-v') || inputs.create_release == true
+      - name: Release erstellen
+        if: startsWith(github.ref, 'refs/tags/kasse-v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('kasse-v{0}', env.VERSION) }}
+          tag_name: ${{ github.ref_name }}
           name: Kassen-App ${{ env.VERSION }}
-          # NIE als "Latest" markieren: releases/latest gehoert dem Desktop-Auto-
-          # Updater (latest.json) — Android-Releases wuerden ihn sonst kapern.
+          # NIE als "Latest": releases/latest gehoert dem Desktop-Updater
           make_latest: false
           body: |
             ## Kassen-App ${{ env.VERSION }}
 
-            Die Kasse (order.fwv-raura.ch) als App - ohne Adressleiste, mit
-            eigenem Symbol. Funktioniert wie die Kasse im Browser.
+            Native Kasse des FWV Raura (Flutter): eine einzige App, laeuft auch
+            im Single-App-Kiosk. Im Schopf direkt am T400, sonst ueber die Cloud.
 
-            **Kompatibilität:** Android 7.0+ (API 24), Chrome nötig.
+            **Kompatibilität:** Android 7.0+ (API 24)
 
-            Download auch unter https://www.fwv-raura.ch/download/kasse.apk
+            Download: https://www.fwv-raura.ch/download/kasse.apk
           files: out/kasse-*-release.apk
           draft: false
-          prerelease: false

@@ -177,8 +177,17 @@ class KasseApi {
   }
 
   // ---- Daten -----------------------------------------------------------------
+  /// Artikel; ohne Verbindung die zuletzt geladene Liste (auch nach Neustart).
   Future<List<Artikel>> artikel() async {
-    final d = await _anfrage('GET', '/items') as List;
+    List d;
+    try {
+      d = await _anfrage('GET', '/items') as List;
+      if (d.isNotEmpty) await _prefs.setString('kasse_artikel', json.encode(d));
+    } on KasseFehler catch (e) {
+      final alt = _prefs.getString('kasse_artikel');
+      if (alt == null || !_nachsenden(e)) rethrow;
+      d = json.decode(alt) as List;
+    }
     return d.whereType<Map<String, dynamic>>().map(Artikel.ausJson).toList();
   }
 
@@ -241,4 +250,127 @@ class KasseApi {
   /// zahlung: 'cash' | 'twint' | 'card'
   Future<void> bezahlt(int bestellung, String zahlung) =>
       _anfrage('PUT', '/orders/$bestellung/status', daten: {'status': 'paid', 'payment_method': zahlung});
+
+  // ---- Zwischenspeicher bei schlechter Verbindung --------------------------
+  // Wie die Web-Kasse: Bar-Bestellung ohne Antwort (kein Netz, Zeitlimit,
+  // Server 5xx) wird gemerkt und die Kasse arbeitet weiter (lokale Nummer
+  // < 0). Ein Takt sendet nach; client_ref verhindert doppeltes Buchen.
+  // Zahlungen, die nicht ankamen, werden ebenso nachgereicht.
+  static const _pufferKey = 'kasse_puffer';
+  final pufferGeaendert = StreamController<int>.broadcast();
+  bool _pufferLaeuft = false;
+
+  List<Map<String, dynamic>> _pufferLesen() {
+    try {
+      final l = json.decode(_prefs.getString(_pufferKey) ?? '[]');
+      return l is List ? l.whereType<Map<String, dynamic>>().toList() : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _pufferSchreiben(List<Map<String, dynamic>> l) async {
+    await _prefs.setString(_pufferKey, json.encode(l));
+    pufferGeaendert.add(pufferOffen);
+  }
+
+  /// Noch nicht ganz beim Server (Bestellung ohne Server-Nummer oder Zahlung offen).
+  int get pufferOffen => _pufferLesen().where((e) => e['art'] == 'zahlung' || e['serverId'] == null || e['zahlung'] != null).length;
+
+  static bool _nachsenden(KasseFehler e) => e.keinNetz || (e.status ?? 0) >= 500;
+
+  /// Bestellen; ohne Verbindung (nur Bar, tisch 0) in den Puffer.
+  Future<AngelegteBestellung> bestellenOderPuffern(List<Position> positionen) async {
+    final ref = neueRef();
+    try {
+      return await bestellen(positionen, clientRef: ref);
+    } on KasseFehler catch (e) {
+      if (!_nachsenden(e)) rethrow;
+      final lokaleId = -DateTime.now().millisecondsSinceEpoch;
+      final l = _pufferLesen()
+        ..add({
+          'art': 'bestellung',
+          'ref': ref,
+          'lokaleId': lokaleId,
+          'erstellt': DateTime.now().millisecondsSinceEpoch,
+          'body': {
+            'table_number': 0,
+            'client_ref': ref,
+            'erfasst_um': DateTime.now().toUtc().toIso8601String(),
+            'items': positionen.map((p) => p.alsJson()).toList(),
+          },
+        });
+      await _pufferSchreiben(l);
+      return AngelegteBestellung(lokaleId, positionen.fold(0.0, (s, p) => s + p.summe), const []);
+    }
+  }
+
+  /// Zahlung melden; lokale Bestellung -> am Puffer-Eintrag merken; ohne
+  /// Verbindung -> als Zahlung puffern. false nur bei klarer Ablehnung.
+  Future<bool> bezahltOderPuffern(int bestellung, String zahlung) async {
+    if (bestellung < 0) {
+      final l = _pufferLesen();
+      for (final e in l) {
+        if (e['lokaleId'] == bestellung) e['zahlung'] = zahlung;
+      }
+      await _pufferSchreiben(l);
+      unawaited(pufferSenden());
+      return true;
+    }
+    try {
+      await bezahlt(bestellung, zahlung);
+      return true;
+    } on KasseFehler catch (e) {
+      if (!_nachsenden(e)) return false;
+      await _pufferSchreiben(_pufferLesen()..add({'art': 'zahlung', 'ref': neueRef(), 'orderId': bestellung, 'zahlung': zahlung, 'erstellt': DateTime.now().millisecondsSinceEpoch}));
+      return true;
+    }
+  }
+
+  /// Puffer nachsenden (Takt, nach jeder Zahlung).
+  Future<void> pufferSenden() async {
+    if (_pufferLaeuft || token == null) return;
+    _pufferLaeuft = true;
+    try {
+      for (final e in _pufferLesen()) {
+        var fertig = false;
+        final neu = <String, dynamic>{};
+        try {
+          if (e['art'] == 'bestellung') {
+            var serverId = e['serverId'] as int?;
+            if (serverId == null) {
+              final d = await _anfrage('POST', '/orders', daten: e['body'], zeit: const Duration(seconds: 20)) as Map<String, dynamic>;
+              serverId = (d['id'] as num).toInt();
+              neu['serverId'] = serverId;
+            }
+            if (e['zahlung'] != null) {
+              await bezahlt(serverId, e['zahlung'] as String);
+              fertig = true;
+            } else if (DateTime.now().millisecondsSinceEpoch - (e['erstellt'] as int) > 12 * 3600 * 1000) {
+              fertig = true;
+            }
+          } else {
+            await bezahlt(e['orderId'] as int, e['zahlung'] as String);
+            fertig = true;
+          }
+        } on KasseFehler catch (f) {
+          if (_nachsenden(f) || f.status == 401 || f.status == 403) break; // spaeter nochmals
+          fertig = true; // Server lehnt ab - nicht ewig wiederholen
+        }
+        // frisch lesen: inzwischen kann die Kasse Neues gepuffert haben
+        final l = _pufferLesen();
+        final i = l.indexWhere((x) => x['ref'] == e['ref']);
+        if (i >= 0) {
+          if (fertig) {
+            l.removeAt(i);
+          } else {
+            l[i] = {...l[i], ...neu};
+          }
+          await _pufferSchreiben(l);
+        }
+      }
+    } finally {
+      _pufferLaeuft = false;
+    }
+  }
 }

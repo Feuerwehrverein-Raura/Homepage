@@ -13,7 +13,7 @@ Die APKs liegen auf der **eigenen Website**, nicht mehr als GitHub-Link
 |---|---|---|---|
 | Mitglieder | `/download/mitglieder.apk` | `members-latest` (Play-signiert) | `flutter/mitglieder` |
 | Kueche | `/download/kueche.apk` | neuestes `kds-v*` (`*-release.apk`) | `simple-order-system/kitchen-display-android` |
-| Kasse | `/download/kasse.apk` | neuestes `kasse-v*` (`*-release.apk`) | `simple-order-system/kasse-android` |
+| Kasse | `/download/kasse.apk` | neuestes `kasse-v*` (`*-release.apk`) | `flutter/kasse` |
 
 `/download/versionen.json` nennt je App Version, SHA-256 und Stand -
 `apps.html` liest daraus Link und Versionsnummer (GitHub nur als Fallback).
@@ -51,16 +51,16 @@ pruefen:
 curl -sI https://www.fwv-raura.ch/download/kasse.apk | grep -i content-type
 ```
 
-## Kassen-App (Trusted Web Activity)
+## Kassen-App (native, Flutter)
 
-Huelle um `https://order.fwv-raura.ch/` (androidbrowserhelper **2.5.0** -
-ab 2.7 braucht es AGP 8.9/compileSdk 36, die Vereins-Apps laufen mit
-AGP 8.7.3). Damit Chrome **keine Adressleiste** zeigt, muss
-`simple-order-system/frontend/public/.well-known/assetlinks.json` den
-Fingerabdruck des Signierschluessels enthalten (Kuechen-Schluessel,
-`D8:28:38:AC:...:4B:96`, Secrets `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`,
-Alias `kds`). Pruefen: `curl https://order.fwv-raura.ch/.well-known/assetlinks.json`.
-Ein Debug-APK hat einen anderen Schluessel - dort ist die Adressleiste normal.
+`flutter/kasse`, Paket `ch.fwvraura.kasse`, Workflow `build-android-kasse.yml`
+(Flutter 3.47.5, `flutter build apk`, danach mit apksigner und dem
+Kuechen-Schluessel signiert: Secrets `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`,
+Alias `kds`). versionCode = X*1000+Y*100+Z - die fruehere TWA-Huelle war
+kasse-v1.0 (Code 1000), deshalb installiert sich 2.x direkt darueber.
+Eine einzige App, laeuft im Single-App-Kiosk (Fully). Die Datei
+`order.fwv-raura.ch/.well-known/assetlinks.json` stammt noch von der
+TWA-Huelle und schadet nicht.
 
 ## Neue App aufnehmen
 
