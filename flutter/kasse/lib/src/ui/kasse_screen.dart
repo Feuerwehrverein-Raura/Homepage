@@ -36,6 +36,9 @@ class _KasseScreenState extends State<KasseScreen> {
   StreamSubscription<bool>? _ortAbo;
   StreamSubscription<int>? _pufferAbo;
   int _puffer = 0;
+  // Nicht gedruckte Bons: bleibt stehen, bis jemand "Gesehen" tippt -
+  // eine kurze Meldung ist im Betrieb weg, bevor sie jemand liest.
+  String? _druckWarnung;
   // Tische (nur bei Service oder solange noch Tische offen sind)
   bool _tischModus = false;
   int? _tischNr;
@@ -153,7 +156,7 @@ class _KasseScreenState extends State<KasseScreen> {
       if (!mounted) return;
       final korbVorher = List.of(_korb);
       setState(_korb.clear);
-      if (b.druckfehler.isNotEmpty) _meldung('Bon nicht gedruckt: ${b.druckfehler.join(' · ')}', fehler: true);
+      if (b.druckfehler.isNotEmpty) setState(() => _druckWarnung = 'Bestellung ${bestellNr(b.id)}: ${b.druckfehler.join(' · ')}');
       final zahlung = await zahlungAbfragen(context, bestellung: b.id, betrag: b.total, art: art, twintQr: _twintQr);
       if (zahlung == null) {
         _meldung('Bestellung ${bestellNr(b.id)} offen gelassen');
@@ -197,8 +200,8 @@ class _KasseScreenState extends State<KasseScreen> {
         _korb.clear();
         _tischNr = null;
       });
-      _meldung('An Tisch $nr gesendet (${bestellNr(b.id)})${b.druckfehler.isNotEmpty ? ' – Bon nicht gedruckt: ${b.druckfehler.join(' · ')}' : ''}',
-          fehler: b.druckfehler.isNotEmpty);
+      _meldung('An Tisch $nr gesendet (${bestellNr(b.id)})');
+      if (b.druckfehler.isNotEmpty) setState(() => _druckWarnung = 'Tisch $nr, ${bestellNr(b.id)}: ${b.druckfehler.join(' · ')}');
       _nebendaten();
     } on KasseFehler catch (e) {
       if (e.status == 401) return _abmelden();
@@ -242,6 +245,19 @@ class _KasseScreenState extends State<KasseScreen> {
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: _kopf(),
       body: Column(children: [
+        if (_druckWarnung != null)
+          Material(
+            color: const Color(0xFFDC2626),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+              child: Row(children: [
+                const Text('🖨️', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Bon nicht gedruckt – $_druckWarnung', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                TextButton(onPressed: () => setState(() => _druckWarnung = null), child: const Text('Gesehen', style: TextStyle(color: Colors.white))),
+              ]),
+            ),
+          ),
         if (_puffer > 0)
           Material(
             color: const Color(0xFFF59E0B),
