@@ -1096,7 +1096,9 @@ function App() {
       const payAmount = Math.min(remaining, orderRemaining);
       const response = await fetch(`${API_URL}/orders/${order.id}/split-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Anmeldung mitschicken - ohne lehnte das Backend seit der Auth-Schranke
+        // jede Tischzahlung ab (Tisch 2 an der Chilbi liess sich nicht abschliessen).
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           amount: payAmount,
           payment_method: paymentMethod,
