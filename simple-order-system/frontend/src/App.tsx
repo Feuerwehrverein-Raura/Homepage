@@ -1715,8 +1715,9 @@ function App() {
                   const totalAmount = tableOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
                   const allItems = tableOrders.flatMap(o => o.items || []);
                   const paidItems = allItems.filter(i => i.paid);
-                  const unpaidItems = allItems.filter(i => !i.paid);
-                  const unpaidAmount = unpaidItems.reduce((sum, i) => sum + parseFloat(i.price) * i.quantity, 0);
+                  // Offen = gebucht minus bezahlt (wie beim Kassieren), nicht nach
+                  // Artikel-Markierung - Zahlungen markieren keine Artikel
+                  const unpaidAmount = tableOrders.reduce((sum, o) => sum + Math.max(0, offenerBetrag(o)), 0);
                   const completedCount = allItems.filter(i => i.completed).length;
                   const allKitchenDone = allItems.length > 0 && completedCount === allItems.length;
 
@@ -2580,7 +2581,7 @@ function App() {
               </p>
 
               {/* Payment Mode Tabs */}
-              <div className="grid grid-cols-3 gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+              <div className="grid grid-cols-2 gap-1 mb-4 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => { setSplitPaymentMode('full'); setSelectedItemIds([]); setSplitAmount(''); }}
                   className={`py-2 px-2 rounded-md text-sm font-medium transition ${
@@ -2601,16 +2602,9 @@ function App() {
                 >
                   Betrag
                 </button>
-                <button
-                  onClick={() => { setSplitPaymentMode('items'); setSplitAmount(''); }}
-                  className={`py-2 px-2 rounded-md text-sm font-medium transition ${
-                    splitPaymentMode === 'items'
-                      ? 'bg-white shadow text-fwv-red'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Artikel
-                </button>
+                {/* "Artikel" (einzeln bezahlen) entfernt: es markierte keine Artikel als
+                    bezahlt, die Kachel zeigte danach zu viel offen (Tisch 7, Chilbi 2026).
+                    Kassiert wird immer der ganze gebuchte Betrag, aufteilen per Betrag. */}
               </div>
 
               {/* Full Payment Mode */}
