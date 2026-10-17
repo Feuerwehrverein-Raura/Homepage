@@ -5,16 +5,17 @@ import 'package:flutter/material.dart';
 
 import '../kacheln.dart';
 
-Future<String?> zahlungAbfragen(BuildContext context, {required int bestellung, required double betrag, required String art, String? twintQr}) {
+Future<String?> zahlungAbfragen(BuildContext context, {required int bestellung, required double betrag, required String art, String? twintQr, String? titel}) {
   return showDialog<String>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => _Zahlung(bestellung: bestellung, betrag: betrag, startArt: art, twintQr: twintQr),
+    builder: (_) => _Zahlung(bestellung: bestellung, betrag: betrag, startArt: art, twintQr: twintQr, titel: titel),
   );
 }
 
 class _Zahlung extends StatefulWidget {
-  const _Zahlung({required this.bestellung, required this.betrag, required this.startArt, this.twintQr});
+  const _Zahlung({required this.bestellung, required this.betrag, required this.startArt, this.twintQr, this.titel});
+  final String? titel;
   final int bestellung;
   final double betrag;
   final String startArt;
@@ -48,7 +49,7 @@ class _ZahlungState extends State<_Zahlung> {
     final titel = switch (_art) { 'cash' => 'Barzahlung', 'twint' => 'TWINT', _ => 'Karte' };
     return AlertDialog(
       insetPadding: const EdgeInsets.all(16),
-      title: Text('$titel · Bestellung ${bestellNr(widget.bestellung)}', style: const TextStyle(fontSize: 18)),
+      title: Text('$titel · ${widget.titel ?? 'Bestellung ${bestellNr(widget.bestellung)}'}', style: const TextStyle(fontSize: 18)),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(child: switch (_art) { 'cash' => _bar(), 'twint' => _twint(), _ => _karte() }),

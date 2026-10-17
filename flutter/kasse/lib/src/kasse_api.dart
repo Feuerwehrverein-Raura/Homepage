@@ -32,9 +32,53 @@ class KasseFehler implements Exception {
 }
 
 class Anlass {
-  const Anlass(this.id, this.titel);
+  const Anlass(this.id, this.titel, {this.hatService = false});
   final String id;
   final String titel;
+  /// Tische nur bei Anlaessen mit Service (wie die Web-Kasse)
+  final bool hatService;
+}
+
+/// Position einer offenen Tisch-Bestellung
+class TischPosition {
+  TischPosition.ausJson(Map<String, dynamic> m)
+      : id = (m['id'] as num).toInt(),
+        name = '${m['item_name'] ?? ''}',
+        menge = (m['quantity'] as num?)?.toInt() ?? 1,
+        preis = double.tryParse('${m['price']}') ?? 0,
+        bezahlt = m['paid'] == true,
+        fertig = m['completed'] == true;
+  final int id;
+  final String name;
+  final int menge;
+  final double preis;
+  final bool bezahlt;
+  final bool fertig;
+}
+
+/// Offene Tisch-Bestellung (GET /api/orders)
+class TischBestellung {
+  TischBestellung.ausJson(Map<String, dynamic> m)
+      : id = (m['id'] as num).toInt(),
+        tisch = (m['table_number'] as num?)?.toInt() ?? 0,
+        status = '${m['status'] ?? ''}',
+        total = double.tryParse('${m['total']}') ?? 0,
+        bezahltBetrag = double.tryParse('${m['paid_amount'] ?? 0}') ?? 0,
+        direktBezahlt = m['payment_method'] != null,
+        erstellt = DateTime.tryParse('${m['created_at']}'),
+        positionen = (m['items'] as List? ?? const []).whereType<Map<String, dynamic>>().map(TischPosition.ausJson).toList();
+  final int id;
+  final int tisch;
+  final String status;
+  final double total;
+  final double bezahltBetrag;
+  final bool direktBezahlt;
+  final DateTime? erstellt;
+  final List<TischPosition> positionen;
+
+  /// Was noch offen ist. Direkt (Bar/TWINT/Karte) bezahlte Bestellungen haben
+  /// payment_method, aber keine Teilzahlungen - die zaehlen als bezahlt.
+  double get offen => status == 'cancelled' || direktBezahlt ? 0 : total - bezahltBetrag;
 }
 
 class Position {
@@ -204,7 +248,7 @@ class KasseApi {
     try {
       final d = await _anfrage('GET', '/anlass') as Map<String, dynamic>;
       final a = d['anlass'];
-      return a is Map ? Anlass('${a['id']}', '${a['titel']}') : null;
+      return a is Map ? Anlass('${a['id']}', '${a['titel']}', hatService: d['hat_service'] == true) : null;
     } catch (_) {
       return null;
     }
@@ -250,6 +294,42 @@ class KasseApi {
   /// zahlung: 'cash' | 'twint' | 'card'
   Future<void> bezahlt(int bestellung, String zahlung) =>
       _anfrage('PUT', '/orders/$bestellung/status', daten: {'status': 'paid', 'payment_method': zahlung});
+
+  // ---- Tische ---------------------------------------------------------------
+  /// Offene Tisch-Bestellungen (Tisch > 0, noch etwas zu bezahlen)
+  Future<List<TischBestellung>> offeneTische() async {
+    final d = await _anfrage('GET', '/orders') as List;
+    return d
+        .whereType<Map<String, dynamic>>()
+        .map(TischBestellung.ausJson)
+        .where((b) => b.tisch > 0 && b.offen > 0.009)
+        .toList();
+  }
+
+  /// Betrag auf die Bestellungen eines Tisches verteilen (aelteste zuerst).
+  /// Liefert true, wenn danach alles bezahlt ist.
+  Future<bool> tischBezahlen(List<TischBestellung> bestellungen, double betrag, String zahlung, String beschreibung) async {
+    var rest = betrag;
+    var allesBezahlt = true;
+    final sortiert = [...bestellungen]..sort((a, b) => a.id.compareTo(b.id));
+    for (final b in sortiert) {
+      if (rest <= 0.009) break;
+      final teil = rest < b.offen ? rest : b.offen;
+      if (teil <= 0.009) continue;
+      final d = await _anfrage('POST', '/orders/${b.id}/split-payment',
+          daten: {'amount': double.parse(teil.toStringAsFixed(2)), 'payment_method': zahlung, 'description': beschreibung}) as Map<String, dynamic>;
+      if (d['all_paid'] != true) allesBezahlt = false;
+      rest -= teil;
+    }
+    return allesBezahlt && rest <= 0.009;
+  }
+
+  /// Position stornieren; von der Kueche bestaetigte nur mit trotzKueche.
+  Future<void> stornieren(int bestellung, int position, {bool trotzKueche = false}) =>
+      _anfrage('DELETE', '/orders/$bestellung/items/$position${trotzKueche ? '?trotz_kueche=1' : ''}');
+
+  /// Bestellung stornieren (Tisch aufloesen); Teilzahlungen bleiben verbucht.
+  Future<void> bestellungStornieren(int bestellung) => _anfrage('POST', '/orders/$bestellung/cancel');
 
   // ---- Zwischenspeicher bei schlechter Verbindung --------------------------
   // Wie die Web-Kasse: Bar-Bestellung ohne Antwort (kein Netz, Zeitlimit,

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../kacheln.dart';
 import '../kasse_api.dart';
 import 'anmeldung.dart' show knopfRot;
+import 'tische_screen.dart';
 import 'zahlung.dart';
 
 class KasseScreen extends StatefulWidget {
@@ -35,6 +36,11 @@ class _KasseScreenState extends State<KasseScreen> {
   StreamSubscription<bool>? _ortAbo;
   StreamSubscription<int>? _pufferAbo;
   int _puffer = 0;
+  // Tische (nur bei Service oder solange noch Tische offen sind)
+  bool _tischModus = false;
+  int? _tischNr;
+  int _offeneTische = 0;
+  bool get _tischeSichtbar => (_anlass?.hatService ?? false) || _offeneTische > 0;
 
   @override
   void initState() {
@@ -89,10 +95,16 @@ class _KasseScreenState extends State<KasseScreen> {
   Future<void> _nebendaten() async {
     final a = await api.anlass();
     final q = await api.twintQrAdresse();
+    var tische = _offeneTische;
+    try {
+      tische = (await api.offeneTische()).map((b) => b.tisch).toSet().length;
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _anlass = a;
       _twintQr = q;
+      _offeneTische = tische;
+      if (!(a?.hatService ?? false)) _tischModus = false;
     });
   }
 
@@ -170,6 +182,48 @@ class _KasseScreenState extends State<KasseScreen> {
     }
   }
 
+  Future<void> _anTischSenden() async {
+    if (_korb.isEmpty || _sendet) return;
+    final nr = _tischNr;
+    if (nr == null || nr <= 0) {
+      await _tischWaehlen();
+      if (_tischNr == null) return;
+      return _anTischSenden();
+    }
+    setState(() => _sendet = true);
+    try {
+      final b = await api.bestellen(List.of(_korb), tisch: nr);
+      setState(() {
+        _korb.clear();
+        _tischNr = null;
+      });
+      _meldung('An Tisch $nr gesendet (${bestellNr(b.id)})${b.druckfehler.isNotEmpty ? ' – Bon nicht gedruckt: ${b.druckfehler.join(' · ')}' : ''}',
+          fehler: b.druckfehler.isNotEmpty);
+      _nebendaten();
+    } on KasseFehler catch (e) {
+      if (e.status == 401) return _abmelden();
+      _meldung('Nicht gesendet: ${e.meldung} – Warenkorb bleibt.', fehler: true);
+    } finally {
+      if (mounted) setState(() => _sendet = false);
+    }
+  }
+
+  Future<void> _tischWaehlen() async {
+    final c = TextEditingController(text: _tischNr?.toString() ?? '');
+    final nr = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Tischnummer'),
+        content: TextField(controller: c, autofocus: true, keyboardType: TextInputType.number, style: const TextStyle(fontSize: 28)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(c.text.trim())), child: const Text('OK')),
+        ],
+      ),
+    );
+    if (nr != null && nr > 0) setState(() => _tischNr = nr);
+  }
+
   void _meldung(String text, {bool fehler = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -242,6 +296,15 @@ class _KasseScreenState extends State<KasseScreen> {
           ),
         ]),
         actions: [
+          if (_tischeSichtbar)
+            IconButton(
+              tooltip: 'Tische',
+              onPressed: () async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TischeScreen(api: api, twintQr: _twintQr)));
+                _nebendaten();
+              },
+              icon: Badge(isLabelVisible: _offeneTische > 0, label: Text('$_offeneTische'), child: const Icon(Icons.table_restaurant)),
+            ),
           PopupMenuButton<String>(
             onSelected: (w) => w == 'neu' ? _laden() : _abmelden(),
             itemBuilder: (_) => const [
@@ -308,7 +371,41 @@ class _KasseScreenState extends State<KasseScreen> {
         },
       );
 
-  Widget _zahlKnoepfe() => Row(children: [
+  Widget _bestellart() => !_tischeSichtbar
+      ? const SizedBox.shrink()
+      : Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Bar'), icon: Icon(Icons.local_bar)),
+              ButtonSegment(value: true, label: Text('Tisch'), icon: Icon(Icons.table_restaurant)),
+            ],
+            selected: {_tischModus},
+            onSelectionChanged: (w) => setState(() => _tischModus = w.first),
+          ),
+        );
+
+  Widget _zahlKnoepfe() => _tischModus
+      ? Row(children: [
+          SizedBox(
+            height: 56,
+            child: OutlinedButton(onPressed: _tischWaehlen, child: Text(_tischNr == null ? 'Tisch ?' : 'Tisch $_tischNr', style: const TextStyle(fontSize: 18))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 56,
+              child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                onPressed: _korb.isEmpty || _sendet ? null : _anTischSenden,
+                child: const Text('An Tisch senden', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+        ])
+      : _barKnoepfe();
+
+  Widget _barKnoepfe() => Row(children: [
         _zahlKnopf('Bar', const Color(0xFF16A34A), 'cash'),
         const SizedBox(width: 8),
         _zahlKnopf('TWINT', Colors.black, 'twint'),
@@ -346,6 +443,7 @@ class _KasseScreenState extends State<KasseScreen> {
                 ]),
               ),
             ),
+            _bestellart(),
             _zahlKnoepfe(),
           ]),
         ),
@@ -390,7 +488,7 @@ class _KasseScreenState extends State<KasseScreen> {
               Text('CHF ${_total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
             ]),
             const SizedBox(height: 10),
-            if (neuZeichnen == null) _zahlKnoepfe(),
+            if (neuZeichnen == null) ...[_bestellart(), _zahlKnoepfe()],
             if (_korb.isNotEmpty)
               TextButton(onPressed: () => neu(_korb.clear), child: const Text('Warenkorb leeren', style: TextStyle(color: knopfRot))),
           ]),
