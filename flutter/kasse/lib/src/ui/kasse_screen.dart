@@ -90,6 +90,51 @@ class _KasseScreenState extends State<KasseScreen> {
     );
   }
 
+  // Tischkarten am Bar-Drucker (backend src/tischkarten.ts), nur im Schopf
+  Future<void> _tischkarten() async {
+    final von = TextEditingController(text: '1');
+    final bis = TextEditingController(text: '20');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Tischkarten drucken'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Am Bar-Drucker je Tisch eine Karte mit grosser Nummer. Nur im Schopf-WLAN.'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(controller: von, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'von')),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(controller: bis, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'bis')),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Drucken')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final a = int.tryParse(von.text.trim());
+    final b = int.tryParse(bis.text.trim()) ?? a;
+    if (a == null || b == null) return _meldung('Bitte Tischnummern eingeben', fehler: true);
+    try {
+      final n = await api.tischkartenDrucken(a, b);
+      protokoll('tischkarten', meldung: 'Tisch $a-$b', daten: {'gedruckt': n});
+      _meldung('$n Tischkarten gedruckt');
+    } on KasseFehler catch (e) {
+      _meldung(e.meldung, fehler: true);
+    }
+  }
+
   Future<void> _updateSuchen({bool melden = false}) async {
     final u = await updatePruefen();
     if (!mounted) return;
@@ -726,10 +771,12 @@ class _KasseScreenState extends State<KasseScreen> {
           'neu' => _laden(),
           'ab' => _abmelden(),
           'update' => _updateSuchen(melden: true),
+          'karten' => _tischkarten(),
           _ => null,
         },
         itemBuilder: (_) => [
           const PopupMenuItem(value: 'neu', child: Text('Artikel neu laden')),
+          const PopupMenuItem(value: 'karten', child: Text('Tischkarten drucken')),
           PopupMenuItem(
             value: 'update',
             child: Text(

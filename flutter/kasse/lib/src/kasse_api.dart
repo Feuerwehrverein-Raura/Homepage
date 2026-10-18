@@ -373,6 +373,12 @@ class KasseApi {
     }
   }
 
+  /// Tischkarten am Bar-Drucker (nur am T400). Liefert die Anzahl.
+  Future<int> tischkartenDrucken(int von, int bis) async {
+    final d = await _anfrage('POST', '/tischkarten/drucken', daten: {'von': von, 'bis': bis}, zeit: const Duration(seconds: 60));
+    return d is Map ? (d['gedruckt'] as num?)?.toInt() ?? 0 : 0;
+  }
+
   /// Position stornieren; von der Kueche bestaetigte nur mit trotzKueche.
   Future<void> stornieren(int bestellung, int position, {bool trotzKueche = false}) =>
       _anfrage('DELETE', '/orders/$bestellung/items/$position${trotzKueche ? '?trotz_kueche=1' : ''}');

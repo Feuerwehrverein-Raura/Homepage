@@ -3238,6 +3238,27 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
     }
     setBonLaeuft(false);
   };
+  // Tischkarten am Bar-Drucker (backend src/tischkarten.ts), nur im Schopf
+  const [karteVon, setKarteVon] = useState('1');
+  const [karteBis, setKarteBis] = useState('20');
+  const [kartenLaeuft, setKartenLaeuft] = useState(false);
+  const [kartenMeldung, setKartenMeldung] = useState<{ ok: boolean; text: string } | null>(null);
+  const tischkartenDrucken = async () => {
+    setKartenLaeuft(true);
+    setKartenMeldung(null);
+    try {
+      const res = await fetch(`${API_URL}/tischkarten/drucken`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ von: parseInt(karteVon), bis: parseInt(karteBis || karteVon) }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setKartenMeldung(res.ok ? { ok: true, text: `${d.gedruckt} Tischkarten gedruckt.` } : { ok: false, text: d.error || `Fehler (${res.status})` });
+    } catch {
+      setKartenMeldung({ ok: false, text: 'Keine Verbindung.' });
+    }
+    setKartenLaeuft(false);
+  };
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -3419,6 +3440,30 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
             className="px-5 py-3 rounded-lg bg-red-700 text-white font-semibold disabled:opacity-50 whitespace-nowrap">
             {bonLaeuft ? 'Druckt…' : '🖨️ Anmeldebon drucken'}
           </button>
+        </div>
+
+        {/* Tischkarten: Nummernkarten fuer die Tische am Bar-Drucker */}
+        <div className="mb-8 border-2 border-gray-200 bg-gray-50 rounded-lg p-4">
+          <h3 className="text-lg font-semibold">🪑 Tischkarten drucken</h3>
+          <p className="text-sm text-gray-600 mb-3">
+            Druckt am Bar-Drucker je Tisch eine Karte mit grosser Nummer zum Aufstellen.
+            Nur im Schopf-WLAN (über den T400).
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm">von
+              <input type="number" min={1} max={999} value={karteVon} onChange={e => setKarteVon(e.target.value)}
+                className="block w-24 border rounded-lg px-3 py-2 text-lg" />
+            </label>
+            <label className="text-sm">bis
+              <input type="number" min={1} max={999} value={karteBis} onChange={e => setKarteBis(e.target.value)}
+                className="block w-24 border rounded-lg px-3 py-2 text-lg" />
+            </label>
+            <button onClick={tischkartenDrucken} disabled={kartenLaeuft || !karteVon}
+              className="px-5 py-3 rounded-lg bg-gray-800 text-white font-semibold disabled:opacity-50">
+              {kartenLaeuft ? 'Druckt…' : '🖨️ Tischkarten drucken'}
+            </button>
+          </div>
+          {kartenMeldung && <p className={`text-sm mt-2 ${kartenMeldung.ok ? 'text-green-700' : 'text-red-700'}`}>{kartenMeldung.text}</p>}
         </div>
 
         {/* Printer Settings */}

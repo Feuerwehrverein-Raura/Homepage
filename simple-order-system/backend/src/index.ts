@@ -15,6 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
+import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
 import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml, kassenbonsZuDrucken, kassenbonGedruckt, kassenbonDruckdienst } from './kassenbon.js';
@@ -195,6 +196,31 @@ app.post('/api/internal/kassenbon', async (req, res) => {
   } catch (e: any) {
     console.error('Kassen-Anmeldebon (intern):', e?.message || e);
     res.status(502).json({ error: `Bon nicht gedruckt: ${e?.message || e}` });
+  }
+});
+// Tischkarten am Bar-Drucker (src/tischkarten.ts). Nur am T400 - die Cloud
+// erreicht den Drucker im Schopf nicht.
+app.post('/api/tischkarten/drucken', async (req, res) => {
+  if (!VOR_ORT) {
+    return res.status(409).json({ error: 'Tischkarten druckt nur die Kasse im Schopf-WLAN (T400). Bitte mit dem Schopf-WLAN verbinden.' });
+  }
+  const b = tischkartenBereich(req.body?.von, req.body?.bis);
+  if (typeof b === 'string') return res.status(400).json({ error: b });
+  try {
+    const cfgs = await getPrinterConfig();
+    const cfg = cfgs.bar || cfgs.kitchen;
+    if (!cfg) return res.status(503).json({ error: 'Kein Bondrucker eingerichtet' });
+    if (cfg.protocol !== 'epos') return res.status(503).json({ error: 'Der Bondrucker kann das nicht (kein ePOS)' });
+    let anlass: string | null = null;
+    try { anlass = (await anlassErmittler.ermitteln())?.anlass?.titel || null; } catch { /* ohne */ }
+    const karten: string[] = [];
+    for (let nr = b.von; nr <= b.bis; nr++) karten.push(tischkarteXml(nr, bonLogoXml(), anlass));
+    await eposSenden(cfg.ip, 'bar', eposHuelle(karten.join('\n')));
+    serverEreignis(pool, 'tischkarten', `Tisch ${b.von}-${b.bis} gedruckt`, { daten: { von: b.von, bis: b.bis } });
+    res.json({ gedruckt: b.bis - b.von + 1 });
+  } catch (e: any) {
+    serverEreignis(pool, 'tischkarten_fehler', String(e?.message || e));
+    res.status(502).json({ error: `Nicht gedruckt: ${e?.message || e}` });
   }
 });
 // T400 holt Bons ab, die in der Cloud zum Drucken vorgemerkt sind
