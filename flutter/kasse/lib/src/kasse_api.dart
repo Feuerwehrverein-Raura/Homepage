@@ -346,6 +346,16 @@ class KasseApi {
     return allesBezahlt && rest <= 0.009;
   }
 
+  /// Nach Posten bezahlen (ganze Zeilen): je Bestellung pay-items, das die
+  /// Posten als bezahlt markiert und die Zahlung bucht.
+  /// [nachBestellung]: Bestellung -> (Posten-IDs, Text fuer diese Zahlung)
+  Future<void> postenBezahlen(Map<int, (List<int>, String)> nachBestellung, String zahlung) async {
+    for (final e in nachBestellung.entries) {
+      await _anfrage('POST', '/orders/${e.key}/pay-items',
+          daten: {'item_ids': e.value.$1, 'payment_method': zahlung, 'description': e.value.$2});
+    }
+  }
+
   /// Position stornieren; von der Kueche bestaetigte nur mit trotzKueche.
   Future<void> stornieren(int bestellung, int position, {bool trotzKueche = false}) =>
       _anfrage('DELETE', '/orders/$bestellung/items/$position${trotzKueche ? '?trotz_kueche=1' : ''}');

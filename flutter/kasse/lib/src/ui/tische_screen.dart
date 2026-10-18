@@ -1,6 +1,7 @@
 // Offene Tische (wie die Web-Kasse): je Tisch der offene Betrag; im Tisch
 // die Positionen (bezahlt durchgestrichen, Kueche fertig mit Haken),
-// Storno je Position, alles bezahlen, Teilbetrag, Tisch aufloesen.
+// Storno je Position, Posten auswaehlen und bezahlen, alles bezahlen,
+// Teilbetrag, Tisch aufloesen.
 // Aktualisiert sich alle 10 s.
 import 'dart:async';
 
@@ -125,6 +126,37 @@ class _TischDetail extends StatefulWidget {
 class _TischDetailState extends State<_TischDetail> {
   List<TischBestellung> _bestellungen = [];
   bool _arbeitet = false;
+  // Nach Posten bezahlen: gewaehlte Posten-IDs (ganze Zeilen)
+  final Set<int> _auswahl = {};
+
+  double get _auswahlSumme => _bestellungen
+      .expand((b) => b.positionen)
+      .where((p) => _auswahl.contains(p.id))
+      .fold(0.0, (s, p) => s + p.preis * p.menge);
+
+  Future<void> _postenBezahlen() async {
+    final summe = _auswahlSumme;
+    if (_auswahl.isEmpty) return;
+    if (summe > _offen + 0.009) {
+      return _meldung('Auswahl (CHF ${summe.toStringAsFixed(2)}) ist mehr als offen - bitte per Teilbetrag', fehler: true);
+    }
+    final art = await zahlungAbfragen(context, bestellung: 0, betrag: summe, art: 'cash', twintQr: widget.twintQr, titel: 'Tisch ${widget.tisch} · Posten');
+    if (art == null) return;
+    final nachBestellung = <int, (List<int>, String)>{};
+    final namen = <String>[];
+    for (final b in _bestellungen) {
+      final posten = b.positionen.where((p) => _auswahl.contains(p.id)).toList();
+      if (posten.isEmpty) continue;
+      final text = posten.map((p) => '${p.menge}x ${anzeigeName(p.name)}').join(', ');
+      nachBestellung[b.id] = (posten.map((p) => p.id).toList(), text);
+      namen.add(text);
+    }
+    await _aktion(() async {
+      await widget.api.postenBezahlen(nachBestellung, art);
+      _auswahl.clear();
+      _meldung('CHF ${summe.toStringAsFixed(2)} bezahlt (${namen.join(', ')})');
+    });
+  }
 
   @override
   void initState() {
@@ -237,6 +269,14 @@ class _TischDetailState extends State<_TischDetail> {
             Card(
               color: p.bezahlt ? const Color(0xFFDCFCE7) : (p.fertig ? const Color(0xFFFEF9C3) : Colors.white),
               child: ListTile(
+                // Tipp waehlt den Posten fuer "Auswahl bezahlen"
+                leading: p.bezahlt
+                    ? const Icon(Icons.check, color: Color(0xFF16A34A))
+                    : Checkbox(
+                        value: _auswahl.contains(p.id),
+                        onChanged: _arbeitet ? null : (_) => setState(() => _auswahl.contains(p.id) ? _auswahl.remove(p.id) : _auswahl.add(p.id)),
+                      ),
+                onTap: p.bezahlt || _arbeitet ? null : () => setState(() => _auswahl.contains(p.id) ? _auswahl.remove(p.id) : _auswahl.add(p.id)),
                 title: Text('${p.fertig && !p.bezahlt ? '✓ ' : ''}${p.menge}x ${anzeigeName(p.name)}',
                     style: TextStyle(decoration: p.bezahlt ? TextDecoration.lineThrough : null, fontWeight: FontWeight.w600)),
                 subtitle: Text('CHF ${(p.preis * p.menge).toStringAsFixed(2)}'),
@@ -255,6 +295,18 @@ class _TischDetailState extends State<_TischDetail> {
               Text('CHF ${_offen.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
             ]),
             const SizedBox(height: 8),
+            if (_auswahl.isNotEmpty) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                  onPressed: _arbeitet ? null : _postenBezahlen,
+                  child: Text('Auswahl bezahlen · CHF ${_auswahlSumme.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             SizedBox(
               width: double.infinity,
               height: 56,

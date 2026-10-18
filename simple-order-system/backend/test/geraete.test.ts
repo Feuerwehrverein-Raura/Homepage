@@ -8,6 +8,7 @@ test('Buchen und Bezahlen sind schreibend', () => {
   assert.ok(istSchreibend('POST', '/orders'));
   assert.ok(istSchreibend('post', '/orders/'));
   assert.ok(istSchreibend('POST', '/orders/500012/split-payment'));
+  assert.ok(istSchreibend('POST', '/orders/500012/pay-items'));
   assert.ok(istSchreibend('PUT', '/orders/7/status'));
   assert.ok(istSchreibend('DELETE', '/orders/7/items/50000001'));
   assert.ok(istSchreibend('POST', '/orders/7/cancel'));

@@ -24,6 +24,7 @@ export const SCHREIBEND: RegExp[] = [
   /^POST \/orders\/\d+\/items$/,
   /^PUT \/orders\/\d+\/status$/,
   /^POST \/orders\/\d+\/split-payment$/,
+  /^POST \/orders\/\d+\/pay-items$/,
   /^POST \/orders\/\d+\/cancel$/,
   /^DELETE \/orders\/\d+\/items\/\d+$/,
   /^POST \/auth\/kassenbon$/,

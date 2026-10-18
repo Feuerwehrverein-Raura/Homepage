@@ -213,6 +213,8 @@ interface OpenOrder {
   paid_amount?: string;
   // When combining multiple orders for a table, store all order IDs
   _allOrders?: { id: number; total: string; paid_amount?: string }[];
+  // Posten -> Bestellung (Tisch mit mehreren Bestellungen, fuer pay-items)
+  _itemOrder?: Record<number, number>;
 }
 
 type OrderType = 'bar' | 'tisch';
@@ -1094,14 +1096,13 @@ function App() {
     return parseFloat(order.total) - parseFloat(order.paid_amount || '0');
   };
 
-  // Calculate total for selected items (unit-based selection with "itemId-unitIndex" keys)
+  // Summe der gewaehlten Posten (ganze Zeilen, Schluessel = Posten-ID)
   const getSelectedItemsTotal = (order: OpenOrder): number => {
     if (!order.items) return 0;
     let total = 0;
     selectedItemIds.forEach(key => {
-      const [itemId] = key.split('-');
-      const item = order.items?.find(i => i.id === parseInt(itemId));
-      if (item) total += parseFloat(item.price);
+      const item = order.items?.find(i => i.id === parseInt(key));
+      if (item) total += parseFloat(item.price) * item.quantity;
     });
     return total;
   };
@@ -1171,22 +1172,51 @@ function App() {
         message = `Teilzahlung: CHF ${amount.toFixed(2)}`;
         description = `Teilzahlung CHF ${amount.toFixed(2)}`;
       } else {
+        // Nach Posten: ganze Zeilen ueber pay-items bezahlen - markiert die
+        // Posten als bezahlt (die fruehere Auswahl buchte nur einen Betrag)
         if (selectedItemIds.length === 0) {
-          alert('Bitte mindestens einen Artikel auswählen');
+          alert('Bitte mindestens einen Posten auswählen');
           return;
         }
         amount = getSelectedItemsTotal(splitPaymentOrder);
-
-        const itemCounts: { [name: string]: number } = {};
-        selectedItemIds.forEach(key => {
-          const [itemId] = key.split('-');
-          const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
-          if (item) {
-            itemCounts[anzeigeName(item.item_name)] = (itemCounts[anzeigeName(item.item_name)] || 0) + 1;
+        if (amount > getUnpaidTotal(splitPaymentOrder) + 0.01) {
+          alert(`Die Auswahl (CHF ${amount.toFixed(2)}) ist mehr als noch offen ist (CHF ${getUnpaidTotal(splitPaymentOrder).toFixed(2)}) - bitte per Betrag bezahlen.`);
+          return;
+        }
+        const nachBestellung = new Map<number, number[]>();
+        for (const key of selectedItemIds) {
+          const pid = parseInt(key);
+          const oid = splitPaymentOrder._itemOrder?.[pid] ?? splitPaymentOrder.id;
+          nachBestellung.set(oid, [...(nachBestellung.get(oid) || []), pid]);
+        }
+        const posten = selectedItemIds
+          .map(key => splitPaymentOrder.items?.find(i => i.id === parseInt(key)))
+          .filter((i): i is OrderItem => !!i);
+        description = posten.map(i => `${i.quantity}x ${anzeigeName(i.item_name)}`).join(', ');
+        for (const [oid, ids] of nachBestellung) {
+          const text = posten.filter(i => ids.includes(i.id)).map(i => `${i.quantity}x ${anzeigeName(i.item_name)}`).join(', ');
+          const r = await fetch(`${API_URL}/orders/${oid}/pay-items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ item_ids: ids, payment_method: splitPaymentMethod, description: text }),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            alert(`Fehler: ${err.error || 'Zahlung fehlgeschlagen'}`);
+            return;
           }
+        }
+        const rest = getUnpaidTotal(splitPaymentOrder) - amount;
+        setOrderConfirmation({
+          orderId: splitPaymentOrder.id,
+          orderType: 'tisch',
+          tableNumber: splitPaymentOrder.table_number,
+          total: amount,
+          message: rest <= 0.01 ? `${description} - Tisch abgeschlossen` : `${description} bezahlt, offen CHF ${rest.toFixed(2)}`,
         });
-        description = Object.entries(itemCounts).map(([name, count]) => `${count}x ${name}`).join(', ');
-        message = `${selectedItemIds.length} Artikel bezahlt`;
+        closeSplitPayment();
+        if (tableNumber) fetchOpenOrders(tableNumber);
+        return;
       }
 
       // Distribute payment across all orders for combined table orders
@@ -1809,7 +1839,8 @@ function App() {
                                 items: allItems,
                                 total: totalAmount.toString(),
                                 paid_amount: tableOrders.reduce((sum, o) => sum + parseFloat(o.paid_amount || '0'), 0).toString(),
-                                _allOrders: tableOrders.map(o => ({ id: o.id, total: o.total, paid_amount: o.paid_amount }))
+                                _allOrders: tableOrders.map(o => ({ id: o.id, total: o.total, paid_amount: o.paid_amount })),
+                                _itemOrder: Object.fromEntries(tableOrders.flatMap(o => (o.items || []).map(i => [i.id, o.id])))
                               };
                               openSplitPayment(combinedOrder);
                             }}
@@ -2581,7 +2612,7 @@ function App() {
               </p>
 
               {/* Payment Mode Tabs */}
-              <div className="grid grid-cols-2 gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+              <div className="grid grid-cols-3 gap-1 mb-4 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => { setSplitPaymentMode('full'); setSelectedItemIds([]); setSplitAmount(''); }}
                   className={`py-2 px-2 rounded-md text-sm font-medium transition ${
@@ -2602,9 +2633,16 @@ function App() {
                 >
                   Betrag
                 </button>
-                {/* "Artikel" (einzeln bezahlen) entfernt: es markierte keine Artikel als
-                    bezahlt, die Kachel zeigte danach zu viel offen (Tisch 7, Chilbi 2026).
-                    Kassiert wird immer der ganze gebuchte Betrag, aufteilen per Betrag. */}
+                <button
+                  onClick={() => { setSplitPaymentMode('items'); setSplitAmount(''); }}
+                  className={`py-2 px-2 rounded-md text-sm font-medium transition ${
+                    splitPaymentMode === 'items'
+                      ? 'bg-white shadow text-fwv-red'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Posten
+                </button>
               </div>
 
               {/* Full Payment Mode */}
@@ -2654,63 +2692,36 @@ function App() {
                 </div>
               )}
 
-              {/* Per-Item Mode */}
+              {/* Nach Posten: ganze Zeilen waehlen (pay-items markiert sie als bezahlt) */}
               {splitPaymentMode === 'items' && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Artikel auswählen (einzeln anklicken)
+                    Posten auswählen
                   </label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {/* Expand items by quantity so each unit can be selected individually */}
-                    {splitPaymentOrder.items?.filter(item => !item.paid).flatMap(item => {
-                      // Create array of individual units for this item
-                      return Array.from({ length: item.quantity }, (_, idx) => {
-                        const unitKey = `${item.id}-${idx}`;
-                        const isSelected = selectedItemIds.includes(unitKey);
-                        return (
-                          <button
-                            key={unitKey}
-                            onClick={() => {
-                              setSelectedItemIds(prev =>
-                                prev.includes(unitKey)
-                                  ? prev.filter(id => id !== unitKey)
-                                  : [...prev, unitKey]
-                              );
-                            }}
-                            className={`w-full text-left p-3 rounded-lg border-2 transition ${
-                              isSelected
-                                ? 'bg-green-100 border-green-500'
-                                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">
-                                {isSelected ? '✓ ' : ''}1x {anzeigeName(item.item_name)}
-                              </span>
-                              <span className="font-bold">
-                                CHF {parseFloat(item.price).toFixed(2)}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      });
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {splitPaymentOrder.items?.filter(item => !item.paid).map(item => {
+                      const key = String(item.id);
+                      const isSelected = selectedItemIds.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setSelectedItemIds(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])}
+                          className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                            isSelected ? 'bg-green-100 border-green-500' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{isSelected ? '✓ ' : ''}{item.quantity}x {anzeigeName(item.item_name)}</span>
+                            <span className="font-bold">CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                          </div>
+                        </button>
+                      );
                     })}
                   </div>
                   {selectedItemIds.length > 0 && (
                     <div className="mt-3 p-3 bg-green-50 rounded-lg text-center">
-                      <span className="text-sm text-green-700">Ausgewählt: {selectedItemIds.length} Artikel = </span>
-                      <span className="font-bold text-green-700">
-                        CHF {(() => {
-                          // Calculate total from selected unit keys
-                          let total = 0;
-                          selectedItemIds.forEach(key => {
-                            const [itemId] = key.split('-');
-                            const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
-                            if (item) total += parseFloat(item.price);
-                          });
-                          return total.toFixed(2);
-                        })()}
-                      </span>
+                      <span className="text-sm text-green-700">Ausgewählt: {selectedItemIds.length} Posten = </span>
+                      <span className="font-bold text-green-700">CHF {getSelectedItemsTotal(splitPaymentOrder).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -2787,7 +2798,7 @@ function App() {
                 {splitPaymentMode === 'split' && splitAmount && `CHF ${parseFloat(splitAmount).toFixed(2)} bezahlen`}
                 {splitPaymentMode === 'split' && !splitAmount && 'Betrag eingeben'}
                 {splitPaymentMode === 'items' && selectedItemIds.length > 0 && `CHF ${getSelectedItemsTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
-                {splitPaymentMode === 'items' && selectedItemIds.length === 0 && 'Artikel auswählen'}
+                {splitPaymentMode === 'items' && selectedItemIds.length === 0 && 'Posten auswählen'}
               </button>
 
               <button
