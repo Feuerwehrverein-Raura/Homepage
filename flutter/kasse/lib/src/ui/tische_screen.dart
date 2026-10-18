@@ -138,6 +138,7 @@ class _TischDetailState extends State<_TischDetail> {
   bool _arbeitet = false;
   // Nach Posten bezahlen: gewaehlte Posten-IDs (ganze Zeilen)
   final Set<int> _auswahl = {};
+  bool _geschlossen = false;
   // live: Kueche fertig, bezahlt, neue Bestellung am Tisch (WebSocket + Takt)
   StreamSubscription<Map<String, dynamic>>? _liveAbo;
   Timer? _entprellt;
@@ -197,7 +198,16 @@ class _TischDetailState extends State<_TischDetail> {
       final l = await widget.api.offeneTische();
       if (!mounted) return;
       setState(() => _bestellungen = l.where((b) => b.tisch == widget.tisch).toList());
-      if (_bestellungen.isEmpty) Navigator.of(context).pop();
+      // Tisch erledigt: genau EINMAL zurueck, und nur wenn diese Ansicht oben
+      // liegt. Seit den Live-Meldungen laden mehrere Stellen gleichzeitig
+      // nach - jede schloss die Ansicht, die zweite schloss die ganze Kasse
+      // (schwarzer Bildschirm nach dem Bezahlen, Chilbi 2026).
+      if (_bestellungen.isEmpty && !_geschlossen && (ModalRoute.of(context)?.isCurrent ?? false)) {
+        _geschlossen = true;
+        _takt?.cancel();
+        _liveAbo?.cancel();
+        Navigator.of(context).pop();
+      }
     } on KasseFehler catch (e) {
       _meldung(e.meldung, fehler: true);
     }
