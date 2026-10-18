@@ -485,7 +485,9 @@ function App() {
       // Solange es welche gibt, bleibt der Reiter sichtbar.
       fetchAllOpenOrders();
       const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); fetchAllOpenOrders(); }, 60 * 1000);
-      return () => clearInterval(t);
+      // Artikel live: Preise, neue oder entfernte Artikel aus dem Inventar
+      const a = setInterval(() => { fetchItems(); }, 30 * 1000);
+      return () => { clearInterval(t); clearInterval(a); };
     }
   }, [token]);
 
@@ -610,12 +612,13 @@ function App() {
   const fetchItems = async () => {
     try {
       const res = await fetch(`${API_URL}/items`, { headers: authHeaders() });
+      if (!res.ok) return; // bisherige Liste behalten
       const data = await res.json();
+      if (!Array.isArray(data) || !data.length) return;
       // Parse price as float since API returns it as string
-      setItems(data.map((item: any) => ({
-        ...item,
-        price: parseFloat(item.price) || 0
-      })));
+      const neu = data.map((item: any) => ({ ...item, price: parseFloat(item.price) || 0 }));
+      // nur neu zeichnen, wenn sich etwas geaendert hat
+      setItems(alt => JSON.stringify(alt) === JSON.stringify(neu) ? alt : neu);
     } catch (error) {
       console.error('Failed to fetch items:', error);
     }

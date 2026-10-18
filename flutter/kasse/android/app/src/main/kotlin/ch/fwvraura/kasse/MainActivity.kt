@@ -21,9 +21,12 @@ import java.security.MessageDigest
  * SHA-256 geprueft und der Paketinstaller geoeffnet (wie die Kuechen-App).
  */
 class MainActivity : FlutterActivity() {
+    private var kanal: MethodChannel? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ch.fwvraura.kasse/update").setMethodCallHandler { call, result ->
+        kanal = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ch.fwvraura.kasse/update")
+        kanal!!.setMethodCallHandler { call, result ->
             when (call.method) {
                 "version" -> result.success(packageManager.getPackageInfo(packageName, 0).versionName)
                 "darfInstallieren" -> result.success(darfInstallieren())
@@ -39,7 +42,7 @@ class MainActivity : FlutterActivity() {
                     val haupt = Handler(Looper.getMainLooper())
                     Thread {
                         try {
-                            val apk = laden(url, sha)
+                            val apk = laden(url, sha) { pct -> haupt.post { kanal?.invokeMethod("fortschritt", pct) } }
                             haupt.post {
                                 oeffnen(apk)
                                 result.success(true)
@@ -57,7 +60,7 @@ class MainActivity : FlutterActivity() {
     private fun darfInstallieren(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()
 
-    private fun laden(url: String, sha256: String?): File {
+    private fun laden(url: String, sha256: String?, fortschritt: (Int) -> Unit): File {
         val ordner = File(cacheDir, "updates").apply { mkdirs() }
         ordner.listFiles()?.forEach { it.delete() }
         val ziel = File(ordner, "kasse.apk")
@@ -67,6 +70,9 @@ class MainActivity : FlutterActivity() {
         try {
             if (verbindung.responseCode != 200) throw Exception("Download: HTTP ${verbindung.responseCode}")
             val md = MessageDigest.getInstance("SHA-256")
+            val gesamt = verbindung.contentLengthLong
+            var geladen = 0L
+            var letzt = -1
             verbindung.inputStream.use { ein ->
                 ziel.outputStream().use { aus ->
                     val puffer = ByteArray(64 * 1024)
@@ -75,6 +81,11 @@ class MainActivity : FlutterActivity() {
                         if (n < 0) break
                         md.update(puffer, 0, n)
                         aus.write(puffer, 0, n)
+                        geladen += n
+                        if (gesamt > 0) {
+                            val pct = (geladen * 100 / gesamt).toInt()
+                            if (pct != letzt) { letzt = pct; fortschritt(pct) }
+                        }
                     }
                 }
             }

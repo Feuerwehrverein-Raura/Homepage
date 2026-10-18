@@ -48,6 +48,8 @@ class _KasseScreenState extends State<KasseScreen> {
   NeueVersion? _update;
   String? _version;
   bool _updateLaeuft = false;
+  int _updateProzent = 0;
+  bool _updateFehler = false;
   bool get _tischeSichtbar =>
       (_anlass?.hatService ?? false) || _offeneTische > 0;
 
@@ -84,10 +86,35 @@ class _KasseScreenState extends State<KasseScreen> {
     api.ortPruefen().then((_) => _laden());
     api.erneuern();
     eigeneVersion().then((v) => mounted ? setState(() => _version = v) : null);
-    _updateSuchen();
+    // wie die Kuechen-App: kurz nach dem Start, dann regelmaessig
+    _takte.add(Timer(const Duration(seconds: 15), _updateSuchen));
     _takte.add(
       Timer.periodic(const Duration(minutes: 30), (_) => _updateSuchen()),
     );
+    // Artikel live: Preise, neue oder entfernte Artikel aus dem Inventar
+    _takte.add(
+      Timer.periodic(const Duration(seconds: 30), (_) => _artikelAuffrischen()),
+    );
+  }
+
+  /// Artikel still nachladen; nur neu zeichnen, wenn sich etwas geaendert hat.
+  /// Der Warenkorb behaelt seine Positionen (eigene Kopien der Artikel).
+  Future<void> _artikelAuffrischen() async {
+    if (_laedt) return;
+    try {
+      final artikel = await api.artikel();
+      final einst = await api.einstellungen();
+      String stand(List<Artikel> l) => l.map((a) => '${a.id}|${a.name}|${a.preis}|${a.kategorie}').join(';');
+      final kats = kategorienSortieren(artikel.map((a) => a.kategorie), einst['kategorien_reihenfolge']);
+      if (!mounted || (stand(artikel) == stand(_artikel) && kats.join(';') == _kategorien.join(';'))) return;
+      protokoll('artikel_aktualisiert', daten: {'vorher': _artikel.length, 'jetzt': artikel.length});
+      setState(() {
+        _artikel = artikel;
+        _kategorien = kats;
+      });
+    } catch (_) {
+      // ohne Verbindung: bisherige Liste bleibt
+    }
   }
 
   // Tischkarten am Bar-Drucker (backend src/tischkarten.ts), nur im Schopf
@@ -179,15 +206,17 @@ class _KasseScreenState extends State<KasseScreen> {
       if (ok == true) await erlaubnisOeffnen();
       return;
     }
-    setState(() => _updateLaeuft = true);
+    setState(() {
+      _updateLaeuft = true;
+      _updateFehler = false;
+      _updateProzent = 0;
+    });
     try {
       protokoll('update_start', meldung: u.version);
-      await installieren(u);
+      await installieren(u, fortschritt: (p) => mounted ? setState(() => _updateProzent = p) : null);
     } catch (e) {
-      _meldung(
-        'Update fehlgeschlagen: ${e.toString().replaceFirst('Exception: ', '')}',
-        fehler: true,
-      );
+      protokoll('update_fehler', meldung: '$e');
+      if (mounted) setState(() => _updateFehler = true);
     } finally {
       if (mounted) setState(() => _updateLaeuft = false);
     }
@@ -551,10 +580,13 @@ class _KasseScreenState extends State<KasseScreen> {
                         const Icon(Icons.system_update, color: Colors.white),
                         const SizedBox(width: 10),
                         Expanded(
+                          // Texte wie die Kuechen-App (strings.xml update_*)
                           child: Text(
                             _updateLaeuft
-                                ? 'Kassen-App ${_update!.version} wird geladen…'
-                                : 'Neue Kassen-App ${_update!.version} – tippen zum Installieren',
+                                ? 'Update wird geladen … $_updateProzent %'
+                                : _updateFehler
+                                    ? 'Update konnte nicht geladen werden – hier tippen für neuen Versuch'
+                                    : 'Neue Version ${_update!.version} verfügbar – hier tippen zum Installieren',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -563,12 +595,13 @@ class _KasseScreenState extends State<KasseScreen> {
                           ),
                         ),
                         if (_updateLaeuft)
-                          const SizedBox(
+                          SizedBox(
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
                               color: Colors.white,
                               strokeWidth: 3,
+                              value: _updateProzent > 0 ? _updateProzent / 100 : null,
                             ),
                           ),
                       ],

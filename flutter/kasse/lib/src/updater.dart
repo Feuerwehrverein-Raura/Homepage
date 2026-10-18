@@ -65,7 +65,11 @@ Future<bool> darfInstallieren() async {
 Future<void> erlaubnisOeffnen() => _kanal.invokeMethod('erlaubnisOeffnen');
 
 /// Laedt, prueft und oeffnet den Android-Installer. Wirft bei Fehlern.
-Future<void> installieren(NeueVersion v) async {
+/// [fortschritt] bekommt 0..100 waehrend des Ladens (wie die Kuechen-App).
+Future<void> installieren(NeueVersion v, {void Function(int prozent)? fortschritt}) async {
+  _kanal.setMethodCallHandler((c) async {
+    if (c.method == 'fortschritt' && c.arguments is int) fortschritt?.call(c.arguments as int);
+  });
   try {
     await _kanal.invokeMethod('installieren', {'url': v.url, 'sha256': v.sha256});
   } on PlatformException catch (e) {
