@@ -683,6 +683,22 @@ function App() {
   };
 
   // Tisch aufloesen: alle offenen Bestellungen des Tisches stornieren.
+  // Quittung fuer den Tisch am Bar-Drucker (backend src/quittung.ts)
+  const quittungDrucken = async (tableNum: number, ids: number[]) => {
+    protokoll('quittung', { daten: { tisch: tableNum, bestellungen: ids } });
+    try {
+      const r = await fetch(`${API_URL}/quittung`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ tisch: tableNum, bestellungen: ids }),
+      });
+      const d = await r.json().catch(() => ({}));
+      alert(r.ok ? `Quittung für Tisch ${tableNum} wird am Bar-Drucker gedruckt.` : (d.error || `Fehler (${r.status})`));
+    } catch {
+      alert('Keine Verbindung - Quittung nicht gedruckt.');
+    }
+  };
+
   const tischAufloesen = async (tableNum: number, bestellungen: OpenOrder[]) => {
     protokoll('tisch_aufloesen', { daten: { tisch: tableNum, bestellungen: bestellungen.map(b => b.id), offen: bestellungen.reduce((s, b) => s + offenerBetrag(b), 0) } });
     const bezahlt = bestellungen.reduce((s, o) => s + (parseFloat(o.paid_amount || '0') || 0), 0);
@@ -1890,6 +1906,14 @@ function App() {
                           </button>
                         </div>
                       )}
+                      <div className="px-3 pb-2">
+                        <button
+                          onClick={() => quittungDrucken(tableNum, tableOrders.map(o => o.id))}
+                          className="w-full text-gray-800 bg-white hover:bg-gray-100 border border-gray-300 py-2 rounded-lg text-sm font-medium touch-manipulation"
+                        >
+                          🧾 Quittung drucken
+                        </button>
+                      </div>
                       <div className="px-3 pb-3">
                         <button
                           onClick={() => tischAufloesen(tableNum, tableOrders)}

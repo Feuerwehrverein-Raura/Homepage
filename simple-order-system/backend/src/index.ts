@@ -16,6 +16,7 @@ import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
 import { barlichtMelden, barlichtStoppen } from './barlicht.js';
+import { quittungXml } from './quittung.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
@@ -199,6 +200,43 @@ app.post('/api/internal/kassenbon', async (req, res) => {
     res.status(502).json({ error: `Bon nicht gedruckt: ${e?.message || e}` });
   }
 });
+// Quittung fuer einen Tisch (src/quittung.ts): die angegebenen Bestellungen
+// (sonst alle offenen des Tisches) zusammengefasst am Bar-Drucker.
+app.post('/api/quittung', async (req: AuthenticatedRequest, res) => {
+  const tisch = Number(req.body?.tisch);
+  if (!Number.isInteger(tisch) || tisch <= 0) return res.status(400).json({ error: 'Tischnummer fehlt' });
+  const ids = Array.isArray(req.body?.bestellungen) ? req.body.bestellungen.map(Number).filter(Number.isInteger) : [];
+  try {
+    const o = await pool.query(
+      `SELECT o.id, COALESCE((SELECT SUM(p.amount) FROM order_payments p WHERE p.order_id = o.id), 0)::float AS bezahlt,
+              o.payment_method, o.total::float AS total
+       FROM orders o
+       WHERE o.table_number = $1 AND o.status <> 'cancelled' AND o.created_at > NOW() - INTERVAL '24 hours'
+         AND (cardinality($2::int[]) > 0 AND o.id = ANY($2) OR cardinality($2::int[]) = 0 AND o.payment_method IS NULL)`,
+      [tisch, ids]);
+    if (!o.rows.length) return res.status(404).json({ error: `Keine Bestellungen fuer Tisch ${tisch}` });
+    const pos = await pool.query(
+      `SELECT item_name AS name, price::float AS preis, quantity AS menge FROM order_items WHERE order_id = ANY($1)`,
+      [o.rows.map((r: any) => r.id)]);
+    // direkt bezahlte Bestellungen (payment_method gesetzt) zaehlen voll als bezahlt
+    const bezahlt = o.rows.reduce((s: number, r: any) => s + (r.payment_method && r.payment_method !== 'split' ? r.total : r.bezahlt), 0);
+    const cfgs = await getPrinterConfig();
+    const cfg = cfgs.bar || cfgs.kitchen;
+    if (!cfg) return res.status(503).json({ error: 'Kein Bondrucker eingerichtet' });
+    if (cfg.protocol !== 'epos') return res.status(503).json({ error: 'Der Bondrucker kann das nicht (kein ePOS)' });
+    let anlass: string | null = null;
+    try { anlass = (await anlassErmittler.ermitteln())?.anlass?.titel || null; } catch { /* ohne */ }
+    await eposSenden(cfg.ip, 'bar', eposHuelle(quittungXml({
+      tisch, posten: pos.rows, bezahlt, zeit: new Date(), anlass, logoXml: bonLogoXml(),
+    })));
+    serverEreignis(pool, 'quittung', `Tisch ${tisch}`, { daten: { bestellungen: o.rows.map((r: any) => r.id), von: req.user?.name || null } });
+    res.json({ gedruckt: true, bestellungen: o.rows.length });
+  } catch (e: any) {
+    serverEreignis(pool, 'quittung_fehler', String(e?.message || e), { daten: { tisch } });
+    res.status(502).json({ error: `Nicht gedruckt: ${e?.message || e}` });
+  }
+});
+
 // Tischkarten am Bar-Drucker (src/tischkarten.ts). Nur am T400 - die Cloud
 // erreicht den Drucker im Schopf nicht.
 app.post('/api/tischkarten/drucken', async (req, res) => {

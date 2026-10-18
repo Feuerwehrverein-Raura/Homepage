@@ -421,6 +421,10 @@ class KasseApi {
     }
   }
 
+  /// Quittung fuer einen Tisch am Bar-Drucker (backend src/quittung.ts).
+  Future<void> quittungDrucken(int tisch, List<int> bestellungen) =>
+      _anfrage('POST', '/quittung', daten: {'tisch': tisch, 'bestellungen': bestellungen}, zeit: const Duration(seconds: 40));
+
   /// Bar-Licht (Spot 1 + Girlande blinken bei Bar-Bestellungen) ein/aus.
   Future<bool> barlichtLesen() async => ((await _anfrage('GET', '/barlicht')) as Map)['an'] == true;
   Future<void> barlichtSetzen(bool an) => _anfrage('PUT', '/barlicht', daten: {'an': an});

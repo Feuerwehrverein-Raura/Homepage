@@ -362,6 +362,18 @@ class _TischDetailState extends State<_TischDetail> {
             ),
             Row(children: [
               Expanded(child: TextButton(onPressed: _arbeitet ? null : _teilbetrag, child: const Text('Teilbetrag'))),
+              Expanded(
+                child: TextButton(
+                  onPressed: _arbeitet
+                      ? null
+                      : () => _aktion(() async {
+                            protokoll('quittung', daten: {'tisch': widget.tisch});
+                            await widget.api.quittungDrucken(widget.tisch, _bestellungen.map((b) => b.id).toList());
+                            _meldung('Quittung für Tisch ${widget.tisch} wird am Bar-Drucker gedruckt');
+                          }),
+                  child: const Text('🧾 Quittung'),
+                ),
+              ),
               Expanded(child: TextButton(onPressed: _arbeitet ? null : _aufloesen, child: const Text('Tisch auflösen', style: TextStyle(color: knopfRot)))),
             ]),
           ]),
