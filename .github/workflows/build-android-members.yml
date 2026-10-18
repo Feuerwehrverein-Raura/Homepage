@@ -289,9 +289,12 @@ jobs:
         run: |
           set -euo pipefail
           cp "members-${VERSION}-release.apk" members-latest.apk
-          # Daran erkennt eine von GitHub installierte App, dass es eine
-          # neuere APK gibt (flutter/mitglieder/lib/einstellungen/app_update.dart).
-          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
+          # Daran erkennt eine aeltere APK-Fassung (bis 1.0.26), dass es eine
+          # neuere gibt (flutter/mitglieder/lib/einstellungen/app_update.dart).
+          # Geladen wird von der Website, nicht von GitHub: GitHubs Download
+          # blieb auf manchen Handys haengen (Skill fwv-app-downloads). Ab
+          # 1.0.27 liest die App ohnehin /download/versionen.json.
+          APK_URL="https://www.fwv-raura.ch/download/mitglieder.apk"
           printf '{"version":"%s","versionCode":%s,"apk":"%s"}\n' "$VERSION" "$VCODE" "$APK_URL" > members-latest.json
 
           NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
