@@ -12,7 +12,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55871;
+const PORT = 61871;
 const BASE = `http://127.0.0.1:${PORT}`;
 const EVENT = '00000000-0000-0000-0000-0000000000d5';
 

@@ -22,8 +22,8 @@ import pg from 'pg';
 import jwt from 'jsonwebtoken';
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55881;
-const AUTH_PORT = 55882;
+const PORT = 61981;
+const AUTH_PORT = 61982;
 const BASE = `http://127.0.0.1:${PORT}/api`;
 const AUTH = `http://127.0.0.1:${AUTH_PORT}`;
 const KEY = 'test-interner-key';

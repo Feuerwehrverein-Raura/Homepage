@@ -110,8 +110,8 @@ test('dieselbe Person schon auf der Schicht: 409', async () => {
 // ---------------------------------------------------------------------------
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55880;
-const DISPATCH_PORT = 55881;
+const PORT = 61880;
+const DISPATCH_PORT = 61881;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'test-geheim';
 const JETZT = '2026-10-11T10:00:00+02:00';

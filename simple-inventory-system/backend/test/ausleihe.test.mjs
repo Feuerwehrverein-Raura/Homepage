@@ -24,9 +24,9 @@ import jwt from 'jsonwebtoken';
 import { heuteZuerich, tageDazu } from '../dist/ausleihe.js';
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55891;
-const AUTH_PORT = 55892;
-const DIENSTE_PORT = 55893;
+const PORT = 61991;
+const AUTH_PORT = 61992;
+const DIENSTE_PORT = 61993;
 const BASE = `http://127.0.0.1:${PORT}/api`;
 const AUTH = `http://127.0.0.1:${AUTH_PORT}`;
 const KEY = 'test-interner-key';

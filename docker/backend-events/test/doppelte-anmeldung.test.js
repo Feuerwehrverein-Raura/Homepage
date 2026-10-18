@@ -142,7 +142,7 @@ test('Echter Server: Doppelklicks ergeben eine Zeile, Paare duerfen', { skip: !D
     const { Pool } = require('pg');
     const jwt = require('jsonwebtoken');
     const { schemaAufbauen } = require('./datenbank');
-    const PORT = 55895, DISPATCH_PORT = 55896, SECRET = 'test-geheim';
+    const PORT = 61895, DISPATCH_PORT = 61896, SECRET = 'test-geheim';
     const BASE = `http://127.0.0.1:${PORT}`;
     const pool = new Pool({ connectionString: DB });
     await schemaAufbauen(pool);

@@ -16,8 +16,8 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55875;
-const DISPATCH_PORT = 55876;
+const PORT = 61875;
+const DISPATCH_PORT = 61876;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'test-geheim';
 const JETZT = '2026-10-11T10:00:00+02:00';

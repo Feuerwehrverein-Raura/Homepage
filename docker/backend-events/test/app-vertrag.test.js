@@ -26,7 +26,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55872;
+const PORT = 61872;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'test-geheim';
 const JETZT = '2026-10-11T10:00:00+02:00'; // Sonntag

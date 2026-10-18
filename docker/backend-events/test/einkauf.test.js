@@ -16,8 +16,8 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55877;
-const INVENTAR_PORT = 55878;
+const PORT = 61877;
+const INVENTAR_PORT = 61878;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'test-geheim';
 const KEY = 'interner-test-key';

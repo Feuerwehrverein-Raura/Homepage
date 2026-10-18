@@ -63,8 +63,8 @@ test('Zugangsdaten-Mail: gleicher Text wie beim externen Haupt-Organisator', () 
 });
 
 const DB = process.env.TEST_DATABASE_URL;
-const PORT = 55878;
-const DISPATCH_PORT = 55879;
+const PORT = 61878;
+const DISPATCH_PORT = 61879;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SECRET = 'test-geheim';
 const JETZT = '2026-10-11T10:00:00+02:00';
