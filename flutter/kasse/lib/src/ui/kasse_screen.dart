@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../kacheln.dart';
 import '../kasse_api.dart';
+import '../protokoll.dart';
 import 'anmeldung.dart' show knopfRot;
 import '../updater.dart';
 import 'tische_screen.dart';
@@ -135,6 +136,7 @@ class _KasseScreenState extends State<KasseScreen> {
     }
     setState(() => _updateLaeuft = true);
     try {
+      protokoll('update_start', meldung: u.version);
       await installieren(u);
     } catch (e) {
       _meldung(
@@ -270,20 +272,28 @@ class _KasseScreenState extends State<KasseScreen> {
       twintQr: _twintQr,
       titel: 'Bar-Verkauf',
     );
-    if (zahlung == null || !mounted) return;
+    if (zahlung == null || !mounted) {
+      protokoll('zahlung_abgebrochen', daten: {'art': art, 'betrag': _total, 'positionen': _korb.length});
+      return;
+    }
     setState(() => _sendet = true);
     try {
       final korbVorher = List.of(_korb);
       final b = await api.bestellenOderPuffern(korbVorher);
+      protokoll('bar_bestellung', bestellung: b.id, daten: {
+        'zahlung': zahlung, 'betrag': b.total, 'positionen': korbVorher.map((p) => '${p.menge}x ${p.artikel.anzeige}').toList(),
+      });
       if (!mounted) return;
       setState(_korb.clear);
       if (b.druckfehler.isNotEmpty) {
+        protokoll('druckwarnung', bestellung: b.id, meldung: b.druckfehler.join(' · '));
         setState(
           () => _druckWarnung =
               'Bestellung ${bestellNr(b.id)}: ${b.druckfehler.join(' · ')}',
         );
       }
       if (!await api.bezahltOderPuffern(b.id, zahlung)) {
+        protokoll('zahlung_abgelehnt', bestellung: b.id, daten: {'zahlung': zahlung});
         _meldung(
           'Bestellung ${bestellNr(b.id)} gebucht, Zahlung vom Server abgelehnt - bitte in der Web-Kasse prüfen.',
           fehler: true,
@@ -314,6 +324,7 @@ class _KasseScreenState extends State<KasseScreen> {
         );
       }
     } on KasseFehler catch (e) {
+      protokoll('buchung_fehler', meldung: e.meldung, daten: {'status': e.status, 'art': zahlung});
       if (e.status == 401) return _abmelden();
       _meldung(
         'Nicht gebucht: ${e.meldung} – Warenkorb bleibt, Zahlung bitte zurückgeben oder nochmals buchen.',
@@ -335,6 +346,9 @@ class _KasseScreenState extends State<KasseScreen> {
     AngelegteBestellung b;
     try {
       b = await api.bestellen(List.of(_korb), tisch: nr);
+      protokoll('tisch_bestellung', bestellung: b.id, daten: {
+        'tisch': nr, 'betrag': b.total, 'positionen': _korb.map((p) => '${p.menge}x ${p.artikel.anzeige}').toList(),
+      });
       setState(() {
         _korb.clear();
         _tischNr = null;
@@ -348,6 +362,7 @@ class _KasseScreenState extends State<KasseScreen> {
       }
       _nebendaten();
     } on KasseFehler catch (e) {
+      protokoll('tisch_fehler', meldung: e.meldung, daten: {'status': e.status, 'tisch': nr});
       if (e.status == 401) return _abmelden();
       _meldung(
         'Nicht gesendet: ${e.meldung} – Warenkorb bleibt.',
@@ -411,6 +426,7 @@ class _KasseScreenState extends State<KasseScreen> {
       ),
     );
     if (!mounted) return;
+    protokoll('tisch_zahlfrage', bestellung: b.id, meldung: art ?? 'geschlossen');
     if (art == null || art == 'spaeter') {
       _meldung('An Tisch $nr gesendet (${bestellNr(b.id)}) – Bezahlung später');
       return;
@@ -424,10 +440,13 @@ class _KasseScreenState extends State<KasseScreen> {
       titel: 'Tisch $nr',
     );
     if (zahlung == null) {
+      protokoll('zahlung_abgebrochen', bestellung: b.id, daten: {'art': art, 'tisch': nr});
       _meldung('Tisch $nr offen gelassen');
       return;
     }
+    protokoll('tisch_sofort_bezahlt', bestellung: b.id, daten: {'zahlung': zahlung, 'betrag': b.total});
     if (!await api.bezahltOderPuffern(b.id, zahlung)) {
+      protokoll('zahlung_abgelehnt', bestellung: b.id, daten: {'zahlung': zahlung});
       _meldung(
         'Zahlung vom Server abgelehnt - bitte bei den Tischen prüfen.',
         fehler: true,

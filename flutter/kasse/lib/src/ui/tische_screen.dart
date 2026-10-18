@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../kacheln.dart';
 import '../kasse_api.dart';
+import '../protokoll.dart';
 import 'anmeldung.dart' show knopfRot;
 import 'zahlung.dart';
 
@@ -153,6 +154,7 @@ class _TischDetailState extends State<_TischDetail> {
     }
     await _aktion(() async {
       await widget.api.postenBezahlen(nachBestellung, art);
+      protokoll('posten_bezahlt', daten: {'tisch': widget.tisch, 'betrag': summe, 'zahlung': art, 'posten': namen});
       _auswahl.clear();
       _meldung('CHF ${summe.toStringAsFixed(2)} bezahlt (${namen.join(', ')})');
     });
@@ -188,6 +190,7 @@ class _TischDetailState extends State<_TischDetail> {
     try {
       await f();
     } on KasseFehler catch (e) {
+      protokoll('tisch_aktion_fehler', meldung: e.meldung, daten: {'tisch': widget.tisch, 'status': e.status});
       _meldung(e.meldung, fehler: true);
     } finally {
       if (mounted) setState(() => _arbeitet = false);
@@ -200,6 +203,7 @@ class _TischDetailState extends State<_TischDetail> {
     if (art == null) return;
     await _aktion(() async {
       final fertig = await widget.api.tischBezahlen(_bestellungen, betrag, art, beschreibung);
+      protokoll('tisch_bezahlt', daten: {'tisch': widget.tisch, 'betrag': betrag, 'zahlung': art, 'text': beschreibung, 'fertig': fertig});
       _meldung(fertig ? 'Tisch ${widget.tisch} bezahlt' : 'CHF ${betrag.toStringAsFixed(2)} bezahlt');
     });
   }
@@ -226,7 +230,10 @@ class _TischDetailState extends State<_TischDetail> {
     final ok = await _frage(p.fertig
         ? '«${p.menge}x ${anzeigeName(p.name)}» hat die Küche schon bestätigt.\n\nTrotzdem entfernen (z.B. falsch getippt, nie serviert)?'
         : '«${p.menge}x ${anzeigeName(p.name)}» stornieren?');
-    if (ok) await _aktion(() => widget.api.stornieren(b.id, p.id, trotzKueche: p.fertig));
+    if (ok) {
+      protokoll('storno_position', bestellung: b.id, daten: {'position': '${p.menge}x ${p.name}', 'preis': p.preis, 'trotzKueche': p.fertig});
+      await _aktion(() => widget.api.stornieren(b.id, p.id, trotzKueche: p.fertig));
+    }
   }
 
   Future<void> _aufloesen() async {
@@ -234,6 +241,7 @@ class _TischDetailState extends State<_TischDetail> {
     final ok = await _frage('Tisch ${widget.tisch} auflösen?\n\nOffen: CHF ${_offen.toStringAsFixed(2)} wird storniert.'
         '${bezahlt > 0 ? '\nBereits bezahlt: CHF ${bezahlt.toStringAsFixed(2)} bleibt in der Abrechnung.' : ''}');
     if (!ok) return;
+    protokoll('tisch_aufgeloest', daten: {'tisch': widget.tisch, 'offen': _offen, 'bestellungen': _bestellungen.map((b) => b.id).toList()});
     await _aktion(() async {
       for (final b in _bestellungen) {
         await widget.api.bestellungStornieren(b.id);

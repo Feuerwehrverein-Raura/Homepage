@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { protokoll, protokollEinrichten } from './protokoll';
 import { createPortal } from 'react-dom';
 import { InstallPrompt } from './InstallPrompt';
 import { QrScanner } from './QrScanner';
@@ -150,15 +151,33 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const t = vorOrtTokenLesen();
     if (t && h.has('Authorization')) h.set('Authorization', `Bearer ${t}`);
   }
-  return echtesFetch(input, { ...init, headers: h });
+  // Jeder fehlgeschlagene API-Aufruf ins Geraete-Protokoll (src/protokoll.ts)
+  const methode = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+  const pfad = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+  return echtesFetch(input, { ...init, headers: h }).then((r) => {
+    if (r.status >= 400) {
+      r.clone().json().catch(() => ({})).then((b: any) =>
+        protokoll('anfrage_fehler', { meldung: String(b?.error || b?.message || `Fehler ${r.status}`), daten: { methode, pfad, status: r.status } }));
+    }
+    return r;
+  }, (e) => {
+    protokoll('anfrage_fehler', { meldung: `Keine Verbindung: ${e?.message || e}`, daten: { methode, pfad } });
+    throw e;
+  });
 };
 type KasseOrt = 'cloud' | 'lokal';
 let kasseOrt: KasseOrt = 'cloud';
 function ortSetzen(o: KasseOrt) {
+  if (o !== kasseOrt) protokoll('ort_wechsel', { meldung: o === 'lokal' ? 'Schopf (T400)' : 'Cloud' });
   kasseOrt = o;
   API_URL = o === 'lokal' ? `${VOR_ORT_BASIS}/api` : CLOUD_API;
   WS_URL = o === 'lokal' ? `${VOR_ORT_BASIS.replace('https:', 'wss:')}/ws` : CLOUD_WS;
 }
+protokollEinrichten({
+  basis: () => API_URL, geraet: () => geraetKennung, ort: () => (kasseOrt === 'lokal' ? 'schopf' : 'cloud'),
+  fetch: echtesFetch,
+});
+protokoll('app_start', { daten: { ua: navigator.userAgent.slice(0, 160), standalone: window.matchMedia?.('(display-mode: standalone)').matches } });
 // Antwortet der T400? (ohne Anmeldung, kurzes Zeitlimit)
 async function vorOrtErreichbar(): Promise<boolean> {
   try {
@@ -662,6 +681,7 @@ function App() {
 
   // Tisch aufloesen: alle offenen Bestellungen des Tisches stornieren.
   const tischAufloesen = async (tableNum: number, bestellungen: OpenOrder[]) => {
+    protokoll('tisch_aufloesen', { daten: { tisch: tableNum, bestellungen: bestellungen.map(b => b.id), offen: bestellungen.reduce((s, b) => s + offenerBetrag(b), 0) } });
     const bezahlt = bestellungen.reduce((s, o) => s + (parseFloat(o.paid_amount || '0') || 0), 0);
     const offen = bestellungen.reduce((s, o) => s + offenerBetrag(o), 0);
     const text = `Tisch ${tableNum} auflösen?\n\nOffen: CHF ${offen.toFixed(2)} wird storniert.` +
@@ -682,6 +702,7 @@ function App() {
 
   // Cancel/Stornieren individual order item
   const cancelOrderItem = async (orderId: number, itemId: number, trotzKueche = false) => {
+    protokoll('storno_position', { bestellung: orderId, daten: { position: itemId, trotzKueche } });
     try {
       const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}${trotzKueche ? '?trotz_kueche=1' : ''}`, {
         method: 'DELETE',
@@ -856,6 +877,7 @@ function App() {
   // (id < 0): Zahlung am Puffer-Eintrag merken, der Takt reicht sie nach.
   // Liefert false nur bei klarer Ablehnung durch den Server.
   const bezahltMelden = async (orderId: number, zahlung: string): Promise<boolean> => {
+    protokoll('zahlung_melden', { bestellung: orderId, daten: { zahlung } });
     if (orderId < 0) {
       const l = pufferLesen();
       const e = l.find(x => x.art === 'bestellung' && x.lokaleId === orderId);
@@ -877,6 +899,7 @@ function App() {
     const l = pufferLesen();
     l.push({ art: 'zahlung', ref: neueRef(), orderId, zahlung, erstellt: Date.now() });
     pufferSchreiben(l);
+    protokoll('puffer_zahlung', { bestellung: orderId, daten: { zahlung } });
     setPufferAnzahl(pufferOffen(l));
     return true;
   };
@@ -930,6 +953,7 @@ function App() {
         if (i >= 0) {
           if (fertig) l.splice(i, 1); else l[i] = { ...l[i], ...neu } as PufferEintrag;
           pufferSchreiben(l);
+          if (fertig) protokoll('puffer_gesendet', { daten: { art: e.art, ref: e.ref } });
         }
         setPufferAnzahl(pufferOffen(l));
       }
@@ -1008,6 +1032,7 @@ function App() {
   };
 
   const confirmCardPayment = async () => {
+    protokoll('karte_bestaetigt', { bestellung: cardPayment?.orderId ?? null });
     if (!cardPayment) return;
 
     try {
@@ -1045,6 +1070,7 @@ function App() {
   };
 
   const confirmCashPayment = async () => {
+    protokoll('bar_bestaetigt');
     if (!cashPayment) return;
 
     try {
@@ -1085,6 +1111,7 @@ function App() {
 
   // Close split payment modal
   const closeSplitPayment = () => {
+    protokoll('tisch_zahlfenster_zu', { bestellung: splitPaymentOrder?.id ?? null });
     setSplitPaymentOrder(null);
     setSplitPaymentMode('full');
     setSplitAmount('');
@@ -1152,6 +1179,7 @@ function App() {
 
   // Process split payment
   const processSplitPayment = async () => {
+    protokoll('tisch_zahlung', { bestellung: splitPaymentOrder?.id ?? null, daten: { modus: splitPaymentMode, art: splitPaymentMethod, betrag: splitAmount, posten: selectedItemIds } });
     if (!splitPaymentOrder) return;
 
     try {
@@ -1262,6 +1290,7 @@ function App() {
   // Neue Bestellung anlegen. Liefert { id, total } oder null; bei null ist
   // die Meldung schon gezeigt und der Warenkorb unveraendert.
   const bestellungAnlegen = async (tableNum: number): Promise<{ id: number; total: number } | null> => {
+    protokoll('bestellung_anlegen', { daten: { tisch: tableNum, positionen: cart.map(c => `${c.quantity}x ${c.name}`) } });
     const body = {
       table_number: tableNum,
       client_ref: neueRef(),
@@ -1287,6 +1316,7 @@ function App() {
       const l = pufferLesen();
       l.push({ art: 'bestellung', ref: body.client_ref, lokaleId, body, total, erstellt: Date.now() });
       pufferSchreiben(l);
+      protokoll('puffer_bestellung', { daten: { ref: body.client_ref, lokaleId, total } });
       setPufferAnzahl(pufferOffen(l));
       return { id: lokaleId, total };
     };
@@ -1322,6 +1352,7 @@ function App() {
   // Bar-Bestellung mit Zahlart direkt aus dem Warenkorb: anlegen und gleich
   // das passende Zahlfenster oeffnen (ohne Zwischenfenster).
   const bezahlenDirekt = async (art: 'bar' | 'twint' | 'karte') => {
+    protokoll('bezahlen_direkt', { daten: { art, positionen: cart.length } });
     if (sendetRef.current || loading) return;
     if (cart.length === 0) {
       alert('Bitte Artikel auswählen!');

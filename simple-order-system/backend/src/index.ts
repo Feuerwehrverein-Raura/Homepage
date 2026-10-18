@@ -15,6 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
+import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
 import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml, kassenbonsZuDrucken, kassenbonGedruckt, kassenbonDruckdienst } from './kassenbon.js';
 import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
@@ -96,21 +97,31 @@ app.use('/api', (req: AuthenticatedRequest, res, next) => {
   const method = req.method;
   const path = req.originalUrl;
 
+  // Fehlermeldung der Antwort merken (fuer audit_log.error, src/protokoll.ts)
+  let fehlerText: string | null = null;
+  const echtesJson = res.json.bind(res);
+  res.json = (body: any) => {
+    if (res.statusCode >= 400 && body && typeof body === 'object') {
+      fehlerText = String(body.error || body.message || body.code || '').slice(0, 500) || null;
+    }
+    return echtesJson(body);
+  };
+
   // Capture response status after request completes
   res.on('finish', async () => {
     const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
 
-    // Skip logging for high-frequency/noisy endpoints
-    if (path === '/api/health' || path.startsWith('/api/orders') && method === 'GET') {
-      return;
-    }
+    // Haeufige Lesezugriffe nur protokollieren, wenn sie scheitern
+    if (path === '/api/health' || path.startsWith('/api/kasse/ereignisse')) return;
+    if (method === 'GET' && statusCode < 400) return;
 
+    const geraet = typeof req.headers['x-kasse-geraet'] === 'string' ? String(req.headers['x-kasse-geraet']).slice(0, 64) : null;
     try {
       await pool.query(
-        `INSERT INTO audit_log (ip, method, path, status_code, user_id, user_email, duration_ms)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [ip, method, path, statusCode, req.user?.id || null, req.user?.email || null, duration]
+        `INSERT INTO audit_log (ip, method, path, status_code, user_id, user_email, duration_ms, error, geraet)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [ip, method, path, statusCode, req.user?.id || null, req.user?.email || null, duration, fehlerText, geraet]
       );
     } catch (err) {
       // Silently fail - don't break the app if audit logging fails
@@ -133,6 +144,8 @@ const OPEN_API_PATHS = [
   /^\/sync\//,
   /^\/internal\//,
   /^\/uploads\//,
+  // Geraete-Protokoll: auch ohne (gueltige) Anmeldung, src/protokoll.ts
+  /^\/kasse\/ereignisse$/,
   // TWINT-QR des Anlasses: <img> schickt kein Token mit (wie /uploads/).
   /^\/twint-qr\/bild\//,
 ];
@@ -544,6 +557,7 @@ async function initDB() {
   // Create index for faster queries on audit_log
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_ip ON audit_log(ip)`);
+  await protokollSchema(pool);
 
   // Gemeinsames Kassen-/Kuechen-Passwort (eine Zeile). Wird woechentlich rotiert
   // und unter "meine Zugaenge" angezeigt. Nur ueber den internen, API-Key-
@@ -839,6 +853,11 @@ if (!ORDER_API_KEY) {
   console.error('FATAL: ORDER_API_KEY nicht gesetzt — interne API-Authentifizierung waere unsicher. Abbruch.');
   process.exit(1);
 }
+
+protokollEinrichten({
+  app, pool, orderApiKey: ORDER_API_KEY, vorOrt: VOR_ORT, ip: (req) => getClientIp(req),
+  cloudUrl: (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, ''),
+});
 
 geraeteEinrichten({
   app, pool, orderApiKey: ORDER_API_KEY, getSetting, setSetting, vorOrt: VOR_ORT,
@@ -2651,6 +2670,7 @@ function meldeDruckfehler(druckfehler: Druckfehler[], orderId: number) {
   if (!druckfehler || druckfehler.length === 0) return;
   for (const f of druckfehler) {
     console.error(`Bestellung #${orderId}: Bon fuer "${f.station}" nicht gedruckt — ${f.meldung}`);
+    serverEreignis(pool, 'druckfehler', `${f.station}: ${f.meldung}`, { bestellung: orderId });
   }
   broadcast({ type: 'print_failed', order_id: orderId, druckfehler });
 }

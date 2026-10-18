@@ -18,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'kacheln.dart';
+import 'protokoll.dart';
 
 // Zum Testen gegen ein lokales Backend: --dart-define=KASSE_CLOUD=http://localhost:3999
 const cloudBasis = String.fromEnvironment('KASSE_CLOUD', defaultValue: 'https://order.fwv-raura.ch');
@@ -112,7 +113,15 @@ class AngelegteBestellung {
 class KasseApi {
   KasseApi._(this._prefs);
 
-  static Future<KasseApi> laden() async => KasseApi._(await SharedPreferences.getInstance());
+  static Future<KasseApi> laden() async {
+    final api = KasseApi._(await SharedPreferences.getInstance());
+    final p = Protokoll.ich
+      ..basis = (() => api.basis)
+      ..geraet = (() => api.geraet)
+      ..ort = (() => api.lokal ? 'schopf' : 'cloud');
+    await p.starten(api._prefs);
+    return api;
+  }
 
   final SharedPreferences _prefs;
   final _client = http.Client();
@@ -159,9 +168,11 @@ class KasseApi {
     if (t is! String || t.isEmpty) throw KasseFehler('Antwort ohne Zugang');
     await _prefs.setString('kasse_token', t);
     await _prefs.setString('kasse_name', '${d['name'] ?? 'Kasse'}');
+    protokoll('anmeldung', meldung: '${d['name'] ?? 'Kasse'}');
   }
 
   Future<void> abmelden() async {
+    protokoll('abmeldung');
     await _prefs.remove('kasse_token');
     await _prefs.remove('kasse_name');
   }
@@ -183,8 +194,10 @@ class KasseApi {
       if (daten != null) req.body = json.encode(daten);
       r = await http.Response.fromStream(await _client.send(req).timeout(zeit)).timeout(zeit);
     } on TimeoutException {
+      protokoll('anfrage_fehler', meldung: 'Keine Antwort vom Server', daten: {'methode': methode, 'pfad': pfad, 'basis': an ?? basis});
       throw KasseFehler('Keine Antwort vom Server');
-    } catch (_) {
+    } catch (e) {
+      protokoll('anfrage_fehler', meldung: 'Keine Verbindung: $e', daten: {'methode': methode, 'pfad': pfad, 'basis': an ?? basis});
       throw KasseFehler('Keine Verbindung');
     }
     dynamic d;
@@ -195,6 +208,7 @@ class KasseApi {
     }
     if (r.statusCode >= 400) {
       final text = d is Map && d['error'] is String ? d['error'] as String : 'Fehler ${r.statusCode}';
+      protokoll('anfrage_fehler', meldung: text, daten: {'methode': methode, 'pfad': pfad, 'status': r.statusCode, 'basis': an ?? basis});
       throw KasseFehler(text, status: r.statusCode);
     }
     return d;
@@ -220,7 +234,10 @@ class KasseApi {
       _fehlschlaege++;
       if (basis == lokalBasis && _fehlschlaege >= 2) basis = cloudBasis;
     }
-    if (basis != vorher) ortGeaendert.add(lokal);
+    if (basis != vorher) {
+      protokoll('ort_wechsel', meldung: lokal ? 'Schopf (T400)' : 'Cloud');
+      ortGeaendert.add(lokal);
+    }
   }
 
   // ---- Anmeldung -----------------------------------------------------------
@@ -413,6 +430,7 @@ class KasseApi {
           },
         });
       await _pufferSchreiben(l);
+      protokoll('puffer_bestellung', meldung: e.meldung, daten: {'ref': ref, 'lokaleId': lokaleId, 'positionen': positionen.length});
       return AngelegteBestellung(lokaleId, positionen.fold(0.0, (s, p) => s + p.summe), const []);
     }
   }
@@ -434,6 +452,7 @@ class KasseApi {
       return true;
     } on KasseFehler catch (e) {
       if (!_nachsenden(e)) return false;
+      protokoll('puffer_zahlung', meldung: e.meldung, bestellung: bestellung, daten: {'zahlung': zahlung});
       await _pufferSchreiben(_pufferLesen()..add({'art': 'zahlung', 'ref': neueRef(), 'orderId': bestellung, 'zahlung': zahlung, 'erstellt': DateTime.now().millisecondsSinceEpoch}));
       return true;
     }
@@ -468,7 +487,9 @@ class KasseApi {
         } on KasseFehler catch (f) {
           if (_nachsenden(f) || f.status == 401 || f.status == 403) break; // spaeter nochmals
           fertig = true; // Server lehnt ab - nicht ewig wiederholen
+          protokoll('puffer_verworfen', meldung: f.meldung, daten: {'eintrag': e});
         }
+        if (fertig) protokoll('puffer_gesendet', bestellung: (neu['serverId'] ?? e['serverId'] ?? e['orderId']) as int?, daten: {'art': e['art'], 'ref': e['ref']});
         // frisch lesen: inzwischen kann die Kasse Neues gepuffert haben
         final l = _pufferLesen();
         final i = l.indexWhere((x) => x['ref'] == e['ref']);

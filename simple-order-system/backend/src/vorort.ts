@@ -36,6 +36,7 @@
 // ---------------------------------------------------------------------------
 import type express from 'express';
 import type pg from 'pg';
+import { serverEreignis } from './protokoll.js';
 
 export const VOR_ORT = process.env.KASSE_VOR_ORT === 'true';
 const CLOUD = (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, '');
@@ -350,7 +351,10 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
         }).catch((err) => console.error('Lager (Vor-Ort-Bestellung):', err?.message || err));
       }
     }
-    if (fehler.length) console.error('Abgleich: nicht uebernommen:', JSON.stringify(fehler));
+    if (fehler.length) {
+      console.error('Abgleich: nicht uebernommen:', JSON.stringify(fehler));
+      serverEreignis(pool, 'abgleich_fehler', 'nicht uebernommen', { daten: fehler });
+    }
     return { ok, fehler };
   }
 
@@ -409,11 +413,14 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
         // Nur als gesendet markieren, wenn sich seither nichts geaendert hat.
         await pool.query('UPDATE orders SET gesendet = $2::timestamptz WHERE id = $1 AND geaendert = $2::timestamptz', [o.id, o.stand]);
       }
-      if (antwort.fehler?.length) console.error('Cloud lehnte Bestellungen ab:', JSON.stringify(antwort.fehler));
-      if (sendeFehler) { console.log('Senden an die Cloud wieder in Ordnung'); sendeFehler = ''; }
+      if (antwort.fehler?.length) {
+        console.error('Cloud lehnte Bestellungen ab:', JSON.stringify(antwort.fehler));
+        serverEreignis(pool, 'abgleich_abgelehnt', 'Cloud lehnte Bestellungen ab', { daten: antwort.fehler });
+      }
+      if (sendeFehler) { console.log('Senden an die Cloud wieder in Ordnung'); serverEreignis(pool, 'cloud_senden_ok', 'wieder in Ordnung'); sendeFehler = ''; }
     } catch (e: any) {
       const m = String(e?.message || e);
-      if (m !== sendeFehler) console.error('Senden an die Cloud:', m);
+      if (m !== sendeFehler) { console.error('Senden an die Cloud:', m); serverEreignis(pool, 'cloud_senden_fehler', m); }
       sendeFehler = m;
     } finally {
       sendet = false;
@@ -444,10 +451,10 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
         if (a.bis && a.bis !== seit) await d.setSetting('cloud_merker', a.bis);
         if (!a.mehr) break;
       }
-      if (holFehler) { console.log('Holen aus der Cloud wieder in Ordnung'); holFehler = ''; }
+      if (holFehler) { console.log('Holen aus der Cloud wieder in Ordnung'); serverEreignis(pool, 'cloud_holen_ok', 'wieder in Ordnung'); holFehler = ''; }
     } catch (e: any) {
       const m = String(e?.message || e);
-      if (m !== holFehler) console.error('Holen aus der Cloud:', m);
+      if (m !== holFehler) { console.error('Holen aus der Cloud:', m); serverEreignis(pool, 'cloud_holen_fehler', m); }
       holFehler = m;
     } finally {
       holt = false;
