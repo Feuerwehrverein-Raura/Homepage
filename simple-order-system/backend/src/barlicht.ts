@@ -4,20 +4,22 @@
 // der Bildschirm der Bar haengt hinten und wird leicht uebersehen.
 // Hoechstens 5 Minuten; danach steht der Spot wieder wie vorher.
 //
-// Spot 1 = Shelly 2PM "Regler 1", Kanal 1, hinter der Zentrale (Pro 3EM,
-// 192.168.88.84) im eigenen WLAN 192.168.33.x. Erreichbar ueber deren Range
+// Lampen: Spot 1 (Shelly 2PM "Regler 1", Kanal 1, 192.168.33.4:1) und die
+// Girlande Bar (Regler 2, Kanal 1, 192.168.33.5:1), hinter der Zentrale
+// (Pro 3EM, 192.168.88.84) im eigenen WLAN 192.168.33.x. Erreichbar ueber deren Range
 // Extender: der Port (mport) wird bei jedem Mal ueber WiFi.ListAPClients
 // erfragt, er kann sich beim Neuverbinden aendern (wie der Kiosk-Dienst,
 // memory/servers/RoterSchopf-T400). Nur am T400 - die Cloud erreicht das
 // Schopf-Netz nicht.
 //
 // Abschalten: Einstellung barlicht = 'aus' (Web-Kasse/Datenbank).
-// Anpassen per Umgebung: BARLICHT_ZENTRALE, BARLICHT_GERAET, BARLICHT_KANAL.
+// Anpassen per Umgebung: BARLICHT_ZENTRALE, BARLICHT_LAMPEN ("ip:kanal,...").
 // ---------------------------------------------------------------------------
 
 const ZENTRALE = process.env.BARLICHT_ZENTRALE || '192.168.88.84';
-const GERAET = process.env.BARLICHT_GERAET || '192.168.33.4';
-const KANAL = Number(process.env.BARLICHT_KANAL || 1);
+const LAMPEN = (process.env.BARLICHT_LAMPEN || '192.168.33.4:1,192.168.33.5:1')
+  .split(',').map((x) => x.trim()).filter(Boolean)
+  .map((x) => ({ geraet: x.split(':')[0], kanal: Number(x.split(':')[1] || 0) }));
 const BLINKEN = 3;
 const TAKT_MS = 450;
 
@@ -55,19 +57,26 @@ export function barlichtMelden(bestellung: number, nochOffen: Offen,
   laeuft = true;
   (async () => {
     const start = Date.now();
-    let basis = '';
-    let vorher: boolean | null = null;
+    // je Lampe: Adresse ueber den Range Extender und Zustand vorher
+    const lampen: { basis: string; kanal: number; vorher: boolean }[] = [];
+    const setzen = async (an: (l: { vorher: boolean }) => boolean) => {
+      // nacheinander - der Range Extender verkraftet wenig Gleichzeitiges
+      for (const l of lampen) await rpc(l.basis, `Switch.Set?id=${l.kanal}&on=${an(l)}`);
+    };
     try {
       const liste = await rpc(`http://${ZENTRALE}`, 'WiFi.ListAPClients');
-      const klient = (liste?.ap_clients || []).find((c: any) => c.ip === GERAET);
-      if (!klient?.mport) throw new Error(`Spot-Geraet ${GERAET} nicht bei der Zentrale angemeldet`);
-      basis = `http://${ZENTRALE}:${klient.mport}`;
-      vorher = !!(await rpc(basis, `Switch.GetStatus?id=${KANAL}`))?.output;
+      for (const { geraet, kanal } of LAMPEN) {
+        const klient = (liste?.ap_clients || []).find((c: any) => c.ip === geraet);
+        if (!klient?.mport) { melden('barlicht_fehler', `Lampe ${geraet} nicht bei der Zentrale angemeldet`); continue; }
+        const basis = `http://${ZENTRALE}:${klient.mport}`;
+        lampen.push({ basis, kanal, vorher: !!(await rpc(basis, `Switch.GetStatus?id=${kanal}`))?.output });
+      }
+      if (!lampen.length) throw new Error('keine Lampe erreichbar');
       while (offen.size && Date.now() - start < HOECHSTENS_MS) {
         for (let i = 0; i < BLINKEN; i++) {
-          await rpc(basis, `Switch.Set?id=${KANAL}&on=${!vorher}`);
+          await setzen((l) => !l.vorher);
           await warten(TAKT_MS);
-          await rpc(basis, `Switch.Set?id=${KANAL}&on=${vorher}`);
+          await setzen((l) => l.vorher);
           await warten(TAKT_MS);
         }
         await warten(1500);
@@ -80,8 +89,8 @@ export function barlichtMelden(bestellung: number, nochOffen: Offen,
       melden('barlicht_fehler', String(e?.message || e));
     } finally {
       // Zustand sicher zuruecksetzen
-      if (basis && vorher !== null) {
-        try { await rpc(basis, `Switch.Set?id=${KANAL}&on=${vorher}`); } catch { /* egal */ }
+      for (const l of lampen) {
+        try { await rpc(l.basis, `Switch.Set?id=${l.kanal}&on=${l.vorher}`); } catch { /* egal */ }
       }
       offen.clear();
       laeuft = false;
