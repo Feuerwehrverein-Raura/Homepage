@@ -224,6 +224,14 @@ app.post('/api/tischkarten/drucken', async (req, res) => {
     res.status(502).json({ error: `Nicht gedruckt: ${e?.message || e}` });
   }
 });
+// Cloud -> T400: Bar-Licht fuer eine Bestellung, die die Cloud gedruckt hat
+app.post('/api/internal/barlicht', (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  const id = Number(req.body?.bestellung);
+  if (!VOR_ORT || !Number.isInteger(id)) return res.status(400).json({ error: 'nur am T400, mit Bestellnummer' });
+  barlichtStarten(id);
+  res.json({ ok: true });
+});
 // T400 holt Bons ab, die in der Cloud zum Drucken vorgemerkt sind
 app.get('/api/internal/kassenbon/offen', async (req, res) => {
   if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
@@ -2624,6 +2632,24 @@ export interface Druckfehler {
 }
 
 // Printer function (ESC/POS)
+// Bar-Licht am T400 starten (src/barlicht.ts): blinkt, bis die Bar-Positionen
+// erledigt sind. Abschalten mit Einstellung barlicht = 'aus'.
+const KASSE_LOKAL_URL = (process.env.KASSE_LOKAL_URL || 'https://kasse-lokal.fwv-raura.ch').replace(/\/$/, '');
+function barlichtStarten(orderId: number): void {
+  getSetting('barlicht').then((w) => {
+    if (w === 'aus') return;
+    // offen = Bar-Positionen nicht erledigt, oder Bestellung (aus der Cloud)
+    // noch nicht hier angekommen
+    barlichtMelden(orderId, async (ids) => (await pool.query(
+      `SELECT x.id FROM unnest($1::int[]) AS x(id)
+       WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.id = x.id)
+          OR EXISTS (SELECT 1 FROM order_items i WHERE i.order_id = x.id
+                     AND COALESCE(i.printer_station, 'bar') = 'bar' AND NOT COALESCE(i.completed, false))`,
+      [ids])).rows.map((r: any) => r.id),
+      (typ, m) => serverEreignis(pool, typ, m, { bestellung: orderId }));
+  }).catch(() => {});
+}
+
 async function printReceipt(orderId: number, tableNumber: number, items: any[]): Promise<Druckfehler[]> {
   const druckfehler: Druckfehler[] = [];
   try {
@@ -2681,17 +2707,17 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]):
       }
     }
 
-    // Bar-Bestellung: Spot 1 blinkt bis quittiert (src/barlicht.ts, nur am T400)
-    if (VOR_ORT && stations.bar) {
-      getSetting('barlicht').then((w) => {
-        if (w === 'aus') return;
-        barlichtMelden(orderId, async (ids) => (await pool.query(
-          `SELECT DISTINCT order_id FROM order_items
-           WHERE order_id = ANY($1) AND COALESCE(printer_station, 'bar') = 'bar' AND NOT COALESCE(completed, false)`,
-          [ids])).rows.map((r: any) => r.order_id),
-          (typ, m) => serverEreignis(pool, typ, m, { bestellung: orderId }));
-      }).catch(() => {});
+    // Bar-Bestellung: Spot 1 + Girlande blinken bis quittiert (src/barlicht.ts).
+    // Geblinkt wird nur am T400 (ein Prozess - sonst stimmt der gemerkte
+    // Lampenzustand nicht). Druckt die Cloud (ueber WireGuard), bittet sie den
+    // T400 darum (/api/internal/barlicht).
+    if (!VOR_ORT && stations.bar) {
+      fetch(`${KASSE_LOKAL_URL}/api/internal/barlicht`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': ORDER_API_KEY! },
+        body: JSON.stringify({ bestellung: orderId }), signal: AbortSignal.timeout(8000),
+      }).catch((e) => serverEreignis(pool, 'barlicht_fehler', `T400 nicht erreicht: ${e?.message || e}`, { bestellung: orderId }));
     }
+    if (VOR_ORT && stations.bar) barlichtStarten(orderId);
     return druckfehler;
 
   } catch (error) {
