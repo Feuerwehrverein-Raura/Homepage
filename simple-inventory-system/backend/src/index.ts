@@ -1875,7 +1875,7 @@ app.get('/api/items/sellable', async (req, res) => {
       SELECT
         i.id,
         i.name,
-        i.sale_price as price,
+        COALESCE(i.sale_price, 0) as price,
         COALESCE(NULLIF(i.sale_category, ''), c.name) as category,
         i.printer_station,
         i.quantity as stock,
@@ -1888,8 +1888,8 @@ app.get('/api/items/sellable', async (req, res) => {
       WHERE i.sellable = true
         AND i.active = true
         AND i.quantity > 0
-        AND i.sale_price IS NOT NULL
-        AND i.sale_price > 0
+        -- Ob ein Artikel in der Kasse erscheint, entscheidet "verkaufbar",
+        -- nicht der Preis (Glaeser zu 0.00, Chilbi 2026); ohne Preis = 0.00
       ORDER BY COALESCE(NULLIF(i.sale_category, ''), c.name), i.name
     `);
 
