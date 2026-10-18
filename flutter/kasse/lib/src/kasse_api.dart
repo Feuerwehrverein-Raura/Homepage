@@ -12,6 +12,7 @@
 // beiden Servern (gleiches JWT_SECRET) und wird taeglich erneuert.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show WebSocket;
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
@@ -128,6 +129,53 @@ class KasseApi {
   String basis = cloudBasis;
   int _fehlschlaege = 0;
   final ortGeaendert = StreamController<bool>.broadcast();
+
+  // ---- Live-Meldungen (WebSocket /ws wie die Web-Kasse) --------------------
+  // new_order, order_updated, order_completed, items_completed, print_failed.
+  // Haelt die Verbindung zum aktuellen Ort (Schopf/Cloud), verbindet nach
+  // Abbruch oder Ortswechsel neu.
+  final live = StreamController<Map<String, dynamic>>.broadcast();
+  WebSocket? _ws;
+  String? _wsBasis;
+  Timer? _wsTakt;
+
+  void liveStarten() {
+    _wsTakt ??= Timer.periodic(const Duration(seconds: 10), (_) => _wsPruefen());
+    _wsPruefen();
+  }
+
+  Future<void> _wsPruefen() async {
+    final t = token;
+    if (t == null) return;
+    if (_ws != null && _wsBasis == basis && _ws!.readyState == WebSocket.open) return;
+    try {
+      await _ws?.close();
+    } catch (_) {}
+    _ws = null;
+    final ziel = basis;
+    try {
+      final ws = await WebSocket.connect('${ziel.replaceFirst('https:', 'wss:').replaceFirst('http:', 'ws:')}/ws',
+              headers: {'Authorization': 'Bearer $t'})
+          .timeout(const Duration(seconds: 8));
+      ws.pingInterval = const Duration(seconds: 25);
+      _ws = ws;
+      _wsBasis = ziel;
+      ws.listen(
+        (n) {
+          try {
+            final d = json.decode('$n');
+            if (d is Map<String, dynamic>) live.add(d);
+          } catch (_) {}
+        },
+        onDone: () => _ws = null,
+        onError: (_) => _ws = null,
+        cancelOnError: true,
+      );
+      live.add({'type': 'verbunden'});
+    } catch (e) {
+      protokoll('live_fehler', meldung: '$e', daten: {'basis': ziel});
+    }
+  }
 
   bool get lokal => basis == lokalBasis;
 

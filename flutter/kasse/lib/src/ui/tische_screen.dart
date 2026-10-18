@@ -28,17 +28,26 @@ class _TischeScreenState extends State<TischeScreen> {
   bool _laedt = true;
   String? _fehler;
   Timer? _takt;
+  StreamSubscription<Map<String, dynamic>>? _liveAbo;
+  Timer? _entprellt;
 
   @override
   void initState() {
     super.initState();
     _laden();
     _takt = Timer.periodic(const Duration(seconds: 10), (_) => _laden());
+    // live: jede Aenderung an Bestellungen sofort zeigen (WebSocket)
+    _liveAbo = widget.api.live.stream.listen((_) {
+      _entprellt?.cancel();
+      _entprellt = Timer(const Duration(milliseconds: 400), _laden);
+    });
   }
 
   @override
   void dispose() {
     _takt?.cancel();
+    _liveAbo?.cancel();
+    _entprellt?.cancel();
     super.dispose();
   }
 
@@ -129,6 +138,18 @@ class _TischDetailState extends State<_TischDetail> {
   bool _arbeitet = false;
   // Nach Posten bezahlen: gewaehlte Posten-IDs (ganze Zeilen)
   final Set<int> _auswahl = {};
+  // live: Kueche fertig, bezahlt, neue Bestellung am Tisch (WebSocket + Takt)
+  StreamSubscription<Map<String, dynamic>>? _liveAbo;
+  Timer? _entprellt;
+  Timer? _takt;
+
+  @override
+  void dispose() {
+    _liveAbo?.cancel();
+    _entprellt?.cancel();
+    _takt?.cancel();
+    super.dispose();
+  }
 
   double get _auswahlSumme => _bestellungen
       .expand((b) => b.positionen)
@@ -164,6 +185,11 @@ class _TischDetailState extends State<_TischDetail> {
   void initState() {
     super.initState();
     _laden();
+    _liveAbo = widget.api.live.stream.listen((_) {
+      _entprellt?.cancel();
+      _entprellt = Timer(const Duration(milliseconds: 400), _laden);
+    });
+    _takt = Timer.periodic(const Duration(seconds: 10), (_) => _laden());
   }
 
   Future<void> _laden() async {

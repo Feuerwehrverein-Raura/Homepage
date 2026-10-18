@@ -36,6 +36,7 @@ class _KasseScreenState extends State<KasseScreen> {
   final List<Timer> _takte = [];
   StreamSubscription<bool>? _ortAbo;
   StreamSubscription<int>? _pufferAbo;
+  StreamSubscription<Map<String, dynamic>>? _liveAbo;
   int _puffer = 0;
   // Nicht gedruckte Bons: bleibt stehen, bis jemand "Gesehen" tippt -
   // eine kurze Meldung ist im Betrieb weg, bevor sie jemand liest.
@@ -66,7 +67,7 @@ class _KasseScreenState extends State<KasseScreen> {
       Timer.periodic(const Duration(seconds: 20), (_) => api.ortPruefen()),
     );
     _takte.add(
-      Timer.periodic(const Duration(minutes: 1), (_) => _nebendaten()),
+      Timer.periodic(const Duration(seconds: 30), (_) => _nebendaten()),
     );
     _takte.add(
       Timer.periodic(const Duration(hours: 12), (_) => api.erneuern()),
@@ -84,6 +85,13 @@ class _KasseScreenState extends State<KasseScreen> {
     );
     api.pufferSenden();
     api.ortPruefen().then((_) => _laden());
+    // live (WebSocket): Tisch-Zaehler sofort nachfuehren
+    api.liveStarten();
+    _liveAbo = api.live.stream.listen((m) {
+      _nebendaten();
+      // nach (Neu-)Verbindung alles frisch: es koennte etwas verpasst sein
+      if (m['type'] == 'verbunden') _artikelAuffrischen();
+    });
     api.erneuern();
     eigeneVersion().then((v) => mounted ? setState(() => _version = v) : null);
     // wie die Kuechen-App: kurz nach dem Start, dann regelmaessig
@@ -229,6 +237,7 @@ class _KasseScreenState extends State<KasseScreen> {
     }
     _ortAbo?.cancel();
     _pufferAbo?.cancel();
+    _liveAbo?.cancel();
     _tischFeld.dispose();
     super.dispose();
   }
