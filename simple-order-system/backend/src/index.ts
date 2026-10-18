@@ -15,7 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
-import { barlichtMelden } from './barlicht.js';
+import { barlichtMelden, barlichtStoppen } from './barlicht.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
@@ -224,6 +224,36 @@ app.post('/api/tischkarten/drucken', async (req, res) => {
     res.status(502).json({ error: `Nicht gedruckt: ${e?.message || e}` });
   }
 });
+// Bar-Licht ein/aus (Web-Kasse: Einstellungen, App: Menue). Die Einstellung
+// barlicht muss an BEIDEN Orten stimmen: der T400 blinkt und uebernimmt
+// Einstellungen aus der Cloud - nur lokal gesetzt wuerde sie ueberschrieben.
+app.get('/api/barlicht', async (_req, res) => {
+  res.json({ an: (await getSetting('barlicht')) !== 'aus' });
+});
+app.put('/api/barlicht', async (req: AuthenticatedRequest, res) => {
+  const an = req.body?.an === true;
+  await setSetting('barlicht', an ? 'an' : 'aus');
+  if (!an) barlichtStoppen();
+  const ziel = VOR_ORT ? CLOUD_ORDER_URL : KASSE_LOKAL_URL;
+  let weitergegeben = true;
+  try {
+    const r = await fetch(`${ziel}/api/internal/barlicht-schalter`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': ORDER_API_KEY! },
+      body: JSON.stringify({ an }), signal: AbortSignal.timeout(8000),
+    });
+    weitergegeben = r.ok;
+  } catch { weitergegeben = false; }
+  serverEreignis(pool, 'barlicht_schalter', an ? 'an' : 'aus', { daten: { von: req.user?.name || null, weitergegeben } });
+  res.json({ an, weitergegeben });
+});
+app.post('/api/internal/barlicht-schalter', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  const an = req.body?.an === true;
+  await setSetting('barlicht', an ? 'an' : 'aus');
+  if (!an) barlichtStoppen();
+  res.json({ an });
+});
+
 // Cloud -> T400: Bar-Licht fuer eine Bestellung, die die Cloud gedruckt hat
 app.post('/api/internal/barlicht', (req, res) => {
   if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });

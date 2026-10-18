@@ -421,6 +421,10 @@ class KasseApi {
     }
   }
 
+  /// Bar-Licht (Spot 1 + Girlande blinken bei Bar-Bestellungen) ein/aus.
+  Future<bool> barlichtLesen() async => ((await _anfrage('GET', '/barlicht')) as Map)['an'] == true;
+  Future<void> barlichtSetzen(bool an) => _anfrage('PUT', '/barlicht', daten: {'an': an});
+
   /// Tischkarten am Bar-Drucker (nur am T400). Liefert die Anzahl.
   Future<int> tischkartenDrucken(int von, int bis) async {
     final d = await _anfrage('POST', '/tischkarten/drucken', daten: {'von': von, 'bis': bis}, zeit: const Duration(seconds: 60));

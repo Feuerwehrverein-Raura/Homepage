@@ -125,6 +125,33 @@ class _KasseScreenState extends State<KasseScreen> {
     }
   }
 
+  // Bar-Licht: Spot 1 + Girlande blinken bei Bar-Bestellungen (backend src/barlicht.ts)
+  Future<void> _barlichtSchalten() async {
+    try {
+      final an = await api.barlichtLesen();
+      if (!mounted) return;
+      final neu = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Bar-Licht'),
+          content: Text(an
+              ? 'Ist an: Spot 1 und Girlande Bar blinken bei jeder Bar-Bestellung, bis die Bar sie erledigt.'
+              : 'Ist aus: bei Bar-Bestellungen blinkt nichts.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Abbrechen')),
+            FilledButton(onPressed: () => Navigator.pop(c, !an), child: Text(an ? 'Ausschalten' : 'Einschalten')),
+          ],
+        ),
+      );
+      if (neu == null) return;
+      await api.barlichtSetzen(neu);
+      protokoll('barlicht_schalter', meldung: neu ? 'an' : 'aus');
+      _meldung(neu ? 'Bar-Licht ist an' : 'Bar-Licht ist aus');
+    } on KasseFehler catch (e) {
+      _meldung(e.meldung, fehler: true);
+    }
+  }
+
   // Tischkarten am Bar-Drucker (backend src/tischkarten.ts), nur im Schopf
   Future<void> _tischkarten() async {
     final von = TextEditingController(text: '1');
@@ -814,11 +841,13 @@ class _KasseScreenState extends State<KasseScreen> {
           'ab' => _abmelden(),
           'update' => _updateSuchen(melden: true),
           'karten' => _tischkarten(),
+          'licht' => _barlichtSchalten(),
           _ => null,
         },
         itemBuilder: (_) => [
           const PopupMenuItem(value: 'neu', child: Text('Artikel neu laden')),
           const PopupMenuItem(value: 'karten', child: Text('Tischkarten drucken')),
+          const PopupMenuItem(value: 'licht', child: Text('Bar-Licht ein/aus')),
           PopupMenuItem(
             value: 'update',
             child: Text(

@@ -97,3 +97,8 @@ export function barlichtMelden(bestellung: number, nochOffen: Offen,
     }
   })();
 }
+
+/** Laufendes Blinken beenden (Schalter aus): Lampen gehen zurueck wie vorher. */
+export function barlichtStoppen(): void {
+  offen.clear();
+}

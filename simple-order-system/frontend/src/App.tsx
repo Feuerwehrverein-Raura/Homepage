@@ -3247,6 +3247,24 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
     }
     setBonLaeuft(false);
   };
+  // Bar-Licht: Spot 1 + Girlande blinken bei Bar-Bestellungen (backend src/barlicht.ts)
+  const [barlicht, setBarlicht] = useState<boolean | null>(null);
+  useEffect(() => {
+    fetch(`${API_URL}/barlicht`, { headers: token ? { 'Authorization': `Bearer ${token}` } : {} })
+      .then(r => r.ok ? r.json() : null).then(d => d && setBarlicht(!!d.an)).catch(() => {});
+  }, [token]);
+  const barlichtSchalten = async (an: boolean) => {
+    setBarlicht(an);
+    try {
+      const r = await fetch(`${API_URL}/barlicht`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ an }),
+      });
+      if (!r.ok) setBarlicht(!an);
+    } catch { setBarlicht(!an); }
+  };
+
   // Tischkarten am Bar-Drucker (backend src/tischkarten.ts), nur im Schopf
   const [karteVon, setKarteVon] = useState('1');
   const [karteBis, setKarteBis] = useState('20');
@@ -3448,6 +3466,21 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
           <button onClick={anmeldebonDrucken} disabled={bonLaeuft}
             className="px-5 py-3 rounded-lg bg-red-700 text-white font-semibold disabled:opacity-50 whitespace-nowrap">
             {bonLaeuft ? 'Druckt…' : '🖨️ Anmeldebon drucken'}
+          </button>
+        </div>
+
+        {/* Bar-Licht ein/aus */}
+        <div className="mb-8 border-2 border-gray-200 bg-gray-50 rounded-lg p-4 flex items-center gap-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold">💡 Bar-Licht</h3>
+            <p className="text-sm text-gray-600">Spot 1 und Girlande Bar blinken bei jeder Bar-Bestellung, bis die Bar sie als erledigt markiert.</p>
+          </div>
+          <button
+            onClick={() => barlicht !== null && barlichtSchalten(!barlicht)}
+            disabled={barlicht === null}
+            className={`px-5 py-3 rounded-lg font-semibold whitespace-nowrap disabled:opacity-50 ${barlicht ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-800'}`}
+          >
+            {barlicht === null ? '…' : barlicht ? 'An – ausschalten' : 'Aus – einschalten'}
           </button>
         </div>
 
