@@ -15,6 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
+import { barlichtMelden } from './barlicht.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
@@ -2680,6 +2681,17 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]):
       }
     }
 
+    // Bar-Bestellung: Spot 1 blinkt bis quittiert (src/barlicht.ts, nur am T400)
+    if (VOR_ORT && stations.bar) {
+      getSetting('barlicht').then((w) => {
+        if (w === 'aus') return;
+        barlichtMelden(orderId, async (ids) => (await pool.query(
+          `SELECT DISTINCT order_id FROM order_items
+           WHERE order_id = ANY($1) AND COALESCE(printer_station, 'bar') = 'bar' AND NOT COALESCE(completed, false)`,
+          [ids])).rows.map((r: any) => r.order_id),
+          (typ, m) => serverEreignis(pool, typ, m, { bestellung: orderId }));
+      }).catch(() => {});
+    }
     return druckfehler;
 
   } catch (error) {
