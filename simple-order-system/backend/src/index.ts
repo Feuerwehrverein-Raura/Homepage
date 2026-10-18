@@ -16,7 +16,7 @@ import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
-import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml } from './kassenbon.js';
+import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml, kassenbonsZuDrucken, kassenbonGedruckt, kassenbonDruckdienst } from './kassenbon.js';
 import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, signMitgliedPosToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
@@ -171,8 +171,10 @@ app.post('/api/internal/kassenbon', async (req, res) => {
   if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
   const von = String(req.body?.erstellt_von || 'Vorstand').slice(0, 100);
   try {
-    const bon = await kassenbonAnlegen(pool, von);
+    // Cloud erreicht den Drucker nicht: Bon fuer den T400 vormerken
+    const bon = await kassenbonAnlegen(pool, von, !!req.body?.drucken && !VOR_ORT);
     if (req.body?.drucken) {
+      if (!VOR_ORT) return res.json({ gilt_bis: bon.giltBis.toISOString(), warteschlange: true });
       await kassenbonDrucken(bon.code, bon.giltBis, von);
       return res.json({ gilt_bis: bon.giltBis.toISOString() });
     }
@@ -181,6 +183,17 @@ app.post('/api/internal/kassenbon', async (req, res) => {
     console.error('Kassen-Anmeldebon (intern):', e?.message || e);
     res.status(502).json({ error: `Bon nicht gedruckt: ${e?.message || e}` });
   }
+});
+// T400 holt Bons ab, die in der Cloud zum Drucken vorgemerkt sind
+app.get('/api/internal/kassenbon/offen', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  res.json(await kassenbonsZuDrucken(pool));
+});
+app.post('/api/internal/kassenbon/gedruckt', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  if (typeof req.body?.code !== 'string') return res.status(400).json({ error: 'code fehlt' });
+  await kassenbonGedruckt(pool, req.body.code);
+  res.json({ ok: true });
 });
 // Kasse: Bon drucken (angemeldet). Am T400 liegt der Bon in der Cloud, damit
 // er auch an einer Kasse gilt, die gerade ueber die Cloud laeuft.
@@ -831,6 +844,11 @@ geraeteEinrichten({
   app, pool, orderApiKey: ORDER_API_KEY, getSetting, setSetting, vorOrt: VOR_ORT,
   cloudUrl: (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, ''),
 });
+
+// T400 druckt Anmeldebons, die in der Cloud vorgemerkt wurden (src/kassenbon.ts)
+if (VOR_ORT) {
+  kassenbonDruckdienst({ pool, cloud: CLOUD_ORDER_URL, schluessel: ORDER_API_KEY!, drucken: kassenbonDrucken });
+}
 
 // Kasse vor Ort (T400) und Annahme ihrer Bestellungen in der Cloud - src/vorort.ts
 vorOrtEinrichten({

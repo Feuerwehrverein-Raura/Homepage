@@ -60,6 +60,15 @@ class MitgliederDienst {
 
   Future<Zugaenge> zugaenge() async => Zugaenge.ausJson(await api.get('members/me/accesses'));
 
+  /// Kassen-Anmeldebon am Bar-Drucker im Schopf drucken (geht ueber die
+  /// Cloud an den T400). Liefert die Meldung fuer die Anzeige.
+  Future<String> kassenbonDrucken() async {
+    final antwort = await api.post('members/me/kassenbon');
+    final bis = antwort is Map ? DateTime.tryParse('${antwort['gilt_bis']}')?.toLocal() : null;
+    final zeit = bis == null ? '' : ' – gilt einmal bis ${bis.hour.toString().padLeft(2, '0')}:${bis.minute.toString().padLeft(2, '0')} Uhr';
+    return 'Bon geht an den Bar-Drucker im Schopf$zeit.';
+  }
+
   Future<String> funktionsMailPasswortAendern({
     required String email,
     required String passwort,

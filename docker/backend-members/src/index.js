@@ -4048,6 +4048,32 @@ app.post('/vorstand/kassenbon', authenticateAny, requireRole('vorstand', 'admin'
     }
 });
 
+// Kassen-Anmeldebon fuer jedes Mitglied (Mitglieder-App, Zugaenge bei
+// roterschopf / Kasse & Kueche): die Zugaenge zeigen allen Mitgliedern das
+// Kassen-Passwort, ein Bon ist also kein Mehr an Rechten. Die Cloud merkt den
+// Bon vor, der T400 druckt ihn am Bar-Drucker im Schopf. Hoechstens einer pro
+// Person und Minute.
+const kassenbonZuletzt = new Map();
+app.post('/members/me/kassenbon', authenticateToken, async (req, res) => {
+    const wer = req.user.email || req.user.id || 'mitglied';
+    const jetzt = Date.now();
+    if ((kassenbonZuletzt.get(wer) || 0) > jetzt - 60000) {
+        return res.status(429).json({ error: 'Eben erst gedruckt - bitte eine Minute warten.' });
+    }
+    kassenbonZuletzt.set(wer, jetzt);
+    try {
+        const ORDER_INTERNAL_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+        const r = await axios.post(`${ORDER_INTERNAL_URL}/api/internal/kassenbon`,
+            { erstellt_von: req.user.name || req.user.email || 'Mitglied', drucken: true },
+            { headers: { 'X-Order-API-Key': process.env.ORDER_API_KEY }, timeout: 15000, validateStatus: () => true });
+        await logAudit(pool, 'KASSENBON_GEDRUCKT', null, req.user.email, getClientIp(req), { status: r.status, quelle: 'app' });
+        res.status(r.status).json(r.data);
+    } catch (error) {
+        console.error('POST /members/me/kassenbon:', error.message);
+        res.status(502).json({ error: 'Kasse nicht erreichbar - Bon nicht gedruckt.' });
+    }
+});
+
 // Geraete-Freigabe der Kasse (order-backend src/geraete.ts): Liste, freigeben,
 // sperren, Durchsetzung ein/aus. Nur Vorstand/Admin.
 async function kassenGeraeteProxy(req, res, methode, pfad, daten) {

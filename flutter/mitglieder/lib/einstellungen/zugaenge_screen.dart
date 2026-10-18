@@ -165,6 +165,8 @@ class _ZugaengeScreenState extends State<ZugaengeScreen> {
                             _Zeile('Nächster Wechsel', schweizerDatum(k.naechsterWechsel!)),
                           if (k.kontoName == 'order-system' && k.passwort != null)
                             _KassenQr(passwort: k.passwort!),
+                          if (k.kontoName == 'order-system' || k.kontoName == 'roterschopf')
+                            _KassenbonKnopf(dienste: widget.dienste),
                         ],
                       ),
                   ],
@@ -459,6 +461,56 @@ class _KassenQr extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               child: QrImageView(data: inhalt, size: 200, backgroundColor: Colors.white),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Anmeldebon am Bar-Drucker im Schopf: ein Geraet scannt ihn bei
+/// "QR-Code" und ist als Kasse angemeldet (einmal, eine Stunde).
+class _KassenbonKnopf extends StatefulWidget {
+  const _KassenbonKnopf({required this.dienste});
+
+  final Dienste dienste;
+
+  @override
+  State<_KassenbonKnopf> createState() => _KassenbonKnopfState();
+}
+
+class _KassenbonKnopfState extends State<_KassenbonKnopf> {
+  bool _laeuft = false;
+
+  Future<void> _drucken() async {
+    setState(() => _laeuft = true);
+    final bote = ScaffoldMessenger.of(context);
+    try {
+      final meldung = await widget.dienste.mitglieder.kassenbonDrucken();
+      bote.showSnackBar(SnackBar(content: Text(meldung)));
+    } catch (e) {
+      bote.showSnackBar(SnackBar(content: Text(fehlerText(e))));
+    } finally {
+      if (mounted) setState(() => _laeuft = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, right: 8, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Anmeldebon: druckt am Bar-Drucker im Schopf einen QR-Bon, '
+              'mit dem sich ein Gerät einmal als Kasse anmeldet (gilt eine Stunde).'),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _laeuft ? null : _drucken,
+            icon: _laeuft
+                ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.print),
+            label: const Text('Anmeldebon drucken'),
           ),
         ],
       ),

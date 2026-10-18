@@ -6,8 +6,11 @@
 // fuer Mitglieder); ein liegengebliebener Bon ist danach wertlos.
 // QR-Inhalt: {"v":1,"type":"fwv-kasse-bon","code":"..."} (src/qrcode.ts).
 //
-// Drucken: in der Kasse (Einstellungen) und im Vorstandsbereich (ueber
-// api-members -> /api/internal/kassenbon). Die Bons liegen in der Cloud; der
+// Drucken: in der Kasse (Einstellungen), im Vorstandsbereich und in der
+// Mitglieder-App unter Zugaenge (ueber api-members -> /api/internal/kassenbon).
+// Die Cloud erreicht den Drucker im Schopf nicht: sie legt den Bon mit
+// druck_offen an, der T400 holt offene Bons ab, druckt sie am Bar-Drucker
+// und meldet sie als gedruckt (kassenbonDruckdienst unten). Die Bons liegen in der Cloud; der
 // T400 holt sich den Code dort, solange Internet da ist, und legt ihn sonst
 // selbst an (dann nur am T400 einloesbar). Einloesen am T400: zuerst lokal,
 // sonst in der Cloud nachfragen.
@@ -24,14 +27,70 @@ export async function kassenbonSchema(pool: pg.Pool): Promise<void> {
       erstellt_am TIMESTAMPTZ DEFAULT now(),
       gilt_bis TIMESTAMPTZ NOT NULL,
       benutzt_am TIMESTAMPTZ)`);
+  await pool.query('ALTER TABLE kassen_bons ADD COLUMN IF NOT EXISTS druck_offen BOOLEAN DEFAULT false');
 }
 
-export async function kassenbonAnlegen(pool: pg.Pool, erstelltVon: string): Promise<{ code: string; giltBis: Date }> {
+export async function kassenbonAnlegen(pool: pg.Pool, erstelltVon: string, druckOffen = false): Promise<{ code: string; giltBis: Date }> {
   const code = crypto.randomBytes(24).toString('base64url');
   const giltBis = new Date(Date.now() + KASSENBON_MINUTEN * 60000);
-  await pool.query('INSERT INTO kassen_bons (code, erstellt_von, gilt_bis) VALUES ($1, $2, $3)',
-    [code, erstelltVon.slice(0, 200), giltBis]);
+  await pool.query('INSERT INTO kassen_bons (code, erstellt_von, gilt_bis, druck_offen) VALUES ($1, $2, $3, $4)',
+    [code, erstelltVon.slice(0, 200), giltBis, druckOffen]);
   return { code, giltBis };
+}
+
+/** Cloud: noch zu druckende, gueltige Bons (fuer den T400) */
+export async function kassenbonsZuDrucken(pool: pg.Pool): Promise<{ code: string; erstellt_von: string; gilt_bis: string }[]> {
+  const r = await pool.query(
+    `SELECT code, erstellt_von, gilt_bis FROM kassen_bons
+     WHERE druck_offen AND benutzt_am IS NULL AND gilt_bis > now() ORDER BY erstellt_am LIMIT 5`);
+  return r.rows.map((b) => ({ ...b, gilt_bis: new Date(b.gilt_bis).toISOString() }));
+}
+
+export async function kassenbonGedruckt(pool: pg.Pool, code: string): Promise<void> {
+  await pool.query('UPDATE kassen_bons SET druck_offen = false WHERE code = $1', [code]);
+}
+
+/**
+ * T400: offene Bons aus der Cloud holen, lokal uebernehmen (damit sie auch
+ * ohne Internet einloesbar sind), drucken, als gedruckt melden. Alle 5 s.
+ */
+export function kassenbonDruckdienst(d: {
+  pool: pg.Pool; cloud: string; schluessel: string;
+  drucken: (code: string, giltBis: Date, von: string) => Promise<void>;
+}): void {
+  let laeuft = false;
+  const fehlerGemeldet = new Set<string>();
+  setInterval(async () => {
+    if (laeuft) return;
+    laeuft = true;
+    try {
+      const r = await fetch(`${d.cloud}/api/internal/kassenbon/offen`, {
+        headers: { 'X-Order-API-Key': d.schluessel }, signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) return;
+      for (const b of (await r.json()) as { code: string; erstellt_von: string; gilt_bis: string }[]) {
+        await d.pool.query(
+          'INSERT INTO kassen_bons (code, erstellt_von, gilt_bis) VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING',
+          [b.code, b.erstellt_von, b.gilt_bis]);
+        try {
+          await d.drucken(b.code, new Date(b.gilt_bis), b.erstellt_von);
+        } catch (e: any) {
+          if (!fehlerGemeldet.has(b.code)) console.error('Anmeldebon aus der Cloud nicht gedruckt:', e?.message || e);
+          fehlerGemeldet.add(b.code);
+          continue; // naechster Takt versucht es nochmals
+        }
+        await fetch(`${d.cloud}/api/internal/kassenbon/gedruckt`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': d.schluessel },
+          body: JSON.stringify({ code: b.code }), signal: AbortSignal.timeout(8000),
+        });
+        console.log(`Anmeldebon aus der Cloud gedruckt (${b.erstellt_von})`);
+      }
+    } catch {
+      // ohne Internet: spaeter
+    } finally {
+      laeuft = false;
+    }
+  }, 5000);
 }
 
 // Einloesen und Entwerten in einem Zug (zwei gleichzeitige Scans: nur einer gilt).
