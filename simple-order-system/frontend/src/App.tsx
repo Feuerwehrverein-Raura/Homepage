@@ -1137,6 +1137,12 @@ function App() {
     return total;
   };
 
+  // Betrag, den das Zahlfenster am Tisch gerade kassiert (je Modus)
+  const tischZahlBetrag = (order: OpenOrder): number =>
+    splitPaymentMode === 'full' ? getUnpaidTotal(order)
+      : splitPaymentMode === 'split' ? (parseFloat(splitAmount) || 0)
+      : getSelectedItemsTotal(order);
+
   // Distribute a payment amount across multiple orders sequentially
   const distributePayment = async (
     allOrders: { id: number; total: string; paid_amount?: string }[],
@@ -2805,9 +2811,9 @@ function App() {
               {/* TWINT QR Code - shown when TWINT is selected */}
               {splitPaymentMethod === 'twint' && twintQrUrl && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                  <p className="text-center text-sm text-gray-600 mb-3">
-                    QR-Code mit TWINT App scannen:
-                  </p>
+                  {/* Klar sagen, was der Gast tut: QR scannen, diesen Betrag eingeben */}
+                  <p className="text-center text-sm text-gray-600">Gast scannt den QR-Code und gibt ein:</p>
+                  <p className="text-center text-3xl font-bold text-gray-900 mb-3">CHF {tischZahlBetrag(splitPaymentOrder).toFixed(2)}</p>
                   <img
                     src={twintQrUrl}
                     alt="TWINT QR Code"
@@ -2828,11 +2834,11 @@ function App() {
                 }
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-lg touch-manipulation"
               >
-                {splitPaymentMode === 'full' && `CHF ${getUnpaidTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
-                {splitPaymentMode === 'split' && splitAmount && `CHF ${parseFloat(splitAmount).toFixed(2)} bezahlen`}
-                {splitPaymentMode === 'split' && !splitAmount && 'Betrag eingeben'}
-                {splitPaymentMode === 'items' && selectedItemIds.length > 0 && `CHF ${getSelectedItemsTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
-                {splitPaymentMode === 'items' && selectedItemIds.length === 0 && 'Posten auswählen'}
+                {/* Die Kasse bestaetigt hier, dass das Geld da ist - nicht "bezahlen"
+                    (verwirrte am Tisch mit TWINT-QR, Chilbi 2026) */}
+                {splitPaymentMode === 'split' && !splitAmount ? 'Betrag eingeben'
+                  : splitPaymentMode === 'items' && selectedItemIds.length === 0 ? 'Posten auswählen'
+                  : `✓ CHF ${tischZahlBetrag(splitPaymentOrder).toFixed(2)} ${splitPaymentMethod === 'twint' ? 'per TWINT' : splitPaymentMethod === 'card' ? 'mit Karte' : 'bar'} erhalten`}
               </button>
 
               <button

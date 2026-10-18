@@ -108,7 +108,7 @@ class _ZahlungState extends State<_Zahlung> {
   }
 
   Widget _twint() => Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Diesen Betrag in TWINT eingeben', style: TextStyle(color: Colors.black54)),
+        const Text('Gast scannt den QR-Code und gibt ein:', style: TextStyle(color: Colors.black54)),
         _betrag(),
         const SizedBox(height: 8),
         if (widget.twintQr != null)
@@ -116,7 +116,7 @@ class _ZahlungState extends State<_Zahlung> {
         else
           const Text('Kein TWINT-QR hinterlegt'),
         const SizedBox(height: 12),
-        _abschliessen('✓ Zahlung erhalten', () => Navigator.pop(context, 'twint')),
+        _abschliessen('✓ CHF ${widget.betrag.toStringAsFixed(2)} per TWINT erhalten', () => Navigator.pop(context, 'twint')),
       ]);
 
   Widget _karte() => Column(mainAxisSize: MainAxisSize.min, children: [
