@@ -10,6 +10,7 @@ import '../kasse_api.dart';
 import '../protokoll.dart';
 import 'anmeldung.dart' show knopfRot;
 import '../updater.dart';
+import 'einstellungen_screen.dart';
 import 'tische_screen.dart';
 import 'zahlung.dart';
 
@@ -699,6 +700,18 @@ class _KasseScreenState extends State<KasseScreen> {
   }
 
   Widget _inhalt(bool breit) {
+    if (_reiter == 2) {
+      return EinstellungenScreen(
+        api: api,
+        version: _version,
+        updatePruefen: () => _updateSuchen(melden: true),
+        abmelden: _abmelden,
+        gespeichert: () {
+          _laden();
+          _nebendaten();
+        },
+      );
+    }
     if (_reiter == 1) {
       return TischeScreen(api: api, twintQr: _twintQr, eingebettet: true);
     }
@@ -752,6 +765,24 @@ class _KasseScreenState extends State<KasseScreen> {
             '🪑 Tische${_offeneTische > 0 ? ' ($_offeneTische)' : ''}',
           ),
         ],
+        const SizedBox(width: 8),
+        // Einstellungen wie in der Web-Kasse; kompakt, damit Kasse/Tische
+        // auf dem Handy breit bleiben
+        SizedBox(
+          width: 64,
+          height: 48,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(64, 48),
+              backgroundColor: _reiter == 2 ? Colors.white : const Color(0xFFB91C1C),
+              foregroundColor: _reiter == 2 ? _rot : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => setState(() => _reiter = 2),
+            child: const Text('⚙️', style: TextStyle(fontSize: 22)),
+          ),
+        ),
       ],
     ),
   );

@@ -331,6 +331,33 @@ class KasseApi {
     }
   }
 
+  // ---- Einstellungen (wie die Web-Kasse) -----------------------------------
+  Future<void> einstellungenSpeichern(Map<String, String> werte) => _anfrage('PUT', '/settings', daten: werte);
+
+  /// Testdruck an einen Bondrucker; liefert die Meldung des Servers.
+  Future<void> testdruck(String station, String ip, String port, String protokoll) => _anfrage('POST', '/settings/test-printer',
+      daten: {'station': station, 'ip': ip, 'port': port, 'protocol': protokoll}, zeit: const Duration(seconds: 40));
+
+  /// Kassen-Anmeldebon am Bar-Drucker; liefert "gilt bis" (lokale Zeit).
+  Future<DateTime?> kassenbonDrucken() async {
+    final d = await _anfrage('POST', '/auth/kassenbon', zeit: const Duration(seconds: 40));
+    return d is Map ? DateTime.tryParse('${d['gilt_bis']}')?.toLocal() : null;
+  }
+
+  /// Anlass-Stand: ({id, titel} | null, modus, auswahl) und die waehlbaren Anlaesse.
+  Future<(Map<String, dynamic>, List<Map<String, dynamic>>)> anlassStand() async {
+    final stand = await _anfrage('GET', '/anlass') as Map<String, dynamic>;
+    List<Map<String, dynamic>> liste = [];
+    try {
+      final l = await _anfrage('GET', '/anlass/liste') as Map<String, dynamic>;
+      liste = (l['anlaesse'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+    } catch (_) {}
+    return (stand, liste);
+  }
+
+  /// Anlass waehlen (null = automatisch).
+  Future<void> anlassWaehlen(String? id) => _anfrage('PUT', '/anlass/auswahl', daten: {'event_id': id});
+
   Future<Anlass?> anlass() async {
     try {
       final d = await _anfrage('GET', '/anlass') as Map<String, dynamic>;
