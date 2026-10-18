@@ -360,22 +360,49 @@ class _TischDetailState extends State<_TischDetail> {
                 child: const Text('Alles bezahlen', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
+            // Grosse Tasten statt Textlinks (wurden im Betrieb verfehlt)
+            const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: TextButton(onPressed: _arbeitet ? null : _teilbetrag, child: const Text('Teilbetrag'))),
               Expanded(
-                child: TextButton(
-                  onPressed: _arbeitet
-                      ? null
-                      : () => _aktion(() async {
-                            protokoll('quittung', daten: {'tisch': widget.tisch});
-                            await widget.api.quittungDrucken(widget.tisch, _bestellungen.map((b) => b.id).toList());
-                            _meldung('Quittung für Tisch ${widget.tisch} wird am Bar-Drucker gedruckt');
-                          }),
-                  child: const Text('🧾 Quittung'),
+                child: SizedBox(
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: _arbeitet ? null : _teilbetrag,
+                    child: const Text('Teilbetrag', style: TextStyle(fontSize: 17)),
+                  ),
                 ),
               ),
-              Expanded(child: TextButton(onPressed: _arbeitet ? null : _aufloesen, child: const Text('Tisch auflösen', style: TextStyle(color: knopfRot)))),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: _arbeitet
+                        ? null
+                        : () => _aktion(() async {
+                              protokoll('quittung', daten: {'tisch': widget.tisch});
+                              await widget.api.quittungDrucken(widget.tisch, _bestellungen.map((b) => b.id).toList());
+                              _meldung('Quittung für Tisch ${widget.tisch} wird am Bar-Drucker gedruckt');
+                            }),
+                    child: const Text('🧾 Quittung', style: TextStyle(fontSize: 17)),
+                  ),
+                ),
+              ),
             ]),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: knopfRot,
+                  backgroundColor: const Color(0xFFFEF2F2),
+                  side: const BorderSide(color: Color(0xFFFECACA)),
+                ),
+                onPressed: _arbeitet ? null : _aufloesen,
+                child: const Text('🗑️ Tisch auflösen', style: TextStyle(fontSize: 17)),
+              ),
+            ),
           ]),
         ),
       ),

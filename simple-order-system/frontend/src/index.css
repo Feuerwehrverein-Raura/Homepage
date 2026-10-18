@@ -10,3 +10,19 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Kasse im Festbetrieb (Chilbi 2026): jeder Knopf mindestens 48 px hoch -
+   mit dem Finger, oft in Eile. Kleine Knoepfe (Storno-Kreuz, Abbrechen,
+   Reiter im Zahlfenster) wurden verfehlt. */
+button {
+  min-height: 48px;
+}
+button.text-xs,
+button.text-sm {
+  font-size: 1rem;
+}
+/* Storno-Kreuz an der Position: echte Taste statt Buchstabe */
+button[title="Artikel stornieren"] {
+  min-width: 48px;
+  font-size: 1.25rem;
+}

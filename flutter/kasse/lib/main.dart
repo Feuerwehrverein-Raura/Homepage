@@ -47,10 +47,22 @@ class _KasseAppState extends State<KasseApp> {
     return MaterialApp(
       title: 'Kasse',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xFFDC2626), useMaterial3: true),
+      // Grosse Knoepfe ueberall (Festbetrieb, Finger, Eile): mindestens 52 px
+      // hoch, Symbole 52x52, Schrift 17 - kleine Knoepfe wurden verfehlt.
+      theme: ThemeData(
+        colorSchemeSeed: const Color(0xFFDC2626),
+        useMaterial3: true,
+        filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(64, 52), textStyle: _knopfSchrift)),
+        textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: const Size(64, 52), textStyle: _knopfSchrift)),
+        outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(64, 52), textStyle: _knopfSchrift)),
+        iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(minimumSize: const Size(52, 52), iconSize: 28)),
+        popupMenuTheme: const PopupMenuThemeData(textStyle: TextStyle(fontSize: 18, color: Colors.black87)),
+      ),
       home: _angemeldet
           ? KasseScreen(api: widget.api, abgemeldet: () => setState(() => _angemeldet = false))
           : Anmeldung(api: widget.api, angemeldet: () => setState(() => _angemeldet = true)),
     );
   }
 }
+
+const _knopfSchrift = TextStyle(fontSize: 17, fontWeight: FontWeight.w600);
