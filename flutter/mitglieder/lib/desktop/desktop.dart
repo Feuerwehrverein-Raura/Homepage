@@ -7,7 +7,7 @@
 //   macOS: Schluesselbund) - wie keyring in vorstand-desktop.
 // - Dateien (PDF, .ics): kein Teilen-Menue, sondern speichern unter
 //   "Downloads" und mit dem passenden Programm oeffnen.
-// - Update: Hinweis aus members-latest.json, Download auf der Release-Seite.
+// - Update: Hinweis aus www.fwv-raura.ch/download/versionen.json, Download auf der Release-Seite.
 // - Kein Push (Firebase gibt es auf Linux/Windows nicht), kein
 //   Kontakt-Abgleich (Adressbuch ueber CardDAV).
 
@@ -69,8 +69,8 @@ Future<Directory> _downloadOrdner() async {
 Uri releaseSeite(String version) =>
     Uri.parse('https://github.com/Feuerwehrverein-Raura/Homepage/releases/tag/members-v$version');
 
-/// Hinweis auf eine neuere Desktop-Fassung: dieselbe members-latest.json wie
-/// die GitHub-APK (build-android-members.yml), der Knopf fuehrt aber zur
+/// Hinweis auf eine neuere Desktop-Fassung: dieselbe versionen.json wie
+/// die APK (www.fwv-raura.ch/download/), der Knopf fuehrt aber zur
 /// Release-Seite der Version. Installieren muss man von Hand.
 class DesktopAppUpdate implements AppUpdate {
   DesktopAppUpdate({required this.appVersion, http.Client? client}) : _client = client ?? http.Client();
@@ -81,7 +81,7 @@ class DesktopAppUpdate implements AppUpdate {
   @override
   Future<UpdateStand> pruefen() async {
     try {
-      final antwort = await _client.get(githubVersionsDatei).timeout(const Duration(seconds: 10));
+      final antwort = await _client.get(versionsDatei).timeout(const Duration(seconds: 10));
       if (antwort.statusCode != 200) return const KeinUpdate();
       return desktopStand(antwort.body, await appVersion());
     } on Object {
@@ -99,8 +99,8 @@ class DesktopAppUpdate implements AppUpdate {
   Future<void> playAbschliessen() async {}
 }
 
-/// Wie [githubStand], aber mit der Release-Seite statt der APK.
-UpdateStand desktopStand(String json, String installiert) => switch (githubStand(json, installiert)) {
+/// Wie [versionsStand], aber mit der Release-Seite statt der APK.
+UpdateStand desktopStand(String json, String installiert) => switch (versionsStand(json, installiert)) {
   ApkUpdate(:final version) => DownloadUpdate(version: version, seite: releaseSeite(version)),
   final andere => andere,
 };

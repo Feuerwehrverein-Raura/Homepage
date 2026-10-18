@@ -5,9 +5,11 @@
 // Antippen laedt Play im Hintergrund, danach "Neu starten". Gilt auch fuer
 // Tester (Play liefert die Version ihres Tracks).
 //
-// Sonst (APK von GitHub, members-latest): die Datei members-latest.json am
-// GitHub-Release sagt, welche Version dort liegt; ist sie neuer, fuehrt der
-// Hinweis zum Herunterladen der APK in Chrome (update_hinweis.dart erklaert
+// Sonst (APK von der Website): www.fwv-raura.ch/download/versionen.json sagt,
+// welche Version unter /download/mitglieder.apk liegt (der Vereinsserver holt
+// sie vom Release members-latest, docker/app-downloads/holen.sh - frueher
+// direkt von GitHub, das blieb auf manchen Handys haengen); ist sie neuer,
+// fuehrt der Hinweis zum Herunterladen der APK in Chrome (update_hinweis.dart erklaert
 // vorher die Chrome-Rueckfrage). Installieren muss man sie von Hand: ein
 // eigener Download mit Paketinstaller braeuchte REQUEST_INSTALL_PACKAGES und
 // waere fuer die Play-Fassung (dieselbe Datei) ein Selbst-Update an Play
@@ -27,11 +29,9 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-/// Wo die GitHub-APK ihre Version ankuendigt (siehe
-/// .github/workflows/build-android-members.yml, members-latest).
-final githubVersionsDatei = Uri.parse(
-  'https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.json',
-);
+/// Wo die APK auf der Website ihre Version ankuendigt (Skill fwv-app-downloads).
+final versionsDatei = Uri.parse('https://www.fwv-raura.ch/download/versionen.json');
+const _downloadOrdner = 'https://www.fwv-raura.ch/download/';
 
 sealed class UpdateStand {
   const UpdateStand();
@@ -48,7 +48,7 @@ class PlayUpdate extends UpdateStand {
   final bool geladen;
 }
 
-/// Neuere APK auf GitHub.
+/// Neuere APK auf der Website.
 class ApkUpdate extends UpdateStand {
   const ApkUpdate({required this.version, required this.apk});
   final String version;
@@ -131,9 +131,9 @@ class AndroidAppUpdate implements AppUpdate {
   }
 
   Future<UpdateStand> _github() async {
-    final antwort = await _client.get(githubVersionsDatei).timeout(const Duration(seconds: 10));
+    final antwort = await _client.get(versionsDatei).timeout(const Duration(seconds: 10));
     if (antwort.statusCode != 200) return const KeinUpdate();
-    return githubStand(antwort.body, await appVersion());
+    return versionsStand(antwort.body, await appVersion());
   }
 
   @override
@@ -143,11 +143,17 @@ class AndroidAppUpdate implements AppUpdate {
   Future<void> playAbschliessen() => kanal.invokeMethod<void>('abschliessen');
 }
 
-/// Wertet members-latest.json aus: {"version": "1.0.2", "apk": "https://…"}.
+/// Wertet versionen.json der Website aus:
+/// {"mitglieder": {"version": "1.0.2", "datei": "mitglieder.apk", ...}, ...}.
+/// Das fruehere Format von members-latest.json ({"version", "apk"}) geht auch.
 /// [installiert] wie [Dienste.appVersion] ("1.0.1 (10001)").
-UpdateStand githubStand(String json, String installiert) {
-  final daten = jsonDecode(json);
+UpdateStand versionsStand(String json, String installiert) {
+  var daten = jsonDecode(json);
   if (daten is! Map) return const KeinUpdate();
+  if (daten['mitglieder'] is Map) {
+    final m = daten['mitglieder'] as Map;
+    daten = {'version': m['version'], 'apk': '$_downloadOrdner${m['datei'] ?? 'mitglieder.apk'}'};
+  }
   final version = daten['version'];
   final apk = daten['apk'];
   if (version is! String || apk is! String) return const KeinUpdate();

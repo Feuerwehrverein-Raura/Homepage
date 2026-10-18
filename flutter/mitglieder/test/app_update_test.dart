@@ -25,24 +25,24 @@ void main() {
     });
   });
 
-  group('githubStand', () {
+  group('versionsStand', () {
     const json = '{"version":"1.0.2","versionCode":10002,"apk":"https://example.org/a.apk"}';
 
     test('neuere APK', () {
-      final s = githubStand(json, '1.0.1 (10001)');
+      final s = versionsStand(json, '1.0.1 (10001)');
       expect(s, isA<ApkUpdate>());
       expect((s as ApkUpdate).version, '1.0.2');
       expect(s.apk, Uri.parse('https://example.org/a.apk'));
     });
 
     test('gleiche oder aeltere Version: kein Hinweis', () {
-      expect(githubStand(json, '1.0.2 (10002)'), isA<KeinUpdate>());
-      expect(githubStand(json, '1.1.0 (10100)'), isA<KeinUpdate>());
+      expect(versionsStand(json, '1.0.2 (10002)'), isA<KeinUpdate>());
+      expect(versionsStand(json, '1.1.0 (10100)'), isA<KeinUpdate>());
     });
 
     test('kaputte Datei: kein Hinweis', () {
-      expect(githubStand('[]', '1.0.0'), isA<KeinUpdate>());
-      expect(githubStand('{"version":1}', '1.0.0'), isA<KeinUpdate>());
+      expect(versionsStand('[]', '1.0.0'), isA<KeinUpdate>());
+      expect(versionsStand('{"version":1}', '1.0.0'), isA<KeinUpdate>());
     });
   });
 
@@ -80,16 +80,23 @@ void main() {
       expect((s as PlayUpdate).geladen, isTrue);
     });
 
-    test('APK von GitHub: liest members-latest.json', () async {
+    test('APK von der Website: liest versionen.json', () async {
       nativ((c) => 'andere');
       Uri? gefragt;
       final client = MockClient((r) async {
         gefragt = r.url;
-        return http.Response('{"version":"1.0.2","apk":"https://example.org/a.apk"}', 200);
+        return http.Response('{"mitglieder":{"datei":"mitglieder.apk","version":"99.0.0"},"kasse":{"version":"2.6"}}', 200);
       });
       final s = await dienst(client).pruefen();
-      expect(gefragt, githubVersionsDatei);
-      expect(s, isA<ApkUpdate>());
+      expect(gefragt, versionsDatei);
+      expect((s as ApkUpdate).apk, Uri.parse('https://www.fwv-raura.ch/download/mitglieder.apk'));
+      expect(s.version, '99.0.0');
+    });
+
+    test('altes Format members-latest.json geht weiterhin', () async {
+      nativ((c) => 'andere');
+      final client = MockClient((r) async => http.Response('{"version":"99.0.2","apk":"https://example.org/a.apk"}', 200));
+      expect(await dienst(client).pruefen(), isA<ApkUpdate>());
     });
 
     test('Fehler: kein Hinweis statt Absturz', () async {

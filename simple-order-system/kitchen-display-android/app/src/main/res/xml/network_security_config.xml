@@ -8,9 +8,11 @@
 <network-security-config>
     <!-- Kasse vor Ort (T400, Oktober 2026): Let's-Encrypt-Kette ECC (YE1 ->
          Root YE -> ISRG Root X2). Android 7.1 kennt X1, aber nicht X2; die
-         beiden Wurzeln liegen deshalb zusaetzlich zu den System-CAs bei. -->
+         beiden Wurzeln liegen deshalb zusaetzlich zu den System-CAs bei.
+         www.fwv-raura.ch: Updates (download/versionen.json, kueche.apk). -->
     <domain-config>
         <domain includeSubdomains="false">kasse-lokal.fwv-raura.ch</domain>
+        <domain includeSubdomains="false">www.fwv-raura.ch</domain>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="@raw/isrg_root_x1" />

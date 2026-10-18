@@ -8,7 +8,6 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.google.gson.Gson
-import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,13 +17,9 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Selbst-Update ueber GitHub-Releases mit Tag kds-v*.
- *
- * Frueher wurden die letzten 100 Releases des Repos durchsucht. Im Repo
- * erscheinen aber laufend andere Releases (Website, Desktop, Mitglieder-App),
- * die KDS-Releases rutschten aus dieser Liste — die App sah kds-v2.4 als
- * neueste Version. Jetzt: alle Tags kds-v* holen (git/matching-refs), nach
- * Version sortieren und das Release zum hoechsten Tag lesen.
+ * Selbst-Update ueber www.fwv-raura.ch/download/ (versionen.json + kueche.apk).
+ * Der Vereinsserver holt dort das neueste Release kds-v* ab. Die GitHub-API
+ * erreichte das Kuechen-Tablet (Android 7) nicht - siehe checkForUpdate.
  *
  * Installiert wird nur das signierte «-release.apk» (gleicher Schluessel wie
  * alle bisherigen Releases). Das Debug-APK ist mit einem wechselnden
@@ -33,10 +28,9 @@ import java.util.concurrent.TimeUnit
 class UpdateChecker(private val context: Context) {
     companion object {
         private const val TAG = "UpdateChecker"
-        private const val REPO = "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage"
-        private const val TAGS_URL = "$REPO/git/matching-refs/tags/kds-v"
-        private const val RELEASE_BY_TAG_URL = "$REPO/releases/tags/"
-        const val RELEASES_PAGE = "https://github.com/Feuerwehrverein-Raura/Homepage/releases"
+        private const val VERSIONEN_URL = "https://www.fwv-raura.ch/download/versionen.json"
+        private const val DOWNLOAD_URL = "https://www.fwv-raura.ch/download/"
+        const val RELEASES_PAGE = "https://www.fwv-raura.ch/apps.html"
 
         /** Vergleicht Versionsnummern wie "3.0" und "2.6.1". */
         fun isNewerVersion(latest: String, current: String): Boolean {
@@ -75,7 +69,6 @@ class UpdateChecker(private val context: Context) {
     private fun getJson(url: String): String? {
         val request = Request.Builder()
             .url(url)
-            .header("Accept", "application/vnd.github+json")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
@@ -86,32 +79,24 @@ class UpdateChecker(private val context: Context) {
         }
     }
 
+    /**
+     * Neue Version? Quelle ist www.fwv-raura.ch/download/versionen.json (der
+     * Vereinsserver holt die Releases kds-v*, Skill fwv-app-downloads). Frueher
+     * die GitHub-API - die erreicht das Kuechen-Tablet (Android 7) nicht, weil
+     * es GitHubs Zertifikatskette nicht kennt; deshalb kamen 3.1/3.2 nie an.
+     */
     suspend fun checkForUpdate(): UpdateResult = withContext(Dispatchers.IO) {
         try {
-            val refsJson = getJson(TAGS_URL) ?: return@withContext UpdateResult.Error("Tags nicht lesbar")
-            val refs = gson.fromJson(refsJson, JsonArray::class.java)
-                .mapNotNull { it.asJsonObject.get("ref")?.asString }
+            val json = getJson(VERSIONEN_URL) ?: return@withContext UpdateResult.Error("Versionen nicht lesbar")
+            val kueche = gson.fromJson(json, JsonObject::class.java).getAsJsonObject("kueche")
+                ?: return@withContext UpdateResult.Error("Keine Kuechen-App in versionen.json")
+            val version = kueche.get("version")?.asString ?: return@withContext UpdateResult.Error("Version fehlt")
+            val datei = kueche.get("datei")?.asString ?: "kueche.apk"
             val currentVersion = getCurrentVersion()
-
-            // Hoechsten Tag mit einem fertigen Release-APK suchen (ein Tag kann
-            // existieren, bevor der Build sein APK angehaengt hat).
-            for (tag in sortTags(refs).take(3)) {
-                val version = tag.removePrefix("kds-v")
-                if (!isNewerVersion(version, currentVersion)) return@withContext UpdateResult.NoUpdate
-                val releaseJson = getJson(RELEASE_BY_TAG_URL + tag) ?: continue
-                val release = gson.fromJson(releaseJson, JsonObject::class.java)
-                val apkUrl = release.getAsJsonArray("assets")
-                    ?.map { it.asJsonObject }
-                    ?.firstOrNull {
-                        val name = it.get("name")?.asString.orEmpty()
-                        name.endsWith("-release.apk")
-                    }
-                    ?.get("browser_download_url")?.asString
-                    ?: continue
-                Log.d(TAG, "Update: $currentVersion -> $version ($apkUrl)")
-                return@withContext UpdateResult.UpdateAvailable(currentVersion, version, apkUrl)
-            }
-            UpdateResult.NoUpdate
+            if (!isNewerVersion(version, currentVersion)) return@withContext UpdateResult.NoUpdate
+            val apkUrl = DOWNLOAD_URL + datei
+            Log.d(TAG, "Update: $currentVersion -> $version ($apkUrl)")
+            UpdateResult.UpdateAvailable(currentVersion, version, apkUrl)
         } catch (e: Exception) {
             Log.e(TAG, "Error checking for updates", e)
             UpdateResult.Error(e.message ?: "Unbekannter Fehler")
