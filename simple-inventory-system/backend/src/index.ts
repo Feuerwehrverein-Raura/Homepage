@@ -2851,7 +2851,8 @@ app.get('/api/qrcode/label/:code', async (req, res) => {
 // BOX CONTENT LABEL (Kisteninhalt-Etikett)
 // ========================================
 
-// Inhaltsblatt fuer den Kistendeckel (A4 hoch): Name, Foto, Stueckliste und
+// Inhaltsblatt fuer den Kistendeckel (A4 quer): links das Foto, rechts Name,
+// Stueckliste und
 // QR-Code, der die Kiste in der Lagerverwaltung oeffnet (/kiste/:id).
 // Ohne zugeordnete Artikel steht die Beschreibung der Kiste als Inhalt da.
 function htmlText(s: unknown): string {
@@ -2915,20 +2916,21 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kiste ${htmlText(location.name)}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
+    @page { size: A4 landscape; margin: 10mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.35; color: #111; background: #fff; }
-    .blatt { max-width: 186mm; margin: 0 auto; padding: 4mm; }
-    .kopf { display: flex; align-items: flex-start; gap: 6mm; border-bottom: 3px solid #B91C1C; padding-bottom: 4mm; margin-bottom: 5mm; }
+    .blatt { width: 277mm; max-width: 100%; margin: 0 auto; padding: 4mm; display: flex; gap: 8mm; align-items: flex-start; }
+    .foto { flex: 0 0 140mm; max-width: 50%; }
+    .foto img { width: 100%; max-height: 186mm; object-fit: contain; border-radius: 2mm; display: block; }
+    .rechts { flex: 1; min-width: 0; }
+    .kopf { display: flex; align-items: flex-start; gap: 5mm; border-bottom: 3px solid #B91C1C; padding-bottom: 3mm; margin-bottom: 4mm; }
     .kopf .titel { flex: 1; }
     .verein { font-size: 10pt; color: #B91C1C; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; }
-    .name { font-size: 40pt; font-weight: bold; line-height: 1.1; margin: 1mm 0 2mm; }
+    .name { font-size: 36pt; font-weight: bold; line-height: 1.1; margin: 1mm 0 2mm; overflow-wrap: anywhere; }
     .unter { font-size: 12pt; color: #333; }
-    .qr { text-align: center; width: 42mm; }
-    .qr img { width: 42mm; height: 42mm; display: block; }
+    .qr { text-align: center; width: 38mm; }
+    .qr img { width: 38mm; height: 38mm; display: block; }
     .qr div { font-size: 7.5pt; color: #555; margin-top: 1mm; }
-    .foto { margin-bottom: 5mm; text-align: center; }
-    .foto img { max-width: 100%; max-height: 120mm; object-fit: contain; border-radius: 2mm; }
     h2 { font-size: 13pt; margin-bottom: 2mm; }
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; font-size: 9pt; color: #555; border-bottom: 2px solid #333; padding: 1.5mm 2mm; }
@@ -2946,15 +2948,18 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
     .knopf button.zweit { background: #6b7280; }
     .platz { height: 60px; }
     @media print { .knopf, .platz { display: none; } .blatt { padding: 0; } }
+    @media screen and (max-width: 700px) { .blatt { display: block; } .foto { max-width: 100%; margin-bottom: 4mm; } }
   </style>
 </head>
 <body>
   <div class="knopf">
-    <button onclick="window.print()">🖨️ Drucken (A4)</button>
+    <button onclick="window.print()">🖨️ Drucken (A4 quer)</button>
     <button class="zweit" onclick="window.close()">Schliessen</button>
   </div>
   <div class="platz"></div>
   <div class="blatt">
+    ${location.image_url ? `<div class="foto"><img src="${htmlText(location.image_url)}" alt="Foto der Kiste"></div>` : ''}
+    <div class="rechts">
     <div class="kopf">
       <div class="titel">
         <div class="verein">Feuerwehrverein Raura · Lager</div>
@@ -2966,12 +2971,12 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
         <div>Scannen: Kiste in der<br>Lagerverwaltung</div>
       </div>
     </div>
-    ${location.image_url ? `<div class="foto"><img src="${htmlText(location.image_url)}" alt="Foto der Kiste"></div>` : ''}
     <h2>Inhalt</h2>
     ${stueckliste}
     <div class="fuss">
       <span>${items.length > 0 ? `${items.length} Artikel · ` : ''}Stand ${datum}</span>
       <span>${htmlText(kisteUrl.replace(/^https?:\/\//, ''))}</span>
+    </div>
     </div>
   </div>
 </body>

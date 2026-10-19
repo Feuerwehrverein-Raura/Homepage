@@ -1894,7 +1894,7 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
             <button
               onClick={() => printBoxLabel(selectedBox.id)}
               className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg touch-manipulation"
-              title="Inhaltsblatt für den Deckel (A4) drucken"
+              title="Inhaltsblatt für den Deckel (A4 quer) drucken"
             >
               🖨️ Deckelblatt
             </button>
