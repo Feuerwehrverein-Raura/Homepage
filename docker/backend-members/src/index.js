@@ -22,6 +22,7 @@ const { vorstandsRollen } = require('./vorstand-rolle');
 const { roterSchopf, hatRoterSchopfZugang, VORGABE: ROTER_SCHOPF_VORGABE } = require('./roter-schopf');
 const { schopfVerlauf, grenzenAus } = require('./schopf-verlauf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
+const { kioskZeileSaeubern, kioskKandidat, kioskAbgleichen } = require('./kiosk-abgleich');
 const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
@@ -6530,78 +6531,7 @@ app.get('/kiosk/bibliothek', authenticateToken, async (req, res) => {
 // Fehlliste ist deshalb kein Mangel, sondern die Antwort auf die Frage,
 // was der Sammlung noch fehlt.
 //
-// Der Abgleich schlaegt vor, er entscheidet nicht: Jeder Treffer landet in
-// der Auswahl und laesst sich dort einzeln herausnehmen. Bei unscharfem
-// Vergleich ist das der Unterschied zwischen Hilfe und Aerger.
-
-// Alles wegraeumen, was zwischen zwei Schreibweisen desselben Titels steht.
-function kioskNormalisiere(text) {
-    return String(text || '')
-        .toLowerCase()
-        .replace(/ß/g, 'ss')
-        // Akzente abtrennen und verwerfen: "Céline" und "Celine" sind dasselbe.
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\.(mp3|m4a|flac|wav|ogg|opus)\s*$/, '')
-        // "K.I.Z" und "A.C.D.C." zu einem Wort zusammenziehen, BEVOR die
-        // Punkte zu Leerzeichen werden. Sonst zerfaellt der Interpret in
-        // Einzelbuchstaben und faellt gleich darauf durch das Laengenraster
-        // — "K.I.Z - Kannibalenlied - Live" blieb so als einziger von
-        // vierzig Testtiteln unerkannt.
-        .replace(/\b(?:[a-z]\.){2,}/g, m => m.replace(/\./g, ''))
-        // Klammern raus — dort steht bei YouTube der ganze Ballast:
-        // "(Official Video)", "[4K Remaster]", "(Lyrics)".
-        .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
-        .replace(/\b(official|video|videoclip|lyric|lyrics|audio|hd|hq|4k|remaster|remastered|live|feat|ft|prod|explicit|version)\b/g, ' ')
-        .replace(/[^a-z0-9 ]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-// Einbuchstabige Reste tragen nichts bei und verzerren nur das Mass — es
-// sei denn, es bleibt sonst nichts uebrig. Bei kurzen Titeln ("U 2 - One")
-// ist ein schwaches Wort besser als gar keines.
-function kioskWorte(text) {
-    const alle = kioskNormalisiere(text).split(' ').filter(Boolean);
-    const lang = alle.filter(w => w.length > 1);
-    return lang.length >= 2 ? lang : alle;
-}
-
-// Aehnlichkeit zweier Wortmengen (Dice). Bewusst wortbasiert und nicht
-// zeichenweise: "Bohemian Rhapsody - Queen" und "Queen - Bohemian Rhapsody"
-// sind derselbe Titel, und die Reihenfolge von Interpret und Titel ist in
-// Exportlisten nicht einheitlich.
-function kioskAehnlichkeit(a, b) {
-    if (!a.length || !b.length) return 0;
-    const zaehler = new Map();
-    for (const w of b) zaehler.set(w, (zaehler.get(w) || 0) + 1);
-    let gemeinsam = 0;
-    for (const w of a) {
-        const n = zaehler.get(w) || 0;
-        if (n > 0) { gemeinsam++; zaehler.set(w, n - 1); }
-    }
-    return (2 * gemeinsam) / (a.length + b.length);
-}
-
-// Listen kommen in allen Formen: nummeriert, als CSV mit acht Spalten, mit
-// Links, mit Tabulatoren. Hier wird jede Zeile auf das Wesentliche gebracht.
-function kioskZeileSaeubern(zeile) {
-    let z = String(zeile).trim();
-    if (!z) return '';
-    z = z.replace(/https?:\/\/\S+/g, ' ');       // Links tragen nichts bei
-    z = z.replace(/^\s*\d{1,3}[.)]\s+/, '');     // "12. " am Zeilenanfang
-
-    // CSV oder Tabulatoren: Die ersten beiden Felder sind bei den gaengigen
-    // Exporten Titel und Interpret — der Rest ist Album, Spieldauer, ISRC
-    // und aehnliches Rauschen, das den Vergleich verwaessert.
-    if (z.includes('\t') || (z.match(/,/g) || []).length >= 2) {
-        const felder = z.split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
-            .map(f => f.replace(/^\s*"|"\s*$/g, '').trim())
-            .filter(f => f && !/^\d+(:\d+)?$/.test(f));
-        if (felder.length >= 2) z = felder[0] + ' ' + felder[1];
-        else if (felder.length === 1) z = felder[0];
-    }
-    return z.trim();
-}
+// Der Vergleich selbst steht in src/kiosk-abgleich.js.
 
 app.post('/kiosk/abgleich', authenticateToken, async (req, res) => {
     try {
@@ -6621,47 +6551,7 @@ app.post('/kiosk/abgleich', authenticateToken, async (req, res) => {
         }
         // Wortmengen einmal vorbereiten statt fuer jede Zeile neu: 1153 Titel
         // mal 300 Zeilen sind sonst 350'000 Normalisierungen.
-        const kandidaten = sammlung.rows.map(r => ({
-            pfad: r.pfad, interpret: r.interpret, titel: r.titel,
-            worte: kioskWorte((r.interpret || '') + ' ' + (r.titel || '') + ' ' + r.pfad)
-        }));
-
-        const gefunden = [];
-        const fehlend = [];
-        const schonDrin = new Set();
-
-        for (const zeile of zeilen) {
-            const w = kioskWorte(zeile);
-            // Eine einzelne Zeile mit nur einem brauchbaren Wort trifft fast
-            // alles — solche Zeilen sind Kopfzeilen oder Trenner, keine Titel.
-            if (w.length < 2) { fehlend.push(zeile); continue; }
-
-            let bester = null, bestwert = 0;
-            for (const k of kandidaten) {
-                const wert = kioskAehnlichkeit(w, k.worte);
-                if (wert > bestwert) { bestwert = wert; bester = k; }
-            }
-
-            // 0.62: unterhalb davon sind es erfahrungsgemaess zufaellige
-            // Wortueberschneidungen ("Love", "Night") und keine Titel.
-            if (bester && bestwert >= 0.62 && !schonDrin.has(bester.pfad)) {
-                schonDrin.add(bester.pfad);
-                gefunden.push({
-                    zeile,
-                    pfad: bester.pfad,
-                    interpret: bester.interpret,
-                    titel: bester.titel,
-                    // Mitgeliefert, damit die Oberflaeche knappe Treffer
-                    // kennzeichnen kann — die will man nachsehen.
-                    sicher: bestwert >= 0.8
-                });
-            } else if (bester && bestwert >= 0.62) {
-                // Treffer, aber der Titel steht schon in der Liste.
-                continue;
-            } else {
-                fehlend.push(zeile);
-            }
-        }
+        const { gefunden, fehlend } = kioskAbgleichen(zeilen, sammlung.rows.map(kioskKandidat));
 
         res.json({ gelesen: zeilen.length, gefunden, fehlend });
     } catch (error) {
