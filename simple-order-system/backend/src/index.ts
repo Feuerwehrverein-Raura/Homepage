@@ -17,6 +17,7 @@ import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMer
 import { qrCodeLesen } from './qrcode.js';
 import { barlichtMelden, barlichtStoppen } from './barlicht.js';
 import { quittungXml } from './quittung.js';
+import { geschaeftstag, uhrzeit, datum } from './zeit.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
@@ -2120,22 +2121,8 @@ app.get('/api/orders/:id/payments', async (req, res) => {
 app.get('/api/stats/daily', async (req, res) => {
   try {
     // Business day runs from 12:00 to 12:00 next day
-    const now = new Date();
-    const currentHour = now.getHours();
-
-    // If before 12:00, the business day started yesterday at 12:00
-    // If after 12:00, the business day started today at 12:00
-    const startDate = new Date(now);
-    if (currentHour < 12) {
-      startDate.setDate(startDate.getDate() - 1);
-    }
-    startDate.setHours(12, 0, 0, 0);
-
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 1);
-
-    // Format for display (the date when the business day started)
-    const displayDate = startDate.toISOString().split('T')[0];
+    // Geschaeftstag 12:00-12:00 Schweizer Zeit (src/zeit.ts)
+    const { start: startDate, ende: endDate, tag: displayDate } = geschaeftstag();
 
     const result = await pool.query(`
       SELECT
@@ -2182,16 +2169,7 @@ app.post('/api/stats/send-report', authenticateToken, async (req: AuthenticatedR
     }
 
     // Get current business day stats (12:00-12:00)
-    const now = new Date();
-    const currentHour = now.getHours();
-    const startDate = new Date(now);
-    if (currentHour < 12) {
-      startDate.setDate(startDate.getDate() - 1);
-    }
-    startDate.setHours(12, 0, 0, 0);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 1);
-    const displayDate = startDate.toISOString().split('T')[0];
+    const { start: startDate, ende: endDate, tag: displayDate } = geschaeftstag();
 
     // Get summary
     const summaryResult = await pool.query(`
@@ -2547,8 +2525,8 @@ async function printViaEpos(
   items: any[]
 ): Promise<void> {
   const now = new Date();
-  const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-  const dateStr = now.toLocaleDateString('de-CH');
+  const timeStr = uhrzeit(now); // Schweizer Zeit, nicht UTC (src/zeit.ts)
+  const dateStr = datum(now);
 
   let itemsXml = '';
   items.forEach((item: any) => {
@@ -2622,8 +2600,8 @@ async function printViaRawTcp(
 
       try {
         const now = new Date();
-        const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-        const dateStr = now.toLocaleDateString('de-CH');
+        const timeStr = uhrzeit(now); // Schweizer Zeit, nicht UTC (src/zeit.ts)
+        const dateStr = datum(now);
 
         printer
           .font('a')
