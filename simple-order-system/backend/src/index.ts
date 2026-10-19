@@ -18,6 +18,7 @@ import { qrCodeLesen } from './qrcode.js';
 import { barlichtMelden, barlichtStoppen } from './barlicht.js';
 import { quittungXml } from './quittung.js';
 import { geschaeftstag, uhrzeit, datum } from './zeit.js';
+import { verkaufsstatistik } from './statistik.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
@@ -1051,16 +1052,16 @@ app.get('/api/internal/pos-credential', async (req, res) => {
 });
 
 // Routes: Items (ONLY from Inventory system)
-app.get('/api/items', async (req, res) => {
+// Verkaufbare Artikel aus dem Inventar (mit Kasse-Kategorie). Der T400 ohne
+// Internet nimmt die letzte gute Liste. Gebraucht von /api/items und der
+// Verkaufsstatistik (Kategorien).
+async function artikelListe(): Promise<any[]> {
   try {
-    // Fetch all items from inventory system
     const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) {
       console.error('Inventory API returned:', response.status);
-      // T400 ohne Internet: letzte gute Liste
-      return res.json((await artikelAusSpeicher(getSetting)) || []);
+      return (await artikelAusSpeicher(getSetting)) || [];
     }
-
     const inventoryItems = await response.json() as any[];
     // Map inventory items to order system format
     const items = inventoryItems.map((item) => ({
@@ -1082,11 +1083,15 @@ app.get('/api/items', async (req, res) => {
     });
 
     await artikelMerken(setSetting, items);
-    res.json(items);
+    return items;
   } catch (error) {
     console.error('Inventory API error:', error);
-    res.json((await artikelAusSpeicher(getSetting)) || []); // T400: letzte gute Liste
+    return (await artikelAusSpeicher(getSetting)) || []; // T400: letzte gute Liste
   }
+}
+
+app.get('/api/items', async (req, res) => {
+  res.json(await artikelListe());
 });
 
 // ============================================
@@ -2117,43 +2122,17 @@ app.get('/api/orders/:id/payments', async (req, res) => {
   }
 });
 
-// Daily statistics
+// Verkaufsstatistik (src/statistik.ts): laufender Geschaeftstag oder mit
+// ?anlass=<event_id> ein ganzer Anlass (gleiche Auswahl wie die Historie).
 app.get('/api/stats/daily', async (req, res) => {
   try {
-    // Business day runs from 12:00 to 12:00 next day
-    // Geschaeftstag 12:00-12:00 Schweizer Zeit (src/zeit.ts)
-    const { start: startDate, ende: endDate, tag: displayDate } = geschaeftstag();
-
-    const result = await pool.query(`
-      SELECT
-        COUNT(*) as total_orders,
-        COALESCE(SUM(total), 0) as total_revenue,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_orders,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders
-      FROM orders
-      WHERE created_at >= $1 AND created_at < $2
-    `, [startDate.toISOString(), endDate.toISOString()]);
-
-    // Best selling items for this business day
-    const itemsResult = await pool.query(`
-      SELECT
-        COALESCE(${anzeigeNameSql('oi.item_name')}, 'Sonderposten') as name,
-        SUM(oi.quantity) as total_sold,
-        SUM(oi.quantity * oi.price) as total_revenue
-      FROM order_items oi
-      JOIN orders o ON oi.order_id = o.id
-      WHERE o.created_at >= $1 AND o.created_at < $2
-      GROUP BY ${anzeigeNameSql('oi.item_name')}
-      ORDER BY total_sold DESC
-      LIMIT 10
-    `, [startDate.toISOString(), endDate.toISOString()]);
-
-    res.json({
-      date: displayDate,
-      summary: result.rows[0],
-      top_items: itemsResult.rows
-    });
+    const anlass = typeof req.query.anlass === 'string' && req.query.anlass ? req.query.anlass : null;
+    const tag = geschaeftstag();
+    const kategorien = new Map((await artikelListe()).map((a) => [String(a.id), a.category as string]));
+    const stats = await verkaufsstatistik(pool,
+      anlass ? { anlass } : { von: tag.start, bis: tag.ende },
+      (id) => kategorien.get(id));
+    res.json({ date: tag.tag, anlass, ...stats });
   } catch (error) {
     console.error('Stats error:', error);
     res.status(500).json({ error: 'Database error' });

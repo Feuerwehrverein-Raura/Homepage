@@ -629,7 +629,8 @@ function App() {
       const filter = historyAnlass ? `&anlass=${encodeURIComponent(historyAnlass)}` : '';
       const [historyRes, statsRes, anlaesseRes] = await Promise.all([
         fetch(`${API_URL}/orders/history?limit=50${filter}`, { headers: authHeaders() }),
-        fetch(`${API_URL}/stats/daily`, { headers: authHeaders() }),
+        // Statistik zum gewaehlten Anlass (ohne Auswahl: laufender Geschaeftstag)
+        fetch(`${API_URL}/stats/daily${historyAnlass && historyAnlass !== 'ohne' ? `?anlass=${encodeURIComponent(historyAnlass)}` : ''}`, { headers: authHeaders() }),
         fetch(`${API_URL}/orders/history/anlaesse`, { headers: authHeaders() })
       ]);
       const history = await historyRes.json();
@@ -3038,6 +3039,41 @@ function InventoryView({ items, onUpdate, token }: { items: Item[]; onUpdate: ()
   );
 }
 
+// Bausteine der Verkaufsstatistik
+const ZAHLART: Record<string, string> = { cash: 'Bar', card: 'Karte', twint: 'TWINT', offen: 'Noch offen', split: 'Geteilt' };
+const chf = (wert: unknown) => (parseFloat(String(wert ?? 0)) || 0).toFixed(2);
+const tagText = (tag: string) => new Date(`${tag}T12:00:00`).toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' });
+
+function StatKachel({ wert, text, farbe }: { wert: string | number; text: string; farbe: 'blue' | 'green' | 'yellow' | 'purple' }) {
+  const stil = { blue: 'bg-blue-50 text-blue-600', green: 'bg-green-50 text-green-600', yellow: 'bg-yellow-50 text-yellow-600', purple: 'bg-purple-50 text-purple-600' }[farbe];
+  return (
+    <div className={`p-4 rounded-lg ${stil.split(' ')[0]}`}>
+      <div className={`text-2xl sm:text-3xl font-bold ${stil.split(' ')[1]}`}>{wert}</div>
+      <div className="text-sm text-gray-600">{text}</div>
+    </div>
+  );
+}
+
+function StatTabelle({ titel, kopf, zeilen }: { titel: string; kopf: string[]; zeilen: (string | number)[][] }) {
+  return (
+    <div>
+      <h3 className="font-semibold mb-2">{titel}</h3>
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50">
+          <tr>{kopf.map((k, i) => <th key={k} className={`px-2 py-1 ${i === 0 ? 'text-left' : 'text-right'}`}>{k}</th>)}</tr>
+        </thead>
+        <tbody>
+          {zeilen.map((z, n) => (
+            <tr key={n} className="border-t">
+              {z.map((w, i) => <td key={i} className={`px-2 py-1 ${i === 0 ? '' : 'text-right tabular-nums'}`}>{w}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass }: {
   data: any[]; stats: any; onRefresh: () => void; token: string | null;
   anlass: string;
@@ -3079,19 +3115,38 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
 
   return (
     <div className="max-w-7xl mx-auto p-2 sm:p-4">
-      {/* Daily Stats */}
-      {stats && (
+      {/* Anlass-Auswahl: gilt fuer Statistik und Historie (event_id an der Bestellung) */}
+      <select
+        value={anlass}
+        onChange={(e) => onAnlass(e.target.value)}
+        className="w-full sm:w-auto mb-4 px-3 py-2 border border-gray-300 rounded-lg bg-white"
+      >
+        <option value="">Heute – alle Bestellungen</option>
+        {anlaesse.map((a) => (
+          <option key={a.event_id} value={a.event_id}>
+            {a.event_titel || a.event_id} ({a.bestellungen} Best., CHF {parseFloat(a.umsatz || '0').toFixed(2)})
+          </option>
+        ))}
+        <option value="ohne">Ohne Anlass</option>
+      </select>
+
+      {/* Verkaufsstatistik (backend src/statistik.ts) */}
+      {stats && stats.summary && (
         <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-            <h2 className="text-xl sm:text-2xl font-bold">Tagesstatistik ({stats.date})</h2>
+            <h2 className="text-xl sm:text-2xl font-bold">
+              {stats.anlass ? `Verkaufsstatistik ${stats.titel || ''}` : `Tagesstatistik (${stats.date})`}
+            </h2>
             <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={sendReport}
-                disabled={sendingReport}
-                className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
-              >
-                {sendingReport ? 'Sende...' : 'Per E-Mail senden'}
-              </button>
+              {!stats.anlass && (
+                <button
+                  onClick={sendReport}
+                  disabled={sendingReport}
+                  className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
+                >
+                  {sendingReport ? 'Sende...' : 'Per E-Mail senden'}
+                </button>
+              )}
               <button
                 onClick={onRefresh}
                 className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
@@ -3102,45 +3157,30 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-2xl sm:text-3xl font-bold text-blue-600">
-                {stats.summary?.total_orders || 0}
-              </div>
-              <div className="text-sm text-gray-600">Bestellungen</div>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-2xl sm:text-3xl font-bold text-green-600">
-                CHF {parseFloat(stats.summary?.total_revenue || 0).toFixed(2)}
-              </div>
-              <div className="text-sm text-gray-600">Umsatz</div>
-            </div>
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <div className="text-2xl sm:text-3xl font-bold text-yellow-600">
-                {stats.summary?.completed_orders || 0}
-              </div>
-              <div className="text-sm text-gray-600">Abgeschlossen</div>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="text-2xl sm:text-3xl font-bold text-purple-600">
-                {stats.summary?.paid_orders || 0}
-              </div>
-              <div className="text-sm text-gray-600">Bezahlt</div>
-            </div>
+            <StatKachel wert={stats.summary.total_orders || 0} text="Bestellungen" farbe="blue" />
+            <StatKachel wert={`CHF ${chf(stats.summary.total_revenue)}`} text="Umsatz" farbe="green" />
+            <StatKachel wert={stats.summary.pending_orders || 0} text="Offen" farbe="yellow" />
+            <StatKachel wert={stats.summary.cancelled_orders || 0} text="Storniert" farbe="purple" />
           </div>
 
-          {/* Top Items */}
-          {stats.top_items && stats.top_items.length > 0 && (
-            <div>
-              <h3 className="font-semibold mb-2">Meistverkaufte Artikel</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {stats.top_items.slice(0, 5).map((item: any, index: number) => (
-                  <div key={index} className="bg-gray-50 p-2 rounded text-sm">
-                    <div className="font-semibold truncate">{anzeigeName(item.name)}</div>
-                    <div className="text-gray-600">{item.total_sold}x verkauft</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="grid gap-6 md:grid-cols-2 mb-6">
+            {stats.anlass && stats.tage?.length > 0 && (
+              <StatTabelle titel="Umsatz je Tag" kopf={['Tag', 'Bestellungen', 'CHF']}
+                zeilen={stats.tage.map((t: any) => [tagText(t.tag), t.bestellungen, chf(t.umsatz)])} />
+            )}
+            {stats.zahlungsarten?.length > 0 && (
+              <StatTabelle titel="Zahlungsarten" kopf={['Art', 'Anzahl', 'CHF']}
+                zeilen={stats.zahlungsarten.map((z: any) => [ZAHLART[z.art] || z.art, z.anzahl, chf(z.betrag)])} />
+            )}
+            {stats.kategorien?.length > 0 && (
+              <StatTabelle titel="Kategorien" kopf={['Kategorie', 'Stück', 'CHF']}
+                zeilen={stats.kategorien.map((k: any) => [k.name, k.menge, chf(k.umsatz)])} />
+            )}
+          </div>
+
+          {stats.artikel?.length > 0 && (
+            <StatTabelle titel="Artikel (nach Stückzahl)" kopf={['Artikel', 'Stück', 'CHF']}
+              zeilen={stats.artikel.map((a: any) => [anzeigeName(a.name), a.total_sold, chf(a.total_revenue)])} />
           )}
         </div>
       )}
@@ -3149,20 +3189,6 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <h2 className="text-xl sm:text-2xl font-bold">Bestellhistorie</h2>
-          {/* Filter nach Anlass (event_id an der Bestellung) - mit Umsatz */}
-          <select
-            value={anlass}
-            onChange={(e) => onAnlass(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">Alle Anlaesse</option>
-            {anlaesse.map((a) => (
-              <option key={a.event_id} value={a.event_id}>
-                {a.event_titel || a.event_id} ({a.bestellungen} Best., CHF {parseFloat(a.umsatz || '0').toFixed(2)})
-              </option>
-            ))}
-            <option value="ohne">Ohne Anlass</option>
-          </select>
         </div>
 
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -3220,10 +3246,12 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
                     <span className={`px-2 py-1 rounded text-xs ${
                       order.status === 'paid' ? 'bg-green-100 text-green-800' :
                       order.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                      order.status === 'cancelled' ? 'bg-gray-100 text-gray-500 line-through' :
                       'bg-yellow-100 text-yellow-800'
                     }`}>
                       {order.status === 'paid' ? 'Bezahlt' :
-                       order.status === 'completed' ? 'Abgeschlossen' : 'Offen'}
+                       order.status === 'completed' ? 'Abgeschlossen' :
+                       order.status === 'cancelled' ? 'Storniert' : 'Offen'}
                     </span>
                   </td>
                 </tr>
