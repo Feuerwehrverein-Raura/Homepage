@@ -25,6 +25,10 @@ class _Server {
   /// Antwort von qr-login (null = QR-Code widerrufen).
   String? qrAntwort;
 
+  /// Refresh-Token von api-members in der Antwort von qr-login (null =
+  /// aelteres Backend ohne).
+  String? qrRefresh;
+
   bool keinNetz = false;
   int refreshAufrufe = 0;
   int qrAufrufe = 0;
@@ -54,6 +58,7 @@ class _Server {
         jsonEncode({
           'success': true,
           'token': a,
+          'refresh_token': ?qrRefresh,
           'user': {'id': 1, 'email': 'e@x.ch', 'name': 'Erika'},
         }),
         200,
@@ -222,12 +227,49 @@ void main() {
 
       expect(server.qrAufrufe, 1);
       final qr = server.anfragen.firstWhere((a) => a.url.path == '/auth/member/qr-login');
-      expect(jsonDecode(qr.body), {'token': 'fwv-member-1'});
+      expect(jsonDecode(qr.body), {'token': 'fwv-member-1', 'mit_erneuerung': true});
       expect(qr.headers['Authorization'], isNull);
       final s = await speicher.laden();
       expect(s!.accessToken, 'qr-access');
       expect(s.qrToken, 'fwv-member-1');
     });
+
+    test(
+      'Refresh-Token von api-members -> erneuert bei api-members, nicht bei Authentik',
+      () async {
+        await anmelden(
+          const Sitzung(accessToken: 'alt', refreshToken: 'fwvm_r1', kontotyp: Kontotyp.mitglied),
+        );
+
+        expect(await verwaltung.api.get('members/me'), isNotNull);
+
+        final refresh = server.anfragen.singleWhere((a) => a.url.toString() == _backendErneuern);
+        expect(refresh.bodyFields['refresh_token'], 'fwvm_r1');
+        expect(refresh.bodyFields['grant_type'], 'refresh_token');
+        expect(server.anfragen.any((a) => a.url.toString() == _tokenEndpunkt), isFalse);
+        final s = await speicher.laden();
+        expect(s!.accessToken, 'neu-access');
+        expect(s.refreshToken, 'neu-refresh');
+      },
+    );
+
+    test(
+      'alte QR-Sitzung bekommt beim Erneuern einen Refresh-Token, QR-Code wird vergessen',
+      () async {
+        server.qrAntwort = 'qr-access';
+        server.qrRefresh = 'fwvm_neu';
+        await anmelden(
+          const Sitzung(accessToken: 'alt', qrToken: 'fwv-member-1', kontotyp: Kontotyp.mitglied),
+        );
+
+        expect(await verwaltung.api.get('members/me'), isNotNull);
+
+        final s = await speicher.laden();
+        expect(s!.accessToken, 'qr-access');
+        expect(s.refreshToken, 'fwvm_neu');
+        expect(s.qrToken, isNull);
+      },
+    );
 
     test('nichts klappt -> abgemeldet, Speicher leer, "Sitzung abgelaufen"', () async {
       server.refreshAntwort = null;
@@ -294,6 +336,36 @@ void main() {
       expect(roh.werte['account_type'], 'member');
     });
 
+    test('QR-Code: mit Refresh-Token von api-members wird der QR-Code nicht gespeichert', () async {
+      server.qrAntwort = 'jwt-qr';
+      server.qrRefresh = 'fwvm_q';
+      await verwaltung.mitQrCodeAnmelden('fwv-member-abc');
+      final anfrage = server.anfragen.singleWhere((a) => a.url.path == '/auth/member/qr-login');
+      expect(jsonDecode(anfrage.body), {'token': 'fwv-member-abc', 'mit_erneuerung': true});
+      final s = await speicher.laden();
+      expect(s!.refreshToken, 'fwvm_q');
+      expect(s.qrToken, isNull);
+    });
+
+    test('Anmeldebon: Refresh-Token wird gespeichert', () async {
+      final v = SitzungsVerwaltung(
+        speicher: speicher,
+        http: MockClient((a) async {
+          expect(a.url.path, '/auth/member/code-login');
+          expect(jsonDecode(a.body), {'code': 'abc', 'mit_erneuerung': true});
+          return http.Response(
+            jsonEncode({'token': 'bon-jwt', 'refresh_token': 'fwvm_bon', 'name': 'Erika'}),
+            200,
+          );
+        }),
+      );
+      await v.mitAnmeldebonAnmelden('abc');
+      final s = await speicher.laden();
+      expect(s!.accessToken, 'bon-jwt');
+      expect(s.refreshToken, 'fwvm_bon');
+      expect(s.name, 'Erika');
+    });
+
     test('QR-Code widerrufen -> Fehler, nicht angemeldet', () async {
       await expectLater(verwaltung.mitQrCodeAnmelden('fwv-member-x'), throwsA(isA<ApiFehler>()));
       expect(verwaltung.angemeldet, isFalse);
@@ -338,11 +410,13 @@ void main() {
             'email': 'e@x.ch',
             'code': '123456',
             'new_password': 'langesPasswort',
+            'mit_erneuerung': true,
           });
           return http.Response(
             jsonEncode({
               'success': true,
               'token': 'reset-jwt',
+              'refresh_token': 'fwvm_reset',
               'user': {'name': 'Erika'},
             }),
             200,
@@ -356,6 +430,7 @@ void main() {
       );
       expect(v.angemeldet, isTrue);
       expect((await speicher.laden())!.accessToken, 'reset-jwt');
+      expect((await speicher.laden())!.refreshToken, 'fwvm_reset');
     });
 
     test('OIDC: Name aus dem ID-Token', () async {

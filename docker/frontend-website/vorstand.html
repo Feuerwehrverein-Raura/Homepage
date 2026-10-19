@@ -4529,7 +4529,8 @@
                       `Scannen ein neues Passwort. Gilt einmalig und nur kurz.`
                     : `<strong>Bon gedruckt</strong>, aber nur für den Mitgliederbereich — Authentik ` +
                       `hat keinen Anmeldelink geliefert (kein Konto oder gerade nicht erreichbar). ` +
-                      `Gilt einmalig bis ${bis} Uhr, danach 7 Tage angemeldet.`;
+                      `Gilt einmalig bis ${bis} Uhr. Danach bleibt die Person angemeldet wie mit Passwort, ` +
+                      `solange sie die App mindestens alle 30 Tage öffnet.`;
             } catch (e) {
                 resultEl.classList.remove('hidden');
                 resultEl.className = 'mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm';

@@ -6,8 +6,10 @@
 // erhaltenen Tokens ([mitOidcTokensAnmelden]). Alles andere — QR-Code,
 // externer Organisator, Passwort-Reset, Erneuern — laeuft hier.
 //
-// Erneuern wie in den alten Apps: zuerst der OIDC-Refresh-Token, sonst ein
-// stilles Neu-Anmelden mit dem gespeicherten QR-Code, sonst ist die Sitzung
+// Erneuern: mit dem Refresh-Token - von Authentik oder, bei QR-Code,
+// Anmeldebon und Passwort-Reset, von api-members (gleich lange gueltig, gleiche
+// Antwort; Entscheid 19.10.2026). Aeltere Sitzungen haben statt dessen den
+// QR-Code und melden sich damit einmal still neu an. Sonst ist die Sitzung
 // vorbei und der Login-Screen zeigt "Sitzung abgelaufen".
 
 import 'dart:convert';
@@ -100,15 +102,20 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     );
   }
 
-  /// QR-Code vom Datenblatt gegen ein Token tauschen. Der QR-Code wird
-  /// gespeichert und dient spaeter zum stillen Neu-Anmelden.
+  /// QR-Code vom Datenblatt gegen ein Token tauschen. Liefert ein aelteres
+  /// Backend keinen Refresh-Token, wird wie frueher der QR-Code gespeichert.
   Future<void> mitQrCodeAnmelden(String qrToken) async {
-    final antwort = await _offen.post('auth/member/qr-login', daten: {'token': qrToken});
+    final antwort = await _offen.post(
+      'auth/member/qr-login',
+      daten: _mitErneuerung({'token': qrToken}),
+    );
     final (token, name, email) = _mitgliedAntwort(antwort);
+    final refresh = _refreshToken(antwort);
     await _beginnen(
       Sitzung(
         accessToken: token,
-        qrToken: qrToken,
+        refreshToken: refresh,
+        qrToken: refresh == null ? qrToken : null,
         kontotyp: Kontotyp.mitglied,
         name: name,
         email: email,
@@ -117,15 +124,19 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
   }
 
   /// Anmeldebon vom Bondrucker (einmaliger Code, `auth/member/code-login`).
-  /// Das Token gilt sieben Tage; ein stilles Neu-Anmelden gibt es nicht,
-  /// der Code ist danach verbraucht. Antwort: `{token, name}`.
+  /// Der Code ist danach verbraucht; erneuert wird mit dem Refresh-Token.
+  /// Antwort: `{token, refresh_token, name}`.
   Future<void> mitAnmeldebonAnmelden(String code) async {
-    final antwort = await _offen.post('auth/member/code-login', daten: {'code': code});
+    final antwort = await _offen.post(
+      'auth/member/code-login',
+      daten: _mitErneuerung({'code': code}),
+    );
     final token = antwort is Map ? _text(antwort['token']) : null;
     if (token == null) throw const ApiFehler('Die Anmeldung wurde nicht angenommen.');
     await _beginnen(
       Sitzung(
         accessToken: token,
+        refreshToken: _refreshToken(antwort),
         kontotyp: Kontotyp.mitglied,
         name: _text((antwort as Map)['name']),
       ),
@@ -173,12 +184,17 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
   }) async {
     final antwort = await _offen.post(
       'auth/member/reset',
-      daten: {'email': email.trim(), 'code': code.trim(), 'new_password': neuesPasswort},
+      daten: _mitErneuerung({
+        'email': email.trim(),
+        'code': code.trim(),
+        'new_password': neuesPasswort,
+      }),
     );
     final (token, name, mail) = _mitgliedAntwort(antwort);
     await _beginnen(
       Sitzung(
         accessToken: token,
+        refreshToken: _refreshToken(antwort),
         kontotyp: Kontotyp.mitglied,
         name: name,
         email: mail ?? email.trim(),
@@ -219,8 +235,17 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     final qr = s.qrToken;
     if (qr != null && s.kontotyp == Kontotyp.mitglied) {
       try {
-        final antwort = await _offen.post('auth/member/qr-login', daten: {'token': qr});
-        return await _uebernehmen(s, _mitgliedAntwort(antwort).$1, null);
+        final antwort = await _offen.post(
+          'auth/member/qr-login',
+          daten: _mitErneuerung({'token': qr}),
+        );
+        final refresh = _refreshToken(antwort);
+        return await _uebernehmen(
+          s,
+          _mitgliedAntwort(antwort).$1,
+          refresh,
+          ohneQr: refresh != null,
+        );
       } on ApiFehler catch (e) {
         if (e.status == null) keinNetz = true;
       }
@@ -233,14 +258,19 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     return Erneuerung.abgelaufen;
   }
 
-  /// `grant_type=refresh_token` am Token-Endpunkt von Authentik. Gibt null
-  /// zurueck, wenn der Refresh-Token nicht mehr angenommen wird.
+  /// `grant_type=refresh_token` am Token-Endpunkt von Authentik - oder bei
+  /// einem Refresh-Token von api-members (`fwvm_`) an dessen `auth/refresh`,
+  /// das gleich antwortet. Gibt null zurueck, wenn der Refresh-Token nicht
+  /// mehr angenommen wird.
   Future<(String, String?)?> _oidcErneuern(String refreshToken) async {
+    final endpunkt = refreshToken.startsWith('fwvm_')
+        ? _basis.resolve('auth/refresh')
+        : Uri.parse(oidc.tokenEndpunkt);
     final http.Response antwort;
     try {
       antwort = await _http
           .post(
-            Uri.parse(oidc.tokenEndpunkt),
+            endpunkt,
             headers: {'Accept': 'application/json'},
             body: {
               'grant_type': 'refresh_token',
@@ -263,13 +293,18 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     }
   }
 
-  Future<Erneuerung> _uebernehmen(Sitzung alt, String access, String? refresh) async {
+  Future<Erneuerung> _uebernehmen(
+    Sitzung alt,
+    String access,
+    String? refresh, {
+    bool ohneQr = false,
+  }) async {
     // Wurde waehrenddessen abgemeldet oder neu angemeldet, gilt das Neue.
     if (!identical(_sitzung, alt)) {
       return _sitzung == null ? Erneuerung.abgelaufen : Erneuerung.erneuert;
     }
     // Liefert Authentik keinen neuen Refresh-Token mit, gilt der alte weiter.
-    final neu = alt.kopieMit(accessToken: access, refreshToken: refresh);
+    final neu = alt.kopieMit(accessToken: access, refreshToken: refresh, ohneQrToken: ohneQr);
     await _speicher.speichern(neu);
     _sitzung = neu;
     _tokenMelden();
@@ -335,5 +370,13 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     );
   }
 }
+
+/// Bittet api-members um einen Refresh-Token (aeltere Apps schicken das nicht
+/// und behalten das alte Verhalten).
+Map<String, Object> _mitErneuerung(Map<String, Object> daten) => {...daten, 'mit_erneuerung': true};
+
+/// `refresh_token` aus der Antwort von qr-login, code-login und reset (fehlt
+/// bei einem aelteren Backend).
+String? _refreshToken(Object? antwort) => antwort is Map ? _text(antwort['refresh_token']) : null;
 
 String? _text(Object? wert) => wert is String && wert.trim().isNotEmpty ? wert.trim() : null;

@@ -44,12 +44,14 @@ class Sitzung {
   /// Kurzlebiges Token fuer `Authorization: Bearer`.
   final String accessToken;
 
-  /// OIDC-Refresh-Token (nur bei Anmeldung ueber Authentik). Authentik
-  /// rotiert ihn bei jedem Erneuern.
+  /// Refresh-Token: von Authentik oder - bei QR-Code, Anmeldebon und
+  /// Passwort-Reset - von api-members (beginnt mit `fwvm_`, gleich lange
+  /// gueltig). Wird bei jedem Erneuern ersetzt.
   final String? refreshToken;
 
-  /// Der gescannte QR-Code. Laeuft nicht ab — der gedruckte Code ist die
-  /// dauerhafte Berechtigung und dient zum stillen Neu-Anmelden.
+  /// Der gescannte QR-Code - nur noch in Sitzungen aus der Zeit, als die
+  /// QR-Anmeldung keinen Refresh-Token bekam; beim naechsten Erneuern durch
+  /// einen ersetzt. Laeuft nicht ab und dient zum stillen Neu-Anmelden.
   final String? qrToken;
 
   final Kontotyp kontotyp;
@@ -84,15 +86,18 @@ class Sitzung {
     return gruppen.any((g) => gesucht.contains(g.toLowerCase()));
   }
 
-  Sitzung kopieMit({String? accessToken, String? refreshToken}) => Sitzung(
-    accessToken: accessToken ?? this.accessToken,
-    refreshToken: refreshToken ?? this.refreshToken,
-    qrToken: qrToken,
-    kontotyp: kontotyp,
-    eventId: eventId,
-    name: name,
-    email: email,
-  );
+  /// [ohneQrToken]: der QR-Code wird nicht mehr gebraucht (die Sitzung hat
+  /// jetzt einen Refresh-Token).
+  Sitzung kopieMit({String? accessToken, String? refreshToken, bool ohneQrToken = false}) =>
+      Sitzung(
+        accessToken: accessToken ?? this.accessToken,
+        refreshToken: refreshToken ?? this.refreshToken,
+        qrToken: ohneQrToken ? null : qrToken,
+        kontotyp: kontotyp,
+        eventId: eventId,
+        name: name,
+        email: email,
+      );
 }
 
 /// Schluessel-Wert-Speicher fuer Geheimnisse. Eigene Schnittstelle, damit

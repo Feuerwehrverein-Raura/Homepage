@@ -29,6 +29,7 @@ const { logoNachtrag } = require('./sender-logo');
 const { vorstandMelder, fcmNachricht, ABSCHALT_ART: VORSTAND_ABSCHALT_ART, ARTEN: VORSTAND_ARTEN } = require('./vorstand-melder');
 const { fcmDaten, vorlageZiel } = require('./push-daten');
 const { appGeraete, geraetAusEingabe, geraetAusFcmEingabe } = require('./app-geraete');
+const { mitgliedErneuerung, ZUGANG_DAUER: MITGLIED_ZUGANG_DAUER, ZUGANG_SEKUNDEN: MITGLIED_ZUGANG_SEKUNDEN } = require('./mitglied-erneuerung');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -297,6 +298,8 @@ function getClientIp(req) {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL
 });
+// Erneuern der Mitglieder-Anmeldungen ohne Authentik (src/mitglied-erneuerung.js)
+const mitgliedAnmeldung = mitgliedErneuerung(pool);
 
 // Middleware - CORS must be before helmet
 // DEUTSCH: CORS erlaubt nur *.fwv-raura.ch Subdomains und localhost
@@ -971,10 +974,16 @@ app.post('/auth/member/qr-login', async (req, res) => {
         // Authentik-Gruppen des Mitglieds (issueMemberJwt).
         const jwtToken = await issueMemberJwt(
             member_id, email, `${vorname || ''} ${nachname || ''}`.trim(), benutzername);
+        // Neue Apps (mit_erneuerung) bekommen ein Erneuerungs-Token wie bei
+        // Authentik, statt sich spaeter still mit dem QR-Code neu anzumelden.
+        const refreshToken = req.body?.mit_erneuerung === true
+            ? await mitgliedAnmeldung.ausstellen({ memberId: member_id, quelle: 'qr', qrTokenId: tokenId })
+            : undefined;
         await logAudit(pool, 'MEMBER_QR_LOGIN_SUCCESS', member_id, email, clientIp, { token_id: tokenId });
         res.json({
             success: true,
             token: jwtToken,
+            refresh_token: refreshToken,
             user: { id: member_id, email, name: `${vorname || ''} ${nachname || ''}`.trim() }
         });
     } catch (err) {
@@ -1277,8 +1286,11 @@ app.post('/auth/member/reset', async (req, res) => {
         await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
         const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
         const token = await issueMemberJwt(m.id, m.email, name, m.benutzername);
+        const refreshToken = req.body?.mit_erneuerung === true
+            ? await mitgliedAnmeldung.ausstellen({ memberId: m.id, quelle: 'reset' })
+            : undefined;
         await logAudit(pool, 'MEMBER_RESET_SUCCESS', m.id, m.email, clientIp, {});
-        res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
+        res.json({ success: true, token, refresh_token: refreshToken, user: { id: m.id, email: m.email, name } });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -2259,6 +2271,24 @@ app.post('/auth/refresh', express.urlencoded({ extended: false }), async (req, r
     try {
         const refreshToken = String(req.body?.refresh_token || '');
         if (!refreshToken) return res.status(400).json({ error: 'refresh_token fehlt' });
+        // Anmeldung per QR-Code, Anmeldebon oder Passwort-Reset: eigenes
+        // Erneuerungs-Token (src/mitglied-erneuerung.js), gleiche Antwort wie
+        // Authentik - die Apps erneuern beides auf demselben Weg.
+        if (mitgliedAnmeldung.istEigenes(refreshToken)) {
+            const stand = await mitgliedAnmeldung.einloesen(refreshToken);
+            if (!stand) {
+                logWarn('AUTH-REFRESH abgelehnt (Mitglied)', {});
+                return res.status(401).json({ error: 'refresh_token ungueltig oder abgelaufen' });
+            }
+            const { mitglied, quelle, qrTokenId } = stand;
+            const name = `${mitglied.vorname || ''} ${mitglied.nachname || ''}`.trim();
+            return res.json({
+                access_token: await issueMemberJwt(mitglied.id, mitglied.email, name, mitglied.benutzername),
+                token_type: 'Bearer',
+                expires_in: MITGLIED_ZUGANG_SEKUNDEN,
+                refresh_token: await mitgliedAnmeldung.ausstellen({ memberId: mitglied.id, quelle, qrTokenId })
+            });
+        }
         const clientId = process.env.AUTHENTIK_CLIENT_ID;
         const clientSecret = process.env.AUTHENTIK_CLIENT_SECRET;
         if (!clientId || !clientSecret) return res.status(500).json({ error: 'OAuth2 configuration error' });
@@ -4167,7 +4197,7 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text>Gilt EINMALIG und nur kurz.&#10;</text>`
         : `<text>Gilt EINMALIG und nur bis&#10;</text>
       <text em="true">${xmlSicher(bis)} Uhr.&#10;</text>
-      <text em="false">Danach bleibst du 7 Tage&#10;angemeldet.&#10;</text>`}
+      <text em="false">Danach bleibst du angemeldet,&#10;solange du die App mindestens&#10;alle 30 Tage oeffnest.&#10;</text>`}
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
       <text>&#10;Anmeldename (falls du ihn&#10;spaeter brauchst):&#10;</text>
       <text em="true">${xmlSicher(mitglied.benutzername || '-')}&#10;</text>
@@ -4226,13 +4256,20 @@ app.post('/auth/member/code-login', async (req, res) => {
         // Stelle gibt, an der ein Mitglieder-Token entsteht — nur laenger
         // gueltig: sieben Tage statt acht Stunden, weil der Bon an einem
         // mehrtaegigen Anlass ausgegeben wird.
+        // Neue Apps (mit_erneuerung): wie Authentik 8 Stunden plus
+        // Erneuerungs-Token (30 Tage, rollend). Aeltere Apps und die Kasse:
+        // wie bisher sieben Tage ohne Erneuern.
+        const mitErneuerung = req.body?.mit_erneuerung === true;
         const token = await issueMemberJwt(
             mitglied.id, mitglied.email,
             `${mitglied.vorname} ${mitglied.nachname}`.trim(),
-            mitglied.benutzername, ANMELDEBON_SITZUNG);
+            mitglied.benutzername, mitErneuerung ? MITGLIED_ZUGANG_DAUER : ANMELDEBON_SITZUNG);
+        const refreshToken = mitErneuerung
+            ? await mitgliedAnmeldung.ausstellen({ memberId: mitglied.id, quelle: 'bon' })
+            : undefined;
 
         await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, {});
-        res.json({ token, name: `${mitglied.vorname} ${mitglied.nachname}` });
+        res.json({ token, refresh_token: refreshToken, name: `${mitglied.vorname} ${mitglied.nachname}` });
     } catch (error) {
         console.error('POST /auth/member/code-login:', error.message);
         res.status(500).json({ error: 'Anmeldung fehlgeschlagen' });

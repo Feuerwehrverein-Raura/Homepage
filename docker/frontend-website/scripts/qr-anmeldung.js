@@ -1,6 +1,7 @@
 // QR-Anmeldung fuer die Website (Oktober 2026): Datenblatt eines Mitglieds
 // oder Anmeldebon vom Bondrucker mit der Kamera scannen und bei api-members
-// einloesen. Liefert das Mitglieder-Token (Datenblatt 8 h, Bon 7 Tage).
+// einloesen. Liefert das Mitglieder-Token (Datenblatt 8 h, Bon 7 Tage; ohne
+// Erneuern - das gibt es nur in der Mitglieder-App, siehe mitglied-erneuerung.js).
 //
 //   const token = await qrAnmeldung('https://api.fwv-raura.ch');  // null = abgebrochen
 //
