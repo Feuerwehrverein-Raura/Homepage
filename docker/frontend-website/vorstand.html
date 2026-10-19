@@ -4524,11 +4524,12 @@
                     { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                 resultEl.className = 'mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm';
                 resultEl.innerHTML = data.umfang === 'sso'
-                    ? `<strong>Bon gedruckt.</strong> Er liegt am Drucker im Roten Schopf und meldet ` +
-                      `<strong>überall</strong> an — Nextcloud, Kasse, Küche. Die Person vergibt beim ` +
-                      `Scannen ein neues Passwort. Gilt einmalig und nur kurz.`
-                    : `<strong>Bon gedruckt</strong>, aber nur für den Mitgliederbereich — Authentik ` +
-                      `hat keinen Anmeldelink geliefert (kein Konto oder gerade nicht erreichbar). ` +
+                    ? `<strong>Bon gedruckt.</strong> Er liegt am Drucker im Roten Schopf. In der App ` +
+                      `meldet er die App an; mit der Handykamera gescannt vergibt die Person ein neues ` +
+                      `Passwort und ist <strong>überall</strong> angemeldet — Nextcloud, Kasse, Küche. ` +
+                      `Gilt einmalig bis ${bis} Uhr.`
+                    : `<strong>Bon gedruckt</strong>, aber nur für App und Mitgliederbereich — das ` +
+                      `Mitglied hat kein Authentik-Konto. ` +
                       `Gilt einmalig bis ${bis} Uhr. Danach bleibt die Person angemeldet wie mit Passwort, ` +
                       `solange sie die App mindestens alle 30 Tage öffnet.`;
             } catch (e) {

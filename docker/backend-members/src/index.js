@@ -4153,28 +4153,22 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
             'WHERE member_id = $1 AND benutzt_am IS NULL', [mitglied.id]
         );
 
-        // Erste Wahl ist der Authentik-Link: Er meldet ueberall an, nicht nur
-        // im Mitgliederbereich. Der lokale Code bleibt als Rueckfallebene fuer
-        // den Fall, dass Authentik gerade nicht antwortet oder das Mitglied
-        // (noch) kein Konto hat — dann ist ein halber Zugang besser als gar
-        // keiner.
-        const anmeldelink = await authentikAnmeldelink(mitglied.authentik_user_id);
-        let adresse, umfang;
+        // Auf den Bon kommt immer der eigene Code als anmelden.html?code=...
+        // Bis Oktober 2026 stand dort direkt der Authentik-Anmeldelink, den
+        // der QR-Scanner der App und des Vorstandsbereichs als fremden Code
+        // abwies. Jetzt entscheidet erst das Einloesen: Die App tauscht den
+        // Code gegen ihre Anmeldung, die Handykamera landet auf anmelden.html
+        // und wird von dort zum Authentik-Link weitergeleitet (code-login mit
+        // sso) — und ist damit ueberall angemeldet, nicht nur im Portal.
         const giltBis = new Date(Date.now() + ANMELDEBON_STUNDEN * 3600 * 1000);
-
-        if (anmeldelink) {
-            adresse = anmeldelink;
-            umfang = 'sso';
-        } else {
-            const code = crypto.randomBytes(24).toString('base64url');
-            await pool.query(
-                'INSERT INTO member_login_codes (code, member_id, erstellt_von, gilt_bis) ' +
-                'VALUES ($1, $2, $3, $4)',
-                [code, mitglied.id, req.user.email || null, giltBis]
-            );
-            adresse = 'https://www.fwv-raura.ch/anmelden.html?code=' + code;
-            umfang = 'mitgliederbereich';
-        }
+        const code = crypto.randomBytes(24).toString('base64url');
+        await pool.query(
+            'INSERT INTO member_login_codes (code, member_id, erstellt_von, gilt_bis) ' +
+            'VALUES ($1, $2, $3, $4)',
+            [code, mitglied.id, req.user.email || null, giltBis]
+        );
+        const adresse = 'https://www.fwv-raura.ch/anmelden.html?code=' + code;
+        const umfang = mitglied.authentik_user_id ? 'sso' : 'mitgliederbereich';
         const name = `${mitglied.vorname} ${mitglied.nachname}`;
         const bis = giltBis.toLocaleString('de-CH', {
             timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit',
@@ -4192,13 +4186,13 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text em="false" width="1" height="1"/>
       <text>&#10;</text>
       <symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlSicher(adresse)}</symbol>
-      <text>&#10;Mit der Handykamera scannen.&#10;&#10;</text>
+      <text>&#10;In der App "Mit QR-Code anmelden"&#10;oder mit der Handykamera scannen.&#10;&#10;</text>
       ${umfang === 'sso'
-        ? `<text>Du vergibst ein neues Passwort&#10;und bist danach ueberall&#10;angemeldet.&#10;&#10;</text>
-      <text>Gilt EINMALIG und nur kurz.&#10;</text>`
-        : `<text>Gilt EINMALIG und nur bis&#10;</text>
+        ? `<text>Mit der Kamera vergibst du ein&#10;neues Passwort und bist danach&#10;ueberall angemeldet.&#10;&#10;</text>`
+        : ''}
+      <text>Gilt EINMALIG und nur bis&#10;</text>
       <text em="true">${xmlSicher(bis)} Uhr.&#10;</text>
-      <text em="false">Danach bleibst du angemeldet,&#10;solange du die App mindestens&#10;alle 30 Tage oeffnest.&#10;</text>`}
+      <text em="false">Danach bleibst du angemeldet,&#10;solange du die App mindestens&#10;alle 30 Tage oeffnest.&#10;</text>
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
       <text>&#10;Anmeldename (falls du ihn&#10;spaeter brauchst):&#10;</text>
       <text em="true">${xmlSicher(mitglied.benutzername || '-')}&#10;</text>
@@ -4247,11 +4241,24 @@ app.post('/auth/member/code-login', async (req, res) => {
         }
 
         const m = await pool.query(
-            'SELECT id, email, benutzername, vorname, nachname FROM members WHERE id = $1',
+            'SELECT id, email, benutzername, vorname, nachname, authentik_user_id FROM members WHERE id = $1',
             [treffer.rows[0].member_id]
         );
         if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const mitglied = m.rows[0];
+
+        // Bon mit der Handykamera gescannt (anmelden.html schickt sso): erste
+        // Wahl ist der Authentik-Anmeldelink — Passwort vergeben und ueberall
+        // angemeldet, von Nextcloud bis zur Kasse. Antwortet Authentik nicht
+        // oder gibt es kein Konto, geht es unten mit der Portal-Anmeldung
+        // weiter; ein halber Zugang ist besser als gar keiner.
+        if (req.body?.sso === true) {
+            const anmeldelink = await authentikAnmeldelink(mitglied.authentik_user_id);
+            if (anmeldelink) {
+                await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, { umfang: 'sso' });
+                return res.json({ authentik_link: anmeldelink, name: `${mitglied.vorname} ${mitglied.nachname}` });
+            }
+        }
 
         // Ueber denselben Helfer wie App- und QR-Login, damit es nur eine
         // Stelle gibt, an der ein Mitglieder-Token entsteht — nur laenger

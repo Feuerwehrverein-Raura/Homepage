@@ -56,16 +56,19 @@
                 const antwort = await fetch(`${API_BASE}/auth/member/code-login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
+                    // sso: Authentik-Anmeldelink bevorzugen (Passwort vergeben,
+                    // ueberall angemeldet); ohne Konto kommt die Portal-Anmeldung.
+                    body: JSON.stringify({ code, sso: true })
                 });
                 const daten = await antwort.json().catch(() => ({}));
                 if (!antwort.ok) return zeigeFehler(daten.error || 'Die Anmeldung hat nicht geklappt.');
 
-                localStorage.setItem('auth_token', daten.token);
                 // Code aus der Adresse nehmen, bevor weitergeleitet wird: Er
                 // ist zwar schon verbraucht, hat aber im Verlauf des Browsers
                 // nichts verloren.
                 window.history.replaceState({}, document.title, window.location.pathname);
+                if (daten.authentik_link) return window.location.replace(daten.authentik_link);
+                localStorage.setItem('auth_token', daten.token);
                 window.location.replace('/mein.html');
             } catch (e) {
                 zeigeFehler('Keine Verbindung zum Vereinsserver.');
