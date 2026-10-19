@@ -212,6 +212,7 @@ interface BoxOverview {
   name: string;
   item_count: number;
   total_quantity: number;
+  image_url?: string | null;
 }
 
 interface BoxContent {
@@ -1634,6 +1635,8 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
   const [editingItem, setEditingItem] = useState<BoxContent | null>(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [boxImage, setBoxImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Fetch box overview on mount
   useEffect(() => {
@@ -1657,6 +1660,7 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
       const res = await fetch(`${API_URL}/locations/${locationId}`);
       if (res.ok) {
         const data = await res.json();
+        setBoxImage(data.image_url || null);
         // Map the API response to our BoxContent interface
         const contents = (data.contents || []).map((c: any) => ({
           item_id: c.id,
@@ -1675,6 +1679,7 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
 
   const handleSelectBox = (box: Location) => {
     setSelectedBox(box);
+    setBoxImage(null);
     fetchBoxContents(box.id);
     setShowAddItem(false);
     setEditingItem(null);
@@ -1769,6 +1774,33 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
     }
   };
 
+  // Foto der Kiste aufnehmen oder ersetzen (Server dreht, verkleinert und
+  // entfernt die Metadaten).
+  const handleBoxImage = async (file: File | undefined) => {
+    if (!token || !selectedBox || !file) return;
+    setUploadingImage(true);
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      const res = await fetch(`${API_URL}/locations/${selectedBox.id}/image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: form
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBoxImage(data.image_url || null);
+        fetchBoxOverview();
+      } else {
+        const error = await res.json().catch(() => ({}));
+        alert(error.error || 'Fehler beim Hochladen des Fotos');
+      }
+    } catch (error) {
+      alert('Fehler beim Hochladen des Fotos');
+    }
+    setUploadingImage(false);
+  };
+
   const printBoxLabel = (locationId: number) => {
     window.open(`${API_URL}/locations/${locationId}/content-label`, '_blank');
   };
@@ -1802,7 +1834,12 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
                   onClick={() => handleSelectBox(box)}
                   className="p-4 bg-white rounded-xl shadow-md hover:shadow-lg active:bg-gray-50 transition text-left touch-manipulation border-2 border-transparent hover:border-blue-400"
                 >
-                  <div className="text-3xl mb-2">📦</div>
+                  {box.image_url ? (
+                    <img src={box.image_url} alt="" loading="lazy"
+                      className="w-full aspect-[4/3] object-cover rounded-lg mb-2 bg-gray-100" />
+                  ) : (
+                    <div className="text-3xl mb-2">📦</div>
+                  )}
                   <div className="font-bold text-lg truncate">{box.name}</div>
                   <div className="text-sm text-gray-500 mt-1">
                     {box.item_count} {box.item_count === 1 ? 'Artikel' : 'Artikel'}
@@ -1842,6 +1879,22 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
               🏷️
             </button>
           </div>
+
+          {/* Foto der Kiste */}
+          {boxImage && (
+            <a href={boxImage} target="_blank" rel="noreferrer" className="block mb-3">
+              <img src={boxImage} alt={`Kiste ${selectedBox.name}`}
+                className="w-full max-h-96 object-contain rounded-lg bg-gray-100" />
+            </a>
+          )}
+          {user && (
+            <label className={`block w-full text-center py-3 rounded-lg font-semibold touch-manipulation mb-4 cursor-pointer ${uploadingImage ? 'bg-gray-300 text-gray-600' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+              {uploadingImage ? 'Foto wird hochgeladen…' : boxImage ? '📷 Foto ersetzen' : '📷 Foto aufnehmen'}
+              <input type="file" accept="image/*" capture="environment" className="hidden"
+                disabled={uploadingImage}
+                onChange={(e) => { handleBoxImage(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+          )}
 
           {/* Add Item Button */}
           {user && !showAddItem && !editingItem && (

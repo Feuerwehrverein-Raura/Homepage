@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import pg from 'pg';
 import bwipjs from 'bwip-js';
 import multer from 'multer';
+import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -93,6 +94,8 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // Foto der Kiste (POST /api/locations/:id/image)
+  await pool.query('ALTER TABLE locations ADD COLUMN IF NOT EXISTS image_url TEXT');
 
   // Items (Artikel)
   await pool.query(`
@@ -2389,6 +2392,40 @@ app.delete('/api/items/:id', async (req, res, next) => {
 // ========================================
 // IMAGE UPLOAD
 // ========================================
+
+// Foto einer Kiste (Lagerort): gedreht nach EXIF, lange Seite hoechstens
+// 2000 px, als JPEG OHNE Metadaten - Handyfotos tragen sonst den Standort.
+// Das alte Foto wird ersetzt.
+app.post('/api/locations/:id/image', authenticateToken, upload.single('image'), async (req: AuthenticatedRequest, res) => {
+  const roh = req.file?.path;
+  try {
+    if (!req.file || !roh) {
+      return res.status(400).json({ error: 'Kein Foto erhalten' });
+    }
+    const { id } = req.params;
+    const alt = await pool.query('SELECT image_url FROM locations WHERE id = $1', [id]);
+    if (alt.rows.length === 0) {
+      return res.status(404).json({ error: 'Kiste nicht gefunden' });
+    }
+
+    const datei = `kiste-${uuidv4()}.jpg`;
+    await sharp(roh).rotate().resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82 }).toFile(path.join(uploadDir, datei));
+
+    const altUrl: string | null = alt.rows[0].image_url;
+    if (altUrl && altUrl.startsWith('/api/uploads/')) {
+      fs.rmSync(path.join(uploadDir, path.basename(altUrl)), { force: true });
+    }
+    const result = await pool.query(
+      'UPDATE locations SET image_url = $2 WHERE id = $1 RETURNING *', [id, `/api/uploads/${datei}`]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Kistenfoto:', error);
+    res.status(500).json({ error: 'Foto konnte nicht gespeichert werden' });
+  } finally {
+    if (roh) fs.rmSync(roh, { force: true });
+  }
+});
 
 // Upload image for an item
 app.post('/api/items/:id/image', authenticateToken, upload.single('image'), async (req: AuthenticatedRequest, res) => {
