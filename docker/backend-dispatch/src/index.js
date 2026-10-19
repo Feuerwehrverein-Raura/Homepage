@@ -763,6 +763,14 @@ app.post('/email/send', authenticateAny, requireRole('vorstand', 'admin'), async
                 .replace(/\n/g, '<br>');
         }
 
+        // Benachrichtigung (sammeln: true): nicht sofort, sondern in der
+        // taeglichen Sammelmail um 18:00 (src/sammelmail.js).
+        if (kannSammeln(req.body)) {
+            await vormerken(pool, { to, subject: emailSubject, text: emailBody, html: emailHtml, member_id, event_id, template_id });
+            console.log('[EMAIL] fuer die Sammelmail vorgemerkt:', to, '-', emailSubject);
+            return res.json({ success: true, gesammelt: true });
+        }
+
         // Send email with both text and HTML versions
         const mailOptions = {
             from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
@@ -4170,6 +4178,15 @@ scheduledJobs.registerHandler('membership_fees_post_bulk', async (payload) => {
 })();
 
 scheduledJobs.mountEndpoints(app, pool, requireVorstand);
+
+// Sammelmail: Benachrichtigungen mit sammeln: true gehen einmal taeglich um
+// 18:00 Europe/Zurich raus, eine Mail je Empfaenger (src/sammelmail.js).
+const { sammelSchema, kannSammeln, vormerken, sammelmailStarten } = require('./sammelmail');
+sammelSchema(pool)
+    .then(() => sammelmailStarten(pool, (m) => transporter.sendMail({
+        from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`, ...m
+    })))
+    .catch(e => console.error('[SAMMELMAIL] init failed:', e.message));
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 // IMAP-Webmail-Endpoints fuer Vorstand (lesen, markieren, loeschen, Anhaenge, senden)

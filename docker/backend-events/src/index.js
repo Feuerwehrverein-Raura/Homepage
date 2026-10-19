@@ -161,7 +161,8 @@ async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
                 to: 'mitglieder@fwv-raura.ch',
                 subject,
                 body,
-                event_id: eventId
+                event_id: eventId,
+                sammeln: true
             }));
         } catch (e) { console.error('notifySlotFreed email failed:', e.message); }
 
@@ -240,7 +241,8 @@ async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestNa
             to: targetEmail,
             subject: title,
             body: emailBody,
-            event_id: eventId
+            event_id: eventId,
+            sammeln: true
         }));
     } catch (e) {
         console.error('notifyRegistrationChange email failed:', e.message);
@@ -412,7 +414,8 @@ Feuerwehrverein Raura
                 to: email,
                 subject: subject,
                 body: body,
-                event_id: event.id
+                event_id: event.id,
+                sammeln: true
             }));
             sent++;
             console.log(`Schicht-Benachrichtigung gesendet an ${email}`);
@@ -2566,7 +2569,7 @@ Eingetragen von: ${eingetragenVon}${notes ? `\nBemerkungen: ${notes}` : ''}`;
             empfaenger.push(...mitorganisatoren.empfaengerListe([], await mitorganisatorenEmails(event_id),
                 [...empfaenger, eingetragenVon]));
             for (const to of empfaenger) {
-                await axios.post(`${DISPATCH_API}/email/send`, { to, subject, body, event_id });
+                await axios.post(`${DISPATCH_API}/email/send`, { to, subject, body, event_id, sammeln: true });
             }
         } catch (emailErr) {
             console.error('Benachrichtigung zur Vorstands-Anmeldung fehlgeschlagen:', emailErr.message);
@@ -2757,7 +2760,7 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
         : mitorganisatoren.empfaengerListe(notifyEmail, await mitorganisatorenEmails(eventId));
     for (const to of orgEmpfaenger) {
         try {
-            await axios.post(`${DISPATCH_API}/email/send`, { to, subject: orgSubject, body: orgBody, event_id: eventId });
+            await axios.post(`${DISPATCH_API}/email/send`, { to, subject: orgSubject, body: orgBody, event_id: eventId, sammeln: true });
         } catch (emailError) {
             console.error('Organisator-E-Mail konnte nicht gesendet werden:', emailError.message);
         }
@@ -3605,7 +3608,8 @@ app.post('/events/:id/organizers', authenticateAny, async (req, res) => {
                 axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                     to: mitglied.email,
                     ...mitorganisatoren.mitgliedMail({ name, titel: event.title, eventUrl, hauptorganisator: hauptName }),
-                    event_id: event.id
+                    event_id: event.id,
+                    sammeln: true
                 })).catch(e => console.error('Mitorganisator-Mail fehlgeschlagen:', e.message));
             }
             return res.status(201).json(mitorganisatoren.eintragAnsicht({
@@ -4224,7 +4228,8 @@ Feuerwehrverein Raura`;
     await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(eventResult.rows[0] || { title: eventTitle }, {
         to: email,
         subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
-        body: emailBody
+        body: emailBody,
+        sammeln: true
     }));
 
     if (reg.member_id) {

@@ -1956,13 +1956,18 @@ async function sendNotificationEmail(memberId, templateName, variables = {}, pus
             ...variables
         };
 
+        // Benachrichtigungen gehen in die taegliche Sammelmail (api-dispatch,
+        // 18:00) - ausser der Willkommensmail: Die kommt einmal und sofort.
+        const sammeln = !['Willkommen neues Mitglied', 'Aufnahmeantrag angenommen'].includes(templateName);
+
         // Send to member (if email enabled)
         if (memberData.email && memberData.zustellung_email) {
             await axios.post(`${DISPATCH_API}/email/send`, {
                 to: memberData.versand_email || memberData.email,
                 template_id: template.id,
                 variables: mergedVars,
-                member_id: memberId
+                member_id: memberId,
+                sammeln
             });
             console.log(`Notification email '${templateName}' sent to member ${memberData.email}`);
         } else {
@@ -1974,7 +1979,8 @@ async function sendNotificationEmail(memberId, templateName, variables = {}, pus
             to: AKTUAR_EMAIL,
             template_id: template.id,
             variables: mergedVars,
-            member_id: memberId
+            member_id: memberId,
+            sammeln: true
         });
         console.log(`Notification email '${templateName}' sent to Aktuar ${AKTUAR_EMAIL}`);
 
@@ -3014,6 +3020,7 @@ app.post('/members/me/austritt', authenticateToken, async (req, res) => {
         try {
             await axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
                 to: 'vorstand@fwv-raura.ch',
+                sammeln: true,
                 subject: `Austritts-Antrag: ${member.vorname} ${member.nachname}`,
                 body: `Hallo Vorstand
 
@@ -4599,7 +4606,8 @@ ${istAktiv
         axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
             to: vorstandEmail,
             subject: `Neues Mitglied: ${registration.vorname} ${registration.nachname}`,
-            body: vorstandInfoBody
+            body: vorstandInfoBody,
+            sammeln: true
         }).catch(err => console.error('Vorstand-Info-Mail fehlgeschlagen:', err.message));
 
         res.json({
@@ -4671,11 +4679,12 @@ app.post('/member-registrations/:id/reject', authenticateVorstand, async (req, r
                         variables
                     });
 
-                    // Send to aktuar
+                    // Send to aktuar (Kopie fuer die Akten: Sammelmail)
                     await axios.post(`${DISPATCH_API}/email/send`, {
                         to: AKTUAR_EMAIL,
                         template_id: template.id,
-                        variables
+                        variables,
+                        sammeln: true
                     });
 
                     console.log(`Rejection email sent to ${registration.email} and ${AKTUAR_EMAIL}`);
