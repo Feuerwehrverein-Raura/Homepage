@@ -3338,6 +3338,27 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
     }
     setKartenLaeuft(false);
   };
+  // Kisten-Etikett quer am Bar-Drucker (backend src/etikett.ts), nur im Schopf
+  const [etikettText, setEtikettText] = useState('');
+  const [etikettUnten, setEtikettUnten] = useState('');
+  const [etikettLaeuft, setEtikettLaeuft] = useState(false);
+  const [etikettMeldung, setEtikettMeldung] = useState<{ ok: boolean; text: string } | null>(null);
+  const etikettDrucken = async () => {
+    setEtikettLaeuft(true);
+    setEtikettMeldung(null);
+    try {
+      const res = await fetch(`${API_URL}/etikett/drucken`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ text: etikettText, unten: etikettUnten }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setEtikettMeldung(res.ok ? { ok: true, text: `Etikett «${etikettText.trim()}» gedruckt.` } : { ok: false, text: d.error || `Fehler (${res.status})` });
+    } catch {
+      setEtikettMeldung({ ok: false, text: 'Keine Verbindung.' });
+    }
+    setEtikettLaeuft(false);
+  };
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -3558,6 +3579,30 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
             </button>
           </div>
           {kartenMeldung && <p className={`text-sm mt-2 ${kartenMeldung.ok ? 'text-green-700' : 'text-red-700'}`}>{kartenMeldung.text}</p>}
+        </div>
+
+        {/* Kisten-Etikett: quer bedruckter Bon fuer die Halterung an der Kiste */}
+        <div className="mb-8 border-2 border-gray-200 bg-gray-50 rounded-lg p-4">
+          <h3 className="text-lg font-semibold">🏷️ Kisten-Etikett drucken</h3>
+          <p className="text-sm text-gray-600 mb-3">
+            Druckt am Bar-Drucker einen quer beschrifteten Bon für die Halterung an der Kiste, z.B. «29 Rugeli».
+            Nur im Schopf-WLAN (über den T400).
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm flex-1 min-w-[12rem]">Text (gross)
+              <input type="text" maxLength={40} value={etikettText} onChange={e => setEtikettText(e.target.value)}
+                placeholder="29 Rugeli" className="block w-full border rounded-lg px-3 py-2 text-lg" />
+            </label>
+            <label className="text-sm flex-1 min-w-[12rem]">Zeile darunter (klein, freiwillig)
+              <input type="text" maxLength={60} value={etikettUnten} onChange={e => setEtikettUnten(e.target.value)}
+                placeholder="Kiste S8" className="block w-full border rounded-lg px-3 py-2 text-lg" />
+            </label>
+            <button onClick={etikettDrucken} disabled={etikettLaeuft || !etikettText.trim()}
+              className="px-5 py-3 rounded-lg bg-gray-800 text-white font-semibold disabled:opacity-50">
+              {etikettLaeuft ? 'Druckt…' : '🖨️ Etikett drucken'}
+            </button>
+          </div>
+          {etikettMeldung && <p className={`text-sm mt-2 ${etikettMeldung.ok ? 'text-green-700' : 'text-red-700'}`}>{etikettMeldung.text}</p>}
         </div>
 
         {/* Printer Settings */}

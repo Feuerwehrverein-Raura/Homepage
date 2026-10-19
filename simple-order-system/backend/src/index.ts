@@ -20,6 +20,7 @@ import { quittungXml } from './quittung.js';
 import { geschaeftstag, uhrzeit, datum } from './zeit.js';
 import { verkaufsstatistik } from './statistik.js';
 import { tischkartenBereich, tischkarteXml } from './tischkarten.js';
+import { etikettPruefen, etikettXml } from './etikett.js';
 import { protokollSchema, protokollEinrichten, serverEreignis } from './protokoll.js';
 import { geraeteSchema, geraeteSchranke, geraeteEinrichten } from './geraete.js';
 import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml, kassenbonsZuDrucken, kassenbonGedruckt, kassenbonDruckdienst } from './kassenbon.js';
@@ -264,6 +265,30 @@ app.post('/api/tischkarten/drucken', async (req, res) => {
     res.status(502).json({ error: `Nicht gedruckt: ${e?.message || e}` });
   }
 });
+
+// Kisten-Etikett quer am Bar-Drucker (src/etikett.ts), z.B. "29 Rugeli".
+// Wie die Tischkarten nur am T400.
+app.post('/api/etikett/drucken', async (req, res) => {
+  if (!VOR_ORT) {
+    return res.status(409).json({ error: 'Etiketten druckt nur die Kasse im Schopf-WLAN (T400). Bitte mit dem Schopf-WLAN verbinden.' });
+  }
+  const e = etikettPruefen(req.body?.text, req.body?.unten);
+  if (typeof e === 'string') return res.status(400).json({ error: e });
+  const anzahl = Math.min(Math.max(parseInt(req.body?.anzahl) || 1, 1), 10);
+  try {
+    const cfgs = await getPrinterConfig();
+    const cfg = cfgs.bar || cfgs.kitchen;
+    if (!cfg) return res.status(503).json({ error: 'Kein Bondrucker eingerichtet' });
+    if (cfg.protocol !== 'epos') return res.status(503).json({ error: 'Der Bondrucker kann das nicht (kein ePOS)' });
+    await eposSenden(cfg.ip, 'bar', eposHuelle(Array(anzahl).fill(etikettXml(e.text, e.unten)).join('\n')));
+    serverEreignis(pool, 'etikett', `Etikett "${e.text}" gedruckt`, { daten: { text: e.text, anzahl } });
+    res.json({ gedruckt: anzahl });
+  } catch (err: any) {
+    serverEreignis(pool, 'etikett_fehler', String(err?.message || err));
+    res.status(502).json({ error: `Nicht gedruckt: ${err?.message || err}` });
+  }
+});
+
 // Bar-Licht ein/aus (Web-Kasse: Einstellungen, App: Menue). Die Einstellung
 // barlicht muss an BEIDEN Orten stimmen: der T400 blinkt und uebernimmt
 // Einstellungen aus der Cloud - nur lokal gesetzt wuerde sie ueberschrieben.
