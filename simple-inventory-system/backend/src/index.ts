@@ -12,7 +12,7 @@ import crypto from 'crypto';
 import webpush from 'web-push';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
-import { generateQRCodeWithLogo, getItemUrl } from './qrcode.js';
+import { generateQRCodeWithLogo, getItemUrl, getKisteUrl, qrCodeMitLogo } from './qrcode.js';
 import { ausleiheEinrichten, ausleiheTabellen, erinnerungenPlanen } from './ausleihe-routen.js';
 
 const app = express();
@@ -2851,19 +2851,28 @@ app.get('/api/qrcode/label/:code', async (req, res) => {
 // BOX CONTENT LABEL (Kisteninhalt-Etikett)
 // ========================================
 
-// Generate printable content list for a storage box/location
+// Inhaltsblatt fuer den Kistendeckel (A4 hoch): Name, Foto, Stueckliste und
+// QR-Code, der die Kiste in der Lagerverwaltung oeffnet (/kiste/:id).
+// Ohne zugeordnete Artikel steht die Beschreibung der Kiste als Inhalt da.
+function htmlText(s: unknown): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function mengeText(n: unknown): string {
+  const z = Number(n);
+  return Number.isFinite(z) ? String(Math.round(z * 100) / 100) : '';
+}
+
 app.get('/api/locations/:id/content-label', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get location info
     const locationResult = await pool.query('SELECT * FROM locations WHERE id = $1', [id]);
     if (locationResult.rows.length === 0) {
       return res.status(404).json({ error: 'Location not found' });
     }
     const location = locationResult.rows[0];
 
-    // Get all items at this location via item_locations junction table
     const itemsResult = await pool.query(`
       SELECT i.name, il.quantity, i.unit, c.name as category_name, il.notes
       FROM item_locations il
@@ -2872,175 +2881,101 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
       WHERE il.location_id = $1 AND i.active = true
       ORDER BY c.name NULLS LAST, i.name
     `, [id]);
-
     const items = itemsResult.rows;
-    const date = new Date().toLocaleDateString('de-CH');
 
-    // Generate printable HTML for A4 or smaller label
-    const html = `
-<!DOCTYPE html>
+    const kisteUrl = getKisteUrl(location.id);
+    const qr = (await qrCodeMitLogo(kisteUrl, { size: 600 })).toString('base64');
+    const datum = new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' });
+
+    const gruppen = new Map<string, typeof items>();
+    for (const item of items) {
+      const kat = item.category_name || 'Ohne Kategorie';
+      gruppen.set(kat, [...(gruppen.get(kat) || []), item]);
+    }
+    const mitKategorien = gruppen.size > 1;
+    const stueckliste = items.length === 0
+      ? (location.description
+        ? `<p class="beschreibung">${htmlText(location.description).replace(/\n/g, '<br>')}</p>`
+        : '<p class="leer">Noch keine Artikel erfasst</p>')
+      : `<table>
+          <thead><tr><th class="menge">Menge</th><th>Artikel</th><th>Bemerkung</th></tr></thead>
+          ${[...gruppen].map(([kat, liste]) => `
+            ${mitKategorien ? `<tr class="kat"><td colspan="3">${htmlText(kat)}</td></tr>` : ''}
+            ${liste.map((i) => `<tr>
+              <td class="menge">${mengeText(i.quantity)} ${htmlText(i.unit)}</td>
+              <td>${htmlText(i.name)}</td>
+              <td class="notiz">${htmlText(i.notes)}</td>
+            </tr>`).join('')}`).join('')}
+        </table>`;
+
+    const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>Kisteninhalt - ${location.name}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kiste ${htmlText(location.name)}</title>
   <style>
-    @page {
-      size: A5 portrait;
-      margin: 10mm;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11pt;
-      line-height: 1.4;
-    }
-    .container {
-      max-width: 148mm;
-      margin: 0 auto;
-    }
-    .header {
-      text-align: center;
-      padding: 4mm 0;
-      border-bottom: 2px solid #333;
-      margin-bottom: 4mm;
-    }
-    .location-name {
-      font-size: 24pt;
-      font-weight: bold;
-      margin-bottom: 2mm;
-    }
-    .date {
-      font-size: 9pt;
-      color: #666;
-    }
-    .category-section {
-      margin-bottom: 4mm;
-    }
-    .category-title {
-      font-size: 10pt;
-      font-weight: bold;
-      background: #e5e5e5;
-      padding: 2mm 3mm;
-      margin-bottom: 1mm;
-    }
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .items-table td {
-      padding: 1.5mm 3mm;
-      border-bottom: 1px solid #ddd;
-      vertical-align: top;
-    }
-    .items-table .qty {
-      width: 60px;
-      text-align: right;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-    .items-table .name {
-      font-size: 10pt;
-    }
-    .empty-message {
-      text-align: center;
-      padding: 10mm;
-      color: #666;
-      font-style: italic;
-    }
-    .footer {
-      margin-top: 6mm;
-      padding-top: 3mm;
-      border-top: 1px solid #ccc;
-      font-size: 8pt;
-      color: #666;
-      text-align: center;
-    }
-    .controls {
-      padding: 15px;
-      text-align: center;
-      background: #f5f5f5;
-      border-bottom: 1px solid #ddd;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-    }
-    .controls button {
-      padding: 10px 20px;
-      font-size: 14px;
-      cursor: pointer;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      margin: 0 5px;
-    }
-    .controls button:hover {
-      background: #1d4ed8;
-    }
-    .controls .secondary {
-      background: #6b7280;
-    }
-    .print-wrapper {
-      padding-top: 60px;
-    }
-    @media print {
-      .controls { display: none; }
-      .print-wrapper { padding-top: 0; }
-    }
+    @page { size: A4 portrait; margin: 12mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.35; color: #111; background: #fff; }
+    .blatt { max-width: 186mm; margin: 0 auto; padding: 4mm; }
+    .kopf { display: flex; align-items: flex-start; gap: 6mm; border-bottom: 3px solid #B91C1C; padding-bottom: 4mm; margin-bottom: 5mm; }
+    .kopf .titel { flex: 1; }
+    .verein { font-size: 10pt; color: #B91C1C; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; }
+    .name { font-size: 40pt; font-weight: bold; line-height: 1.1; margin: 1mm 0 2mm; }
+    .unter { font-size: 12pt; color: #333; }
+    .qr { text-align: center; width: 42mm; }
+    .qr img { width: 42mm; height: 42mm; display: block; }
+    .qr div { font-size: 7.5pt; color: #555; margin-top: 1mm; }
+    .foto { margin-bottom: 5mm; text-align: center; }
+    .foto img { max-width: 100%; max-height: 120mm; object-fit: contain; border-radius: 2mm; }
+    h2 { font-size: 13pt; margin-bottom: 2mm; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 9pt; color: #555; border-bottom: 2px solid #333; padding: 1.5mm 2mm; }
+    td { padding: 1.8mm 2mm; border-bottom: 1px solid #ccc; vertical-align: top; }
+    .menge { width: 28mm; text-align: right; font-weight: bold; white-space: nowrap; }
+    th.menge { text-align: right; }
+    .notiz { color: #555; font-size: 9.5pt; }
+    tr.kat td { background: #eee; font-weight: bold; font-size: 9.5pt; }
+    tr { break-inside: avoid; }
+    .beschreibung { font-size: 16pt; font-weight: bold; padding: 2mm 0; }
+    .leer { color: #666; font-style: italic; }
+    .fuss { margin-top: 6mm; padding-top: 2mm; border-top: 1px solid #ccc; font-size: 8pt; color: #666; display: flex; justify-content: space-between; }
+    .knopf { position: fixed; top: 0; left: 0; right: 0; padding: 10px; text-align: center; background: #f5f5f5; border-bottom: 1px solid #ddd; }
+    .knopf button { padding: 10px 20px; font-size: 14px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; margin: 0 4px; cursor: pointer; }
+    .knopf button.zweit { background: #6b7280; }
+    .platz { height: 60px; }
+    @media print { .knopf, .platz { display: none; } .blatt { padding: 0; } }
   </style>
 </head>
 <body>
-  <div class="controls">
-    <button onclick="window.print()">🖨️ Drucken</button>
-    <button class="secondary" onclick="window.close()">Schliessen</button>
+  <div class="knopf">
+    <button onclick="window.print()">🖨️ Drucken (A4)</button>
+    <button class="zweit" onclick="window.close()">Schliessen</button>
   </div>
-  <div class="print-wrapper">
-    <div class="container">
-      <div class="header">
-        <div class="location-name">${location.name}</div>
-        <div class="date">Stand: ${date}</div>
+  <div class="platz"></div>
+  <div class="blatt">
+    <div class="kopf">
+      <div class="titel">
+        <div class="verein">Feuerwehrverein Raura · Lager</div>
+        <div class="name">${htmlText(location.name)}</div>
+        ${items.length > 0 && location.description ? `<div class="unter">${htmlText(location.description)}</div>` : ''}
       </div>
-
-      ${items.length === 0 ? `
-        <div class="empty-message">Diese Kiste ist leer</div>
-      ` : (() => {
-        // Group items by category
-        const grouped: Record<string, typeof items> = {};
-        items.forEach(item => {
-          const cat = item.category_name || 'Ohne Kategorie';
-          if (!grouped[cat]) grouped[cat] = [];
-          grouped[cat].push(item);
-        });
-
-        return Object.entries(grouped).map(([category, categoryItems]) => `
-          <div class="category-section">
-            <div class="category-title">${category}</div>
-            <table class="items-table">
-              ${categoryItems.map(item => `
-                <tr>
-                  <td class="qty">${item.quantity} ${item.unit}</td>
-                  <td class="name">${item.name}</td>
-                </tr>
-              `).join('')}
-            </table>
-          </div>
-        `).join('');
-      })()}
-
-      <div class="footer">
-        ${items.length} Artikel • FWV Raura Lagerverwaltung
+      <div class="qr">
+        <img src="data:image/png;base64,${qr}" alt="QR-Code zur Kiste">
+        <div>Scannen: Kiste in der<br>Lagerverwaltung</div>
       </div>
+    </div>
+    ${location.image_url ? `<div class="foto"><img src="${htmlText(location.image_url)}" alt="Foto der Kiste"></div>` : ''}
+    <h2>Inhalt</h2>
+    ${stueckliste}
+    <div class="fuss">
+      <span>${items.length > 0 ? `${items.length} Artikel · ` : ''}Stand ${datum}</span>
+      <span>${htmlText(kisteUrl.replace(/^https?:\/\//, ''))}</span>
     </div>
   </div>
 </body>
-</html>
-    `;
+</html>`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);

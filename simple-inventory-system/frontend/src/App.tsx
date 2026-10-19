@@ -244,6 +244,7 @@ function App() {
   const [assignCode, setAssignCode] = useState<string | null>(null); // Gescannter Code, der einem bestehenden Artikel zugeordnet werden soll
   const [assignSearch, setAssignSearch] = useState(''); // Suchtext im Zuordnen-Picker
   const [assignBusy, setAssignBusy] = useState(false); // Zuordnung läuft
+  const [startKiste, setStartKiste] = useState<number | null>(null); // /kiste/:id (QR-Code im Kistendeckel)
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -255,6 +256,13 @@ function App() {
 
     if (itemMatch) {
       setPublicItemCode(itemMatch[1]);
+    }
+
+    // /kiste/:id - QR-Code auf dem Inhaltsblatt im Kistendeckel
+    const kisteMatch = path.match(/^\/kiste\/(\d+)\/?$/);
+    if (kisteMatch) {
+      setStartKiste(parseInt(kisteMatch[1]));
+      setTab('kisten');
     }
   }, []);
 
@@ -1138,6 +1146,8 @@ function App() {
             user={user}
             onLogin={login}
             onRefresh={fetchItems}
+            startKisteId={startKiste}
+            onStartKisteGeoeffnet={() => setStartKiste(null)}
           />
         )}
 
@@ -1616,12 +1626,14 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
 }
 
 // Kisten (Boxes) View Component
-function KistenView({ items, token, user, onLogin, onRefresh }: {
+function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onStartKisteGeoeffnet }: {
   items: Item[];
   token: string | null;
   user: User | null;
   onLogin: () => void;
   onRefresh: () => void;
+  startKisteId?: number | null;
+  onStartKisteGeoeffnet?: () => void;
 }) {
   const [selectedBox, setSelectedBox] = useState<Location | null>(null);
   const [boxContents, setBoxContents] = useState<BoxContent[]>([]);
@@ -1642,6 +1654,14 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
   useEffect(() => {
     fetchBoxOverview();
   }, []);
+
+  // Über /kiste/:id geöffnet: diese Kiste gleich anzeigen
+  useEffect(() => {
+    if (!startKisteId || boxOverview.length === 0) return;
+    const box = boxOverview.find((b) => b.id === startKisteId);
+    if (box) handleSelectBox(box);
+    onStartKisteGeoeffnet?.();
+  }, [startKisteId, boxOverview]);
 
   const fetchBoxOverview = async () => {
     try {
@@ -1874,9 +1894,9 @@ function KistenView({ items, token, user, onLogin, onRefresh }: {
             <button
               onClick={() => printBoxLabel(selectedBox.id)}
               className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg touch-manipulation"
-              title="Etikett drucken"
+              title="Inhaltsblatt für den Deckel (A4) drucken"
             >
-              🏷️
+              🖨️ Deckelblatt
             </button>
           </div>
 

@@ -21,14 +21,19 @@ export async function generateQRCodeWithLogo(
   customBarcode: string,
   options: QRCodeOptions = {}
 ): Promise<Buffer> {
+  return qrCodeMitLogo(getItemUrl(customBarcode), options);
+}
+
+/** QR-Code mit Vereinslogo fuer eine beliebige Adresse (z.B. [getKisteUrl]). */
+export async function qrCodeMitLogo(
+  url: string,
+  options: QRCodeOptions = {}
+): Promise<Buffer> {
   const {
     size = 300,
     logoSize = 20, // 20% of QR code
     margin = 2,
   } = options;
-
-  // Generate URL that will be encoded in the QR code
-  const url = getItemUrl(customBarcode);
 
   // Generate QR code as PNG buffer with high error correction for logo support
   const qrBuffer = await QRCode.toBuffer(url, {
@@ -103,6 +108,11 @@ export async function generateQRCodeWithLogo(
     // Return QR code without logo if compositing fails
     return qrBuffer;
   }
+}
+
+/** Adresse einer Kiste (Lagerort) in der Lagerverwaltung. */
+export function getKisteUrl(id: number | string): string {
+  return `${BASE_URL}/kiste/${id}`;
 }
 
 /**
