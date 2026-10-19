@@ -267,26 +267,36 @@ app.post('/api/tischkarten/drucken', async (req, res) => {
 });
 
 // Kisten-Etikett quer am Bar-Drucker (src/etikett.ts), z.B. "29 Rugeli".
-// Wie die Tischkarten nur am T400.
-app.post('/api/etikett/drucken', async (req, res) => {
-  if (!VOR_ORT) {
-    return res.status(409).json({ error: 'Etiketten druckt nur die Kasse im Schopf-WLAN (T400). Bitte mit dem Schopf-WLAN verbinden.' });
-  }
-  const e = etikettPruefen(req.body?.text, req.body?.unten);
-  if (typeof e === 'string') return res.status(400).json({ error: e });
-  const anzahl = Math.min(Math.max(parseInt(req.body?.anzahl) || 1, 1), 10);
+// Geht auch aus der Cloud: sie erreicht den Drucker ueber WireGuard (am
+// 19.10.2026 aus dem Container geprueft, wie beim Rezeptdruck).
+//   POST /api/etikett/drucken           Web-Kasse (angemeldet)
+//   POST /api/internal/etikett/drucken  Inventar (X-Order-API-Key)
+// Body: { text, unten?, anzahl? (1-10) }
+async function etikettDrucken(body: any, von: string | null): Promise<{ status: number; daten: any }> {
+  const e = etikettPruefen(body?.text, body?.unten);
+  if (typeof e === 'string') return { status: 400, daten: { error: e } };
+  const anzahl = Math.min(Math.max(parseInt(body?.anzahl) || 1, 1), 10);
   try {
     const cfgs = await getPrinterConfig();
     const cfg = cfgs.bar || cfgs.kitchen;
-    if (!cfg) return res.status(503).json({ error: 'Kein Bondrucker eingerichtet' });
-    if (cfg.protocol !== 'epos') return res.status(503).json({ error: 'Der Bondrucker kann das nicht (kein ePOS)' });
+    if (!cfg) return { status: 503, daten: { error: 'Kein Bondrucker eingerichtet' } };
+    if (cfg.protocol !== 'epos') return { status: 503, daten: { error: 'Der Bondrucker kann das nicht (kein ePOS)' } };
     await eposSenden(cfg.ip, 'bar', eposHuelle(Array(anzahl).fill(etikettXml(e.text, e.unten)).join('\n')));
-    serverEreignis(pool, 'etikett', `Etikett "${e.text}" gedruckt`, { daten: { text: e.text, anzahl } });
-    res.json({ gedruckt: anzahl });
+    serverEreignis(pool, 'etikett', `Etikett "${e.text}" gedruckt`, { daten: { text: e.text, anzahl, von } });
+    return { status: 200, daten: { gedruckt: anzahl } };
   } catch (err: any) {
     serverEreignis(pool, 'etikett_fehler', String(err?.message || err));
-    res.status(502).json({ error: `Nicht gedruckt: ${err?.message || err}` });
+    return { status: 502, daten: { error: `Nicht gedruckt: ${err?.message || err}` } };
   }
+}
+app.post('/api/etikett/drucken', async (req: AuthenticatedRequest, res) => {
+  const r = await etikettDrucken(req.body, req.user?.name || null);
+  res.status(r.status).json(r.daten);
+});
+app.post('/api/internal/etikett/drucken', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  const r = await etikettDrucken(req.body, typeof req.body?.von === 'string' ? req.body.von.slice(0, 100) : 'Inventar');
+  res.status(r.status).json(r.daten);
 });
 
 // Bar-Licht ein/aus (Web-Kasse: Einstellungen, App: Menue). Die Einstellung

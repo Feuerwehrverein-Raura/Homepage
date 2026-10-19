@@ -3585,8 +3585,7 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
         <div className="mb-8 border-2 border-gray-200 bg-gray-50 rounded-lg p-4">
           <h3 className="text-lg font-semibold">🏷️ Kisten-Etikett drucken</h3>
           <p className="text-sm text-gray-600 mb-3">
-            Druckt am Bar-Drucker einen quer beschrifteten Bon für die Halterung an der Kiste, z.B. «29 Rugeli».
-            Nur im Schopf-WLAN (über den T400).
+            Druckt am Bar-Drucker im Schopf einen quer beschrifteten Bon für die Halterung an der Kiste, z.B. «29 Rugeli».
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-sm flex-1 min-w-[12rem]">Text (gross)

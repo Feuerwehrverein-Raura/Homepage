@@ -936,6 +936,27 @@ app.post('/api/recipes/:id/drucken', authenticateToken, async (req: Authenticate
   }
 });
 
+// Kisten-Etikett: quer bedruckter Bon fuer die Halterung an der Kiste
+// (z.B. "29 Rugeli"). Wie beim Rezept reicht das Inventar den Auftrag an die
+// Kasse weiter (order-backend src/etikett.ts). Body: { text, unten?, anzahl? }
+app.post('/api/locations/:id/etikett', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungueltige Kiste' });
+  try {
+    const r = await fetch(`${ORDER_INTERNAL_URL}/api/internal/etikett/drucken`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': ORDER_API_KEY! },
+      body: JSON.stringify({ text: req.body?.text, unten: req.body?.unten, anzahl: req.body?.anzahl, von: req.user?.name }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const daten = await r.json().catch(() => ({}));
+    res.status(r.status).json(daten);
+  } catch (err: any) {
+    console.error('Etikett drucken:', err?.message || err);
+    res.status(502).json({ error: 'Kasse nicht erreichbar - Bondrucker kann nicht angesprochen werden' });
+  }
+});
+
 // Prepare recipe (manually deduct ingredients)
 app.post('/api/recipes/:id/prepare', authenticateToken, async (req: AuthenticatedRequest, res) => {
   const client = await pool.connect();

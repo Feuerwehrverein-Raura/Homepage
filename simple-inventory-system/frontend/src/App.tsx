@@ -1649,6 +1649,10 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
   const [editNotes, setEditNotes] = useState('');
   const [boxImage, setBoxImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [boxDescription, setBoxDescription] = useState<string | null>(null);
+  const [etikett, setEtikett] = useState<{ text: string; unten: string } | null>(null);
+  const [etikettLaeuft, setEtikettLaeuft] = useState(false);
+  const [etikettMeldung, setEtikettMeldung] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Fetch box overview on mount
   useEffect(() => {
@@ -1681,6 +1685,7 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
       if (res.ok) {
         const data = await res.json();
         setBoxImage(data.image_url || null);
+        setBoxDescription(data.description || null);
         // Map the API response to our BoxContent interface
         const contents = (data.contents || []).map((c: any) => ({
           item_id: c.id,
@@ -1700,6 +1705,9 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
   const handleSelectBox = (box: Location) => {
     setSelectedBox(box);
     setBoxImage(null);
+    setBoxDescription(null);
+    setEtikett(null);
+    setEtikettMeldung(null);
     fetchBoxContents(box.id);
     setShowAddItem(false);
     setEditingItem(null);
@@ -1821,6 +1829,37 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
     setUploadingImage(false);
   };
 
+  // Kisten-Etikett (quer bedruckter Bon) - Vorschlag aus dem Inhalt:
+  // ein Artikel "29 Rugeli", sonst die Beschreibung, sonst der Kistenname.
+  const etikettVorschlag = () => {
+    if (!selectedBox) return;
+    const text = boxContents.length === 1
+      ? `${boxContents[0].quantity} ${boxContents[0].item_name}`
+      : (boxDescription || selectedBox.name);
+    setEtikett({ text: text.slice(0, 40), unten: `Kiste ${selectedBox.name}` });
+    setEtikettMeldung(null);
+  };
+
+  const etikettDrucken = async () => {
+    if (!token || !selectedBox || !etikett?.text.trim()) return;
+    setEtikettLaeuft(true);
+    setEtikettMeldung(null);
+    try {
+      const res = await fetch(`${API_URL}/locations/${selectedBox.id}/etikett`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(etikett)
+      });
+      const d = await res.json().catch(() => ({}));
+      setEtikettMeldung(res.ok
+        ? { ok: true, text: `Etikett «${etikett.text.trim()}» am Bon-Drucker im Schopf gedruckt.` }
+        : { ok: false, text: d.error || `Fehler (${res.status})` });
+    } catch {
+      setEtikettMeldung({ ok: false, text: 'Keine Verbindung.' });
+    }
+    setEtikettLaeuft(false);
+  };
+
   const printBoxLabel = (locationId: number) => {
     window.open(`${API_URL}/locations/${locationId}/content-label`, '_blank');
   };
@@ -1914,6 +1953,38 @@ function KistenView({ items, token, user, onLogin, onRefresh, startKisteId, onSt
                 disabled={uploadingImage}
                 onChange={(e) => { handleBoxImage(e.target.files?.[0]); e.target.value = ''; }} />
             </label>
+          )}
+
+          {/* Kisten-Etikett (quer bedruckter Bon fuer die Halterung) */}
+          {user && !etikett && (
+            <button onClick={etikettVorschlag}
+              className="w-full bg-gray-700 hover:bg-gray-800 text-white py-3 rounded-lg font-semibold touch-manipulation mb-4">
+              🏷️ Etikett für die Halterung (Bon)
+            </button>
+          )}
+          {user && etikett && (
+            <div className="bg-white p-4 rounded-lg shadow mb-4 space-y-3">
+              <h3 className="font-semibold">🏷️ Etikett drucken (Bon-Drucker im Schopf)</h3>
+              <label className="block text-sm">Text (gross, quer)
+                <input type="text" maxLength={40} value={etikett.text}
+                  onChange={(e) => setEtikett({ ...etikett, text: e.target.value })}
+                  className="block w-full p-3 border-2 rounded-lg text-lg" />
+              </label>
+              <label className="block text-sm">Zeile darunter (klein)
+                <input type="text" maxLength={60} value={etikett.unten}
+                  onChange={(e) => setEtikett({ ...etikett, unten: e.target.value })}
+                  className="block w-full p-3 border-2 rounded-lg" />
+              </label>
+              <div className="flex gap-3">
+                <button onClick={etikettDrucken} disabled={etikettLaeuft || !etikett.text.trim()}
+                  className="flex-1 bg-gray-800 text-white py-3 rounded-lg font-semibold disabled:opacity-50">
+                  {etikettLaeuft ? 'Druckt…' : '🖨️ Drucken'}
+                </button>
+                <button onClick={() => { setEtikett(null); setEtikettMeldung(null); }}
+                  className="px-4 py-3 bg-gray-200 rounded-lg">Schliessen</button>
+              </div>
+              {etikettMeldung && <p className={`text-sm ${etikettMeldung.ok ? 'text-green-700' : 'text-red-700'}`}>{etikettMeldung.text}</p>}
+            </div>
           )}
 
           {/* Add Item Button */}

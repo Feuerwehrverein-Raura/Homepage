@@ -9,7 +9,8 @@
 // laenger als ~15 cm wird. Darunter klein eine zweite Zeile.
 // Erprobt am TM-m30III im Schopf am 19.10.2026 ("29 Rugeli" passt genau in
 // die Halterung der gruenen Kisten).
-// Gedruckt wird wie die Tischkarten am Bar-Drucker ueber den T400.
+// Gedruckt wird am Bar-Drucker - vom T400 oder aus der Cloud (WireGuard).
+// Das Inventar druckt ueber POST /api/internal/etikett/drucken (index.ts).
 // ---------------------------------------------------------------------------
 
 export const ETIKETT_MAX = 40;
