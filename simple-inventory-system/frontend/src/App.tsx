@@ -2255,6 +2255,20 @@ function ReportsView({ items, locations, onRefresh }: { items: Item[]; locations
         </div>
       </div>
 
+      {/* Speisekarte */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="font-semibold mb-3">🍄 Speisekarte</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Karte mit allen verkaufbaren Artikeln und Preisen, A5 je zwei auf A4 quer. Die Beschreibung eines Artikels steht klein darunter.
+        </p>
+        <button
+          onClick={() => window.open(`${API_URL}/speisekarte`, '_blank')}
+          className="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded flex items-center gap-2"
+        >
+          🖨️ Speisekarte drucken
+        </button>
+      </div>
+
       {/* Box Content Labels */}
       <div className="bg-white p-4 rounded-lg shadow">
         <h3 className="font-semibold mb-3">📦 Kisten-Etiketten</h3>

@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
 import { generateQRCodeWithLogo, getItemUrl, getKisteUrl, qrCodeMitLogo } from './qrcode.js';
 import { ausleiheEinrichten, ausleiheTabellen, erinnerungenPlanen } from './ausleihe-routen.js';
+import { karteAufbauen, speisekarteHtml } from './speisekarte.js';
 
 const app = express();
 const server = createServer(app);
@@ -3008,6 +3009,56 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
   } catch (error) {
     console.error('Box content label generation failed:', error);
     res.status(500).json({ error: 'Label generation failed' });
+  }
+});
+
+// ========================================
+// SPEISEKARTE (druckbar, aus den verkaufbaren Artikeln)
+// ========================================
+
+// Karte im Stil der Chilbi 2026 (Pilze, Herbstgirlande), je zwei A5-Seiten
+// auf A4 quer. Anders als die Kasse ohne Bestandspruefung: die Karte wird
+// vor dem Anlass gedruckt. ?titel= ersetzt "Zum Rote Schopf".
+let speisekarteBilder: { hintergrund: string; logo: string } | null = null;
+function speisekarteBilderLaden() {
+  if (!speisekarteBilder) {
+    const lesen = (datei: string) =>
+      `data:image/jpeg;base64,${fs.readFileSync(path.join(process.cwd(), 'assets', datei)).toString('base64')}`;
+    speisekarteBilder = { hintergrund: lesen('speisekarte-hintergrund.jpg'), logo: lesen('speisekarte-logo.jpg') };
+  }
+  return speisekarteBilder;
+}
+
+app.get('/api/speisekarte', async (req, res) => {
+  try {
+    const [items, recipes] = await Promise.all([
+      pool.query(`
+        SELECT i.name, i.sale_price as price, i.description,
+               COALESCE(NULLIF(i.sale_category, ''), c.name) as category
+        FROM items i
+        LEFT JOIN categories c ON i.category_id = c.id
+        WHERE i.sellable = true AND i.active = true
+      `),
+      pool.query(`
+        SELECT r.name, r.sale_price as price, r.description,
+               COALESCE(NULLIF(r.sale_category, ''), rc.name) as category
+        FROM recipes r
+        LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
+        WHERE r.sellable = true AND r.active = true
+      `)
+    ]);
+    const titel = typeof req.query.titel === 'string' && req.query.titel.trim()
+      ? req.query.titel.trim().slice(0, 60)
+      : 'Zum Rote Schopf';
+    const stand = new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' });
+    const html = speisekarteHtml(karteAufbauen([...items.rows, ...recipes.rows]), {
+      titel, stand, ...speisekarteBilderLaden()
+    });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Speisekarte:', error);
+    res.status(500).json({ error: 'Speisekarte failed' });
   }
 });
 
