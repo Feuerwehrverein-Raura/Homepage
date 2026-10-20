@@ -226,6 +226,20 @@ jobs:
           flutter pub get
           flutter build macos --release --build-name "$VERSION" --build-number "$VCODE"
 
+      # Festes Zertifikat statt ad hoc: sonst fragt macOS nach jedem Update
+      # nach dem Schluesselbund-Passwort (flutter/packaging/signieren-macos.sh).
+      # Ohne Secrets bleibt es bei ad hoc - der Build laeuft trotzdem.
+      - name: Signieren
+        env:
+          MACOS_SIGNATUR_P12: ${{ secrets.MACOS_SIGNATUR_P12 }}
+          MACOS_SIGNATUR_PASSWORT: ${{ secrets.MACOS_SIGNATUR_PASSWORT }}
+        run: |
+          if [ -z "$MACOS_SIGNATUR_P12" ]; then
+            echo "::warning::MACOS_SIGNATUR_P12 fehlt - App bleibt ad hoc signiert"
+          else
+            ../packaging/signieren-macos.sh "build/macos/Build/Products/Release/FWV Musik.app" macos/Runner/Release.entitlements
+          fi
+
       - name: Zip und DMG
         run: |
           set -euo pipefail
