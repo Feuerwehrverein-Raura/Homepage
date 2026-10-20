@@ -25,14 +25,18 @@ for ds in json.load(sys.stdin)["devices"].values():
             print(d["udid"]); sys.exit()
 ' "$NAME")
 if [ -z "$UDID" ]; then
-  # Neuester iOS-Simulator; Sprache und Region wie im Verein.
+  # Neuester iOS-Simulator.
   UDID=$(xcrun simctl create "$NAME" "$TYP")
-  xcrun simctl boot "$UDID"
-  xcrun simctl bootstatus "$UDID" >/dev/null
-  xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array de-CH
-  xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string de_CH
-  xcrun simctl shutdown "$UDID"
 fi
+# Jeder Lauf startet sauber (Werkszustand), dann Sprache und Region wie im
+# Verein - erase setzt auch die Sprache zurueck.
+xcrun simctl shutdown "$UDID" 2>/dev/null || true
+xcrun simctl erase "$UDID"
+xcrun simctl boot "$UDID"
+xcrun simctl bootstatus "$UDID" >/dev/null
+xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array de-CH
+xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string de_CH
+xcrun simctl shutdown "$UDID"
 xcrun simctl bootstatus "$UDID" -b >/dev/null
 # Das Simulator-Fenster heisst "Device Hub" (nur zum Zuschauen).
 HUB="$(xcode-select -p)/../Applications/DeviceHub.app"

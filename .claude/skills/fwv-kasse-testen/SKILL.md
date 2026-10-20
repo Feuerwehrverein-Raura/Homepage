@@ -40,8 +40,16 @@ echte Cloud. Start: `npx tsx src/index.ts`.
 
 Ohne Drucker meldet die Kasse «Bon nicht gedruckt». Das ist hier richtig so.
 
-## 2. Emulator verbinden
+## 2. Emulator sauber starten und verbinden
 
+Jeder Test beginnt mit einem frisch zurueckgesetzten Emulator (keine alten
+Apps, Logins oder Daten; haelt die AVD auch klein):
+```sh
+~/Library/Android/sdk/emulator/emulator -avd fwv-pixel -wipe-data -no-snapshot-save &
+adb wait-for-device
+until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 2; done
+```
+Danach:
 ```sh
 adb reverse tcp:3999 tcp:3999      # Backend
 adb reverse tcp:4173 tcp:4173      # Web-Kasse (vite preview)
@@ -83,7 +91,8 @@ Signaturkonflikt mit der installierten App: `adb uninstall ch.fwvraura.kasse`
   normal.
 
 Aufraeumen: App deinstallieren, `pkill -f "tsx src/index.ts"`,
-`pkill -f "vite preview"`, `pg_ctl … stop`, `adb reverse --remove-all`.
+`pkill -f "vite preview"`, `pg_ctl … stop`, `adb reverse --remove-all`,
+`adb emu kill` (der naechste Test setzt den Emulator ohnehin zurueck).
 
 ## 4. Release
 
