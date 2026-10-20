@@ -114,8 +114,9 @@ class SichererSpeicher implements GeheimSpeicher {
   /// (kSecAttrService). Ohne ihn teilen sich alle Apps
   /// "flutter_secure_storage_service" - dann liest z.B. FWV Musik Eintraege,
   /// die die Mitglieder-App oder eine aeltere Version angelegt hat, und
-  /// macOS fragt fuer jeden einzelnen nach dem Passwort. Die Mitglieder-App
-  /// behaelt den alten Namen, damit niemand abgemeldet wird.
+  /// macOS fragt fuer jeden einzelnen nach dem Passwort. Darum hat jede App
+  /// ihren eigenen (Mitglieder: ch.fwvraura.members, Musik:
+  /// ch.fwvraura.musik); nach der Umstellung einmal neu anmelden.
   SichererSpeicher([FlutterSecureStorage? speicher, String? macDienst])
     : _speicher =
           speicher ??

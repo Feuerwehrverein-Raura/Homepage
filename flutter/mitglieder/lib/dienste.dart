@@ -111,7 +111,9 @@ class Dienste {
   /// (web/browser.dart). Als Desktop-Programm (desktop/desktop.dart):
   /// Anmeldung ueber Loopback, Dateien oeffnen statt teilen, kein Push.
   factory Dienste.echt() {
-    final geheim = kIsWeb ? browserSpeicher() : SichererSpeicher();
+    // Eigener Bereich im macOS-Schluesselbund (siehe SichererSpeicher) -
+    // betrifft nur das Mac-Programm; Android, iOS, Windows, Linux bleiben.
+    final geheim = kIsWeb ? browserSpeicher() : SichererSpeicher(null, 'ch.fwvraura.members');
     final speicher = SitzungsSpeicher(geheim);
     final push = FirebasePush();
     const kontakte = KontakteAbgleich();
