@@ -67,9 +67,14 @@ Ubuntu 24.04+, Debian 13 und ähnlich neuen Systemen.
 
 ## Windows
 
-`.zip` mit `fwv_mitglieder.exe`, inkl. Visual-C++-Laufzeit. Nicht signiert:
-SmartScreen warnt beim ersten Start («Weitere Informationen» → «Trotzdem
-ausführen»).
+Installer `fwv-raura-<version>-windows-x64-setup.exe` (Inno Setup,
+`flutter/packaging/windows-setup.iss`, gemeinsam mit FWV Musik). Installiert
+ohne Administratorrechte nach `%LOCALAPPDATA%\Programs\FWV Raura`, mit
+Startmenü-Eintrag und Deinstallation; die Visual-C++-Laufzeit liegt bei.
+Die AppId im Workflow darf sich nie ändern, sonst gilt ein Update als
+zweites Programm. Nicht signiert: SmartScreen warnt beim ersten Start
+(«Weitere Informationen» → «Trotzdem ausführen»). Bis members-v1.0.28 gab
+es statt dessen eine `.zip`.
 
 ## macOS
 
@@ -85,8 +90,8 @@ Tag `members-v*` (wie Android): `build-android-members.yml` baut zusätzlich
 die Jobs *Desktop Linux/Windows/macOS* und hängt die Dateien danach ans
 Release (`desktop-release`), feste Namen auch unter `members-latest`
 (`members-latest-linux-amd64.deb`, `…-linux-x64.tar.gz`,
-`…-windows-x64.zip`, `…-macos.dmg`). Auf main/PR prüft `flutter-apps.yml`
-mit `flutter build linux --debug`, dass Linux baut.
+`…-windows-x64-setup.exe`, `…-macos.dmg`). Auf main/PR prüft
+`flutter-apps.yml` mit `flutter build linux --debug`, dass Linux baut.
 
 ## Offen
 

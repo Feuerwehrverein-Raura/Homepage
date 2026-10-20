@@ -4,7 +4,7 @@ name: Build Desktop Musik
 # Roten Schopfs als eigenes Desktop-Programm, docs/flutter-musik-desktop.md.
 #
 # Tag musik-vX.Y.Z  ->  Analyse + Tests, dann Linux (.deb + .tar.gz),
-# Windows (.zip) und macOS (.dmg + .zip, unsigniert) und ein GitHub-Release
+# Windows (Installer .exe) und macOS (.dmg + .zip, unsigniert) und ein GitHub-Release
 # musik-vX.Y.Z. Das Release wird NIE "Latest": releases/latest gehoert dem
 # Auto-Updater von vorstand-desktop (build-desktop-vorstand.yml).
 # Push auf main baut nichts - den Compile-Check fuer Linux macht
@@ -165,18 +165,33 @@ jobs:
           flutter build windows --release --build-name "$VERSION" --build-number "$VCODE"
 
       # Die Laufzeit von Visual C++ mitliefern - sonst startet das Programm
-      # auf Rechnern ohne "VC++ Redistributable" nicht. libmpv-2.dll legt
-      # media_kit_libs_windows_audio selbst ins Release-Verzeichnis.
-      - name: Zip
+      # auf Rechnern ohne "VC++ Redistributable" nicht.
+      - name: Laufzeit beilegen
         run: |
           set -euo pipefail
           OUT=build/windows/x64/runner/Release
+          # libmpv-2.dll legt media_kit_libs_windows_audio selbst hierher.
           ls "$OUT"/libmpv-2.dll
           for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
             cp "/c/Windows/System32/$dll" "$OUT/"
           done
-          mkdir -p "$GITHUB_WORKSPACE/desktop"
-          (cd "$OUT" && 7z a -tzip "$GITHUB_WORKSPACE/desktop/fwv-musik-${VERSION}-windows-x64.zip" .)
+
+      # Installer (.exe) mit Inno Setup statt .zip - auf windows-latest
+      # vorinstalliert. Skript: flutter/packaging/windows-setup.iss. In
+      # PowerShell, weil Git-Bash "/D..." fuer einen Pfad haelt.
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\desktop" | Out-Null
+          & $iscc /Q "/DAppName=FWV Musik" "/DAppId={{818a9929-6e30-4e1d-b5d1-6aef2ac38242}" "/DExeName=fwv_musik.exe" `
+            "/DVersion=$env:VERSION" "/DQuelle=$PWD\build\windows\x64\runner\Release" `
+            "/DSymbol=$PWD\windows\runner\resources\app_icon.ico" `
+            "/DZiel=$env:GITHUB_WORKSPACE\desktop" "/DDatei=fwv-musik-$env:VERSION-windows-x64-setup" `
+            "$env:GITHUB_WORKSPACE\flutter\packaging\windows-setup.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem "$env:GITHUB_WORKSPACE\desktop"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -267,7 +282,7 @@ jobs:
             \`.tar.gz\` entpacken und \`fwv_musik\` starten (dann
             \`libmpv2\` von Hand installieren). Braucht einen Schlüsselbund
             (GNOME-Schlüsselbund oder KWallet).
-          - **Windows 10/11:** \`.zip\` entpacken, \`fwv_musik.exe\` starten.
+          - **Windows 10/11:** \`…-setup.exe\` ausführen (ohne Administratorrechte).
             Nicht signiert: SmartScreen → «Weitere Informationen» →
             «Trotzdem ausführen».
           - **macOS 12+:** \`.dmg\` öffnen, «FWV Musik» in Programme ziehen.

@@ -45,7 +45,8 @@ Tag `musik-vX.Y.Z` → `.github/workflows/build-desktop-musik.yml`:
 Analyse und Tests (`fwv_core`, `fwv_roterschopf`, `musik`), dann
 
 - Linux: `fwv-musik_X.Y.Z_amd64.deb` und `fwv-musik-X.Y.Z-linux-x64.tar.gz`
-- Windows: `fwv-musik-X.Y.Z-windows-x64.zip`
+- Windows: `fwv-musik-X.Y.Z-windows-x64-setup.exe` (Inno Setup,
+  `flutter/packaging/windows-setup.iss`, ohne Administratorrechte)
 - macOS: `fwv-musik-X.Y.Z-macos.dmg` und `.zip` (unsigniert)
 
 und ein GitHub-Release `musik-vX.Y.Z`, **nie** «Latest» (das gehört dem

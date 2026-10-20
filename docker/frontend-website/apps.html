@@ -1038,7 +1038,8 @@
 
                 const datei = (endung) => release.assets.find(a => a.name.endsWith(endung))?.browser_download_url;
                 const dateien = {
-                    windows: datei('-windows-x64.zip'),
+                    // Installer ab 1.0.1; davor nur .zip.
+                    windows: datei('-windows-x64-setup.exe') || datei('-windows-x64.zip'),
                     macos: datei('-macos.dmg'),
                     deb: datei('_amd64.deb'),
                     tar: datei('-linux-x64.tar.gz'),

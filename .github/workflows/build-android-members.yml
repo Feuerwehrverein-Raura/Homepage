@@ -12,7 +12,8 @@ name: Build Android Members
 # und docs/play-console-setup.md.
 #
 # Daneben dieselbe App als Desktop-Programm (docs/flutter-desktop.md):
-# Linux (.deb + .tar.gz), Windows (.zip), macOS (.dmg + .zip, unsigniert).
+# Linux (.deb + .tar.gz), Windows (Installer .exe), macOS (.dmg + .zip,
+# unsigniert).
 # Diese Jobs haengen nicht am Android-Build - schlaegt einer fehl, geht das
 # Android-Release trotzdem raus. Angehaengt werden die Dateien erst, wenn
 # das GitHub-Release aus "build" steht (Job desktop-release).
@@ -437,15 +438,30 @@ jobs:
 
       # Die Laufzeit von Visual C++ mitliefern - sonst startet das Programm
       # auf Rechnern ohne "VC++ Redistributable" nicht.
-      - name: Zip
+      - name: Laufzeit beilegen
         run: |
           set -euo pipefail
           OUT=build/windows/x64/runner/Release
           for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
             cp "/c/Windows/System32/$dll" "$OUT/"
           done
-          mkdir -p "$GITHUB_WORKSPACE/desktop"
-          (cd "$OUT" && 7z a -tzip "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-windows-x64.zip" .)
+
+      # Installer (.exe) mit Inno Setup statt .zip - auf windows-latest
+      # vorinstalliert. Skript: flutter/packaging/windows-setup.iss. In
+      # PowerShell, weil Git-Bash "/D..." fuer einen Pfad haelt.
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\desktop" | Out-Null
+          & $iscc /Q "/DAppName=FWV Raura" "/DAppId={{e6677bca-e80e-4818-bd08-2c51fdf0a91e}" "/DExeName=fwv_mitglieder.exe" `
+            "/DVersion=$env:VERSION" "/DQuelle=$PWD\build\windows\x64\runner\Release" `
+            "/DSymbol=$PWD\windows\runner\resources\app_icon.ico" `
+            "/DZiel=$env:GITHUB_WORKSPACE\desktop" "/DDatei=fwv-raura-$env:VERSION-windows-x64-setup" `
+            "$env:GITHUB_WORKSPACE\flutter\packaging\windows-setup.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem "$env:GITHUB_WORKSPACE\desktop"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -554,7 +570,8 @@ jobs:
             (\`sudo apt install ./fwv-raura_*.deb\`) oder \`.tar.gz\` entpacken
             und \`fwv_mitglieder\` starten. Braucht libsecret und einen
             Schlüsselbund (GNOME-Schlüsselbund oder KWallet).
-          - **Windows 10/11:** \`.zip\` entpacken, \`fwv_mitglieder.exe\` starten.
+          - **Windows 10/11:** \`…-setup.exe\` ausführen (ohne Administratorrechte).
+            Nicht signiert: SmartScreen → «Weitere Informationen» → «Trotzdem ausführen».
           - **macOS 12+:** \`.dmg\` öffnen, «FWV Raura» in Programme ziehen.
             Unsigniert: beim ersten Start Rechtsklick → Öffnen." > notes.md
             gh release edit "$TAG" --notes-file notes.md
@@ -565,10 +582,10 @@ jobs:
             cd desktop
             cp fwv-raura_*_amd64.deb ../members-latest-linux-amd64.deb
             cp fwv-raura-*-linux-x64.tar.gz ../members-latest-linux-x64.tar.gz
-            cp fwv-raura-*-windows-x64.zip ../members-latest-windows-x64.zip
+            cp fwv-raura-*-windows-x64-setup.exe ../members-latest-windows-x64-setup.exe
             cp fwv-raura-*-macos.dmg ../members-latest-macos.dmg
             cd ..
             gh release upload members-latest members-latest-linux-amd64.deb \
-              members-latest-linux-x64.tar.gz members-latest-windows-x64.zip \
+              members-latest-linux-x64.tar.gz members-latest-windows-x64-setup.exe \
               members-latest-macos.dmg --clobber
           fi
