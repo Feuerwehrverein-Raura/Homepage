@@ -41,6 +41,10 @@ Desktop-Releases werden **nie** «Latest» (`--latest=false`):
 - **Anmeldung:** `LoopbackAnmeldung` aus `package:fwv_core/desktop.dart`
   (Authentik-Provider fwv-members-app, Rueckleitung `127.0.0.1` per Regex -
   in Authentik nichts einzutragen).
+- **Schluesselbund (macOS):** jede App ihr eigener Bereich -
+  `SichererSpeicher(null, 'ch.fwvraura.<name>')`. Mit dem gemeinsamen
+  Standardnamen liest eine App die Eintraege einer anderen, und macOS fragt
+  fuer jeden der ~7 Eintraege einzeln nach dem Passwort (FWV Musik 1.0.2).
 - **Windows:** Installer mit Inno Setup, ein Skript fuer alle:
   `flutter/packaging/windows-setup.iss`, aufgerufen per `pwsh` (Git-Bash
   verbiegt `/D…`). Jede App hat eine **eigene, nie geaenderte AppId**
