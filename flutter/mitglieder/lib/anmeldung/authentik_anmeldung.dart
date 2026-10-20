@@ -6,35 +6,13 @@
 // passt — die Pruefung, die der alten iOS-App fehlte. Kein Client-Secret: der
 // Provider "fwv-members-app" ist oeffentlich, AppAuth schickt beim Token-Tausch
 // deshalb keine Client-Authentifizierung mit.
+//
+// Schnittstelle und Tokens (AuthentikAnmeldung, AuthentikTokens) liegen in
+// fwv_core, die Desktop-Anmeldung in package:fwv_core/desktop.dart.
 
 import 'package:flutter/services.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:fwv_core/fwv_core.dart';
-
-/// Tokens nach erfolgreicher Anmeldung.
-class AuthentikTokens {
-  const AuthentikTokens({required this.accessToken, this.refreshToken, this.idToken});
-
-  final String accessToken;
-  final String? refreshToken;
-  final String? idToken;
-}
-
-/// Eigene Schnittstelle, damit Tests ohne Browser laufen.
-abstract interface class AuthentikAnmeldung {
-  /// Oeffnet den Browser. Gibt null zurueck, wenn der Nutzer abbricht; wirft
-  /// [AuthentikFehler], wenn die Anmeldung scheitert.
-  Future<AuthentikTokens?> anmelden();
-}
-
-class AuthentikFehler implements Exception {
-  const AuthentikFehler(this.meldung);
-
-  final String meldung;
-
-  @override
-  String toString() => 'AuthentikFehler: $meldung';
-}
 
 class AppAuthAnmeldung implements AuthentikAnmeldung {
   AppAuthAnmeldung({this.konfiguration = OidcKonfiguration.mitgliederApp, FlutterAppAuth? appAuth})

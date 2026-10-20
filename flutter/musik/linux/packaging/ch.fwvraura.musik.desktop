@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=FWV Musik
+GenericName=Musik Roter Schopf
+Comment=Playlists und Radiosender für den Roten Schopf zusammenstellen und hören
+Exec=fwv-musik %U
+Icon=ch.fwvraura.musik
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=ch.fwvraura.musik
+Keywords=FWV;Feuerwehrverein;Raura;Musik;Playlist;Radio;Schopf;

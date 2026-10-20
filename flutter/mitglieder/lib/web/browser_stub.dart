@@ -3,7 +3,6 @@
 
 import 'package:fwv_core/fwv_core.dart';
 
-import '../anmeldung/authentik_anmeldung.dart';
 
 GeheimSpeicher browserSpeicher() => throw UnsupportedError('nur im Browser');
 

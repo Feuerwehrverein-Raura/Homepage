@@ -5,7 +5,8 @@ name: Flutter-Apps
 # mit Oberflaeche, Organisator + Vorstand), flutter/fwv_lager (Lager mit
 # Oberflaeche, beide Apps), flutter/fwv_roterschopf (Licht und Tiefkuehler
 # im Roten Schopf, Vertrag aus docker/backend-members/test/fixtures),
-# flutter/mitglieder (Mitglieder + Organisatoren),
+# flutter/mitglieder (Mitglieder + Organisatoren), flutter/musik (Musik des
+# Roten Schopfs als Desktop-Programm, docs/flutter-musik-desktop.md),
 # spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag des Backends
 # aendert — der Kern testet gegen dieselben Dateien. Die Vertraege der
 # Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json und
@@ -35,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        paket: [fwv_core, fwv_anlass, fwv_lager, fwv_roterschopf, fwv_vorstand, mitglieder]
+        paket: [fwv_core, fwv_anlass, fwv_lager, fwv_roterschopf, fwv_vorstand, mitglieder, musik]
     defaults:
       run:
         working-directory: flutter/${{ matrix.paket }}
@@ -100,6 +101,33 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
             libstdc++-12-dev libsecret-1-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Linux bauen
+        run: flutter build linux --debug
+
+  # Dasselbe fuer FWV Musik - zusaetzlich mit libmpv (just_audio_media_kit).
+  musik-linux:
+    name: Musik-App Linux (debug)
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/musik
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux-Bauwerkzeuge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libsecret-1-dev libmpv-dev
 
       - uses: subosito/flutter-action@v2
         with:

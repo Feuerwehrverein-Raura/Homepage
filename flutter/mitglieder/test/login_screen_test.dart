@@ -5,7 +5,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
-import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
 import 'package:fwv_mitglieder/einstellungen/einstellungen_tab.dart';
 import 'package:fwv_mitglieder/main.dart';

@@ -10,7 +10,6 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
-import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/anmeldung/loopback_anmeldung.dart';
 import 'package:fwv_mitglieder/desktop/desktop.dart';
 import 'package:fwv_mitglieder/einstellungen/app_update.dart';

@@ -9,7 +9,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
-import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
 import 'package:fwv_mitglieder/einstellungen/kontakte_abgleich.dart';
 import 'package:fwv_mitglieder/main.dart';

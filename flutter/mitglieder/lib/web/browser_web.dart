@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:web/web.dart' as web;
 
-import '../anmeldung/authentik_anmeldung.dart';
 
 /// Wie mein.html (AUTHENTIK_URL, CLIENT_ID, REDIRECT_URI).
 const _authentik = 'https://auth.fwv-raura.ch';

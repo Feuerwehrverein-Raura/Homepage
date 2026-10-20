@@ -1,0 +1,281 @@
+name: Build Desktop Musik
+
+# FWV Musik (flutter/musik): Playlist-Editor, Radiosender und Player des
+# Roten Schopfs als eigenes Desktop-Programm, docs/flutter-musik-desktop.md.
+#
+# Tag musik-vX.Y.Z  ->  Analyse + Tests, dann Linux (.deb + .tar.gz),
+# Windows (.zip) und macOS (.dmg + .zip, unsigniert) und ein GitHub-Release
+# musik-vX.Y.Z. Das Release wird NIE "Latest": releases/latest gehoert dem
+# Auto-Updater von vorstand-desktop (build-desktop-vorstand.yml).
+# Push auf main baut nichts - den Compile-Check fuer Linux macht
+# flutter-apps.yml.
+
+on:
+  push:
+    tags:
+      - 'musik-v*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'GitHub-Release erstellen'
+        required: false
+        default: false
+        type: boolean
+      version:
+        description: 'Versionsnummer (z.B. 1.0.0)'
+        required: false
+        default: '1.0.0'
+        type: string
+
+env:
+  FLUTTER_VERSION: '3.47.5'
+
+jobs:
+  test:
+    name: Analyse und Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        paket: [fwv_core, fwv_roterschopf, musik]
+    defaults:
+      run:
+        working-directory: flutter/${{ matrix.paket }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Abhaengigkeiten
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze
+
+      - name: Tests
+        run: flutter test
+
+  # Version aus dem Tag (oder der Eingabe), einmal fuer alle Jobs.
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      vcode: ${{ steps.v.outputs.vcode }}
+    steps:
+      - id: v
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/musik-v* ]]; then
+            VERSION="${REF_NAME#musik-v}"
+          else
+            VERSION="${INPUT_VERSION:-0.0.0}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' ist nicht X.Y.Z"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "vcode=$VCODE" >> "$GITHUB_OUTPUT"
+
+  # Gebaut auf ubuntu-latest (24.04, glibc 2.39): laeuft auf Ubuntu 24.04+,
+  # Debian 13 und aehnlich neuen Systemen. libmpv kommt vom System
+  # (media_kit_libs_linux bringt sie nicht mit).
+  linux:
+    name: Linux
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      VCODE: ${{ needs.version.outputs.vcode }}
+    defaults:
+      run:
+        working-directory: flutter/musik
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux-Bauwerkzeuge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libsecret-1-dev libmpv-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build linux --release --build-name "$VERSION" --build-number "$VCODE"
+
+      - name: Pakete (.tar.gz, .deb)
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/desktop"
+          tar -C build/linux/x64/release -czf "$GITHUB_WORKSPACE/desktop/fwv-musik-${VERSION}-linux-x64.tar.gz" \
+            --transform "s,^bundle,fwv-musik-${VERSION}," bundle
+          linux/packaging/deb-bauen.sh "$VERSION" "$GITHUB_WORKSPACE/desktop/fwv-musik_${VERSION}_amd64.deb"
+          dpkg-deb --info "$GITHUB_WORKSPACE/desktop/fwv-musik_${VERSION}_amd64.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musik-linux
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  windows:
+    name: Windows
+    needs: [test, version]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      VCODE: ${{ needs.version.outputs.vcode }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: flutter/musik
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build windows --release --build-name "$VERSION" --build-number "$VCODE"
+
+      # Die Laufzeit von Visual C++ mitliefern - sonst startet das Programm
+      # auf Rechnern ohne "VC++ Redistributable" nicht. libmpv-2.dll legt
+      # media_kit_libs_windows_audio selbst ins Release-Verzeichnis.
+      - name: Zip
+        run: |
+          set -euo pipefail
+          OUT=build/windows/x64/runner/Release
+          ls "$OUT"/libmpv-2.dll
+          for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
+            cp "/c/Windows/System32/$dll" "$OUT/"
+          done
+          mkdir -p "$GITHUB_WORKSPACE/desktop"
+          (cd "$OUT" && 7z a -tzip "$GITHUB_WORKSPACE/desktop/fwv-musik-${VERSION}-windows-x64.zip" .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musik-windows
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  # Unsigniert (kein Apple-Entwicklerkonto fuer Developer ID): beim ersten
+  # Start Rechtsklick -> Oeffnen.
+  macos:
+    name: macOS
+    needs: [test, version]
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      VCODE: ${{ needs.version.outputs.vcode }}
+    defaults:
+      run:
+        working-directory: flutter/musik
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build macos --release --build-name "$VERSION" --build-number "$VCODE"
+
+      - name: Zip und DMG
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/FWV Musik.app"
+          mkdir -p "$GITHUB_WORKSPACE/desktop" dmg
+          ditto -c -k --keepParent "$APP" "$GITHUB_WORKSPACE/desktop/fwv-musik-${VERSION}-macos.zip"
+          cp -R "$APP" dmg/
+          ln -s /Applications dmg/Programme
+          hdiutil create -volname "FWV Musik" -srcfolder dmg -ov -format UDZO \
+            "$GITHUB_WORKSPACE/desktop/fwv-musik-${VERSION}-macos.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musik-macos
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: GitHub-Release
+    needs: [version, linux, windows, macos]
+    if: startsWith(github.ref, 'refs/tags/musik-v') || inputs.create_release == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: musik-*
+          path: desktop
+          merge-multiple: true
+
+      - name: Release erstellen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          TAG: musik-v${{ needs.version.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ls -la desktop
+          cat > notes.md <<EOF
+          ## FWV Musik ${VERSION}
+
+          Playlists und Radiosender für den Roten Schopf zusammenstellen, am
+          Computer hören und – mit Gruppe Roter Schopf, Vorstand oder admin –
+          den Laptop im Lokal fernbedienen. Anmeldung mit dem Vereinskonto.
+
+          ### Installation
+
+          - **Linux (Ubuntu 24.04+, Debian 13):** \`.deb\` installieren
+            (\`sudo apt install ./fwv-musik_*.deb\`, zieht libmpv mit) oder
+            \`.tar.gz\` entpacken und \`fwv_musik\` starten (dann
+            \`libmpv2\` von Hand installieren). Braucht einen Schlüsselbund
+            (GNOME-Schlüsselbund oder KWallet).
+          - **Windows 10/11:** \`.zip\` entpacken, \`fwv_musik.exe\` starten.
+            Nicht signiert: SmartScreen → «Weitere Informationen» →
+            «Trotzdem ausführen».
+          - **macOS 12+:** \`.dmg\` öffnen, «FWV Musik» in Programme ziehen.
+            Unsigniert: beim ersten Start Rechtsklick → Öffnen.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" desktop/* --clobber
+          else
+            gh release create "$TAG" desktop/* --title "FWV Musik ${VERSION}" \
+              --notes-file notes.md --target "$SHA" --latest=false
+          fi

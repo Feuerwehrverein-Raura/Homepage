@@ -91,7 +91,9 @@ mit `flutter build linux --debug`, dass Linux baut.
 ## Offen
 
 - Musik (just_audio) gibt es auf Linux/Windows nicht (kein Plugin), der
-  Musik-Bereich zeigt dort nichts Abspielbares.
+  Musik-Bereich zeigt dort nichts Abspielbares. Wer dort Musik hören will:
+  das eigene Programm FWV Musik (`docs/flutter-musik-desktop.md`, spielt
+  über libmpv).
 - QR-Code-/Barcode-Scan (mobile_scanner) hat nur auf macOS ein Plugin; auf
   Linux/Windows funktioniert der Scan nicht (Login per QR-Code, Lager).
   Ungetestet, wie sich der Scanner dort meldet.

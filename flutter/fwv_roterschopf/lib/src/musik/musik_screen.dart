@@ -32,6 +32,7 @@ class MusikScreen extends StatefulWidget {
     this.wiedergabe,
     this.laptopSteuern = false,
     this.senderAdresse,
+    this.aktionen = const [],
   });
 
   final MusikZugang zugang;
@@ -49,6 +50,9 @@ class MusikScreen extends StatefulWidget {
   /// Reiter "Im Schopf": den Laptop fernbedienen (Gruppe Roter Schopf,
   /// Vorstand, admin).
   final bool laptopSteuern;
+
+  /// Knoepfe rechts in der Titelleiste (Desktop-App: Abmelden).
+  final List<Widget> aktionen;
 
   @override
   State<MusikScreen> createState() => _MusikScreenState();
@@ -78,6 +82,7 @@ class _MusikScreenState extends State<MusikScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Musik'),
+          actions: widget.aktionen,
           bottom: reiterAufRot(
             tabs: [
               const Tab(text: 'Playlists'),

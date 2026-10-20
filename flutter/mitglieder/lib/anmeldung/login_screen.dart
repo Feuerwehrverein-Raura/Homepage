@@ -15,7 +15,6 @@ import 'package:material_ui/material_ui.dart';
 import '../dienste.dart';
 import '../gemeinsam.dart' show logoMitglieder;
 import '../web/browser.dart' show automatischAnmeldenErlaubt;
-import 'authentik_anmeldung.dart';
 import 'loopback_anmeldung.dart' show AbbrechbareAnmeldung;
 import 'organisator_login_screen.dart';
 import 'passwort_reset_screen.dart';
