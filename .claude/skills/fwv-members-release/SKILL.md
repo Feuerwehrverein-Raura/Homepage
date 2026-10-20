@@ -65,7 +65,7 @@ angleichen braucht das Motiv in 1024 px.
 Derselbe Tag baut die Desktop-Fassung (Linux, Windows-Installer, macOS fest
 signiert) - Details im Skill `fwv-desktop-apps`. Nach dem Release die
 Links der Karte «Mitglieder» auf `apps.html` pruefen (feste Namen unter
-`members-latest`). Einmalig offen: Windows-Link von
-`members-latest-windows-x64.zip` auf `members-latest-windows-x64-setup.exe`
-umstellen, sobald das erste Release mit Installer (nach members-v1.0.28)
-durch ist.
+`members-latest`). Seit 1.0.29 Windows als Installer
+(`members-latest-windows-x64-setup.exe`); auch `anleitung-app.html` verlinkt
+die festen Namen - bei neuen Dateinamen dort mitziehen (PDFs: Skill
+`fwv-anleitung`).
