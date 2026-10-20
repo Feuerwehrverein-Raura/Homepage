@@ -59,3 +59,13 @@ erzeugt: Motiv 300/432 px mittig auf #B91C1C (= Hintergrund des Motivs und
 `@color/primary`). Aendert sich das Play-Icon, die Symbole genauso neu
 erzeugen. Das iOS-Icon (AppIcon-1024) zeigt noch das runde Abzeichen;
 angleichen braucht das Motiv in 1024 px.
+
+## Desktop-Programm
+
+Derselbe Tag baut die Desktop-Fassung (Linux, Windows-Installer, macOS fest
+signiert) - Details im Skill `fwv-desktop-apps`. Nach dem Release die
+Links der Karte «Mitglieder» auf `apps.html` pruefen (feste Namen unter
+`members-latest`). Einmalig offen: Windows-Link von
+`members-latest-windows-x64.zip` auf `members-latest-windows-x64-setup.exe`
+umstellen, sobald das erste Release mit Installer (nach members-v1.0.28)
+durch ist.

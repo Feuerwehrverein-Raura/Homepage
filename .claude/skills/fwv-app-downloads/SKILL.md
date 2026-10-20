@@ -69,6 +69,10 @@ TWA-Huelle und schadet nicht.
 
 ## Neue App aufnehmen
 
+Desktop-Programme (macOS, Windows, Linux) laufen anders - Skill
+`fwv-desktop-apps`. Fuer jede neue App gilt: erst fertig, wenn sie auf
+`apps.html` steht und der Download live geht.
+
 1. Release-Workflow mit eigenem Tag-Praefix (`<app>-v*`), Asset `*-release.apk`,
    `make_latest: false` (sonst kapert es den Desktop-Updater).
 2. In `docker/app-downloads/holen.sh` eine Zeile `hol <name> "$tag" ...`
