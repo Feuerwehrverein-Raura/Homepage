@@ -6,9 +6,11 @@
 import 'dart:async';
 
 import 'package:fwv_anlass/fwv_anlass.dart';
+import 'package:fwv_core/fwv_core.dart' show isoDatum;
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
+import '../mitglieder/export.dart';
 import '../mitglieder/modelle.dart';
 import 'mitglieder/bausteine.dart';
 import 'mitglieder/mitglied_detail_screen.dart';
@@ -144,6 +146,7 @@ class _MitgliederAnsichtState extends State<MitgliederAnsicht> with AutomaticKee
                       CheckedPopupMenuItem(value: s, checked: _status == s, child: Text(s)),
                   ],
                 ),
+                _ExportMenue(dienste: widget.dienste),
               ],
             ),
           ),
@@ -275,4 +278,67 @@ class _Kennzahlen extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Telefonliste (PDF) und CSV-Exporte wie in vorstand.html; die Datei geht
+/// ueber das Teilen-Menue (Desktop: Downloads) weiter.
+class _ExportMenue extends StatelessWidget {
+  const _ExportMenue({required this.dienste});
+
+  final VorstandDienste dienste;
+
+  Future<void> _csv(BuildContext context, MitgliederExport art) async {
+    final ursprung = stelleVon(context);
+    try {
+      final (:bytes, :anzahl) = await dienste.export.csv(art);
+      await dienste.umgebung.dateiTeilen(
+        bytes,
+        exportDateiname(art, DateTime.now()),
+        'text/csv',
+        ursprung: ursprung,
+      );
+      if (context.mounted) {
+        meldung(context, anzahl == 1 ? '1 Mitglied exportiert.' : '$anzahl Mitglieder exportiert.');
+      }
+    } on Object catch (e) {
+      if (context.mounted) meldung(context, fehlerText(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<Object>(
+    key: const Key('mitglieder-export'),
+    tooltip: 'Exportieren',
+    icon: const Icon(Icons.file_download_outlined),
+    onSelected: (wahl) => wahl is MitgliederExport
+        ? _csv(context, wahl)
+        : pdfTeilen(
+            context,
+            dienste.umgebung,
+            dienste.export.telefonliste,
+            'Telefonliste_${isoDatum(DateTime.now())}.pdf',
+          ),
+    itemBuilder: (_) => [
+      const PopupMenuItem(
+        key: Key('export-telefonliste'),
+        value: 'telefonliste',
+        child: ListTile(
+          leading: Icon(Icons.picture_as_pdf_outlined),
+          title: Text('Telefonliste (PDF)'),
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+      const PopupMenuDivider(),
+      for (final art in MitgliederExport.values)
+        PopupMenuItem(
+          key: Key('export-${art.name}'),
+          value: art,
+          child: ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: Text('CSV: ${art.titel}'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+    ],
+  );
 }

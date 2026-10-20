@@ -26,6 +26,7 @@
 import 'dart:typed_data';
 import 'dart:ui' show Rect;
 
+import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:fwv_core/fwv_core.dart';
 
 import 'daten.dart';
@@ -271,10 +272,14 @@ class VerwaltungsUmgebung {
 
 /// Zugang und Umgebung zusammen — das, was jeder Screen bekommt.
 class AnlassVerwaltung {
-  const AnlassVerwaltung({required this.zugang, required this.umgebung});
+  const AnlassVerwaltung({required this.zugang, required this.umgebung, this.einladen});
 
   final AnlassVerwaltungZugang zugang;
   final VerwaltungsUmgebung umgebung;
+
+  /// Einladung an die Mitglieder verfassen (nur Vorstand: oeffnet
+  /// "Verfassen" aus fwv_vorstand). Ohne fehlt der Knopf "Einladung".
+  final Future<void> Function(BuildContext context, Anlass anlass)? einladen;
 }
 
 /// Groesstes TWINT-QR-Bild (wie das Backend, src/kasse-anlass.js).

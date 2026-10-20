@@ -251,6 +251,10 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
               pdf: () => _pdfWaehlen(a),
               arbeitsplanSenden: () => _arbeitsplanSenden(a),
               organisatoren: () => _oeffnen(OrganisatorenScreen(verwaltung: _v, anlass: a.anlass)),
+              einladen: switch (_v.einladen) {
+                final e? => () => e(context, a.anlass),
+                null => null,
+              },
             ),
             Abschnitt(_anmeldungenTitel(a, personen)),
             if (a.anmeldungen.isEmpty)
@@ -404,6 +408,7 @@ class _Werkzeuge extends StatelessWidget {
     required this.pdf,
     required this.arbeitsplanSenden,
     required this.organisatoren,
+    this.einladen,
   });
 
   final AnlassRechte rechte;
@@ -413,6 +418,9 @@ class _Werkzeuge extends StatelessWidget {
 
   /// Mitorganisatoren verwalten (Vorstand und Haupt-Organisator).
   final VoidCallback organisatoren;
+
+  /// Einladung an die Mitglieder (nur Vorstand), sonst null.
+  final VoidCallback? einladen;
 
   @override
   Widget build(BuildContext context) {
@@ -428,6 +436,7 @@ class _Werkzeuge extends StatelessWidget {
           knopf(Icons.send_outlined, 'Arbeitsplan senden', arbeitsplanSenden),
         if (rechte.organisatorenVerwalten)
           knopf(Icons.groups_outlined, 'Organisatoren', organisatoren),
+        if (einladen case final e?) knopf(Icons.mail_outline, 'Einladung', e),
       ],
     );
   }

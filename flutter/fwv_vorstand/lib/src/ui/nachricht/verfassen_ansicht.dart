@@ -13,15 +13,19 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../dienste.dart';
 import '../../mitglieder/modelle.dart';
+import '../../versand/einladung.dart';
 import '../../versand/versand.dart';
 import '../../versand/versand_dienst.dart';
 import 'empfaenger_auswahl.dart';
 import 'versand_bausteine.dart';
 
 class VerfassenAnsicht extends StatefulWidget {
-  const VerfassenAnsicht({super.key, required this.dienste});
+  const VerfassenAnsicht({super.key, required this.dienste, this.entwurf});
 
   final VorstandDienste dienste;
+
+  /// Betreff und Text zum Start (z.B. Einladung zu einem Anlass).
+  final NachrichtEntwurf? entwurf;
 
   @override
   State<VerfassenAnsicht> createState() => _VerfassenAnsichtState();
@@ -47,6 +51,10 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
   @override
   void initState() {
     super.initState();
+    if (widget.entwurf case final e?) {
+      _betreff.text = e.betreff;
+      _text.text = e.text;
+    }
     _betreff.addListener(_neu);
     _text.addListener(_neu);
   }

@@ -113,8 +113,11 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   }
 
   @override
-  Future<String?> twintQrSetzen(String a, GewaehlteDatei bild) =>
-      _merken('twintQrSetzen', [a, bild.bytes.length, bildTyp(bild.bytes)], '/events/$a/twint-qr?v=1');
+  Future<String?> twintQrSetzen(String a, GewaehlteDatei bild) => _merken('twintQrSetzen', [
+    a,
+    bild.bytes.length,
+    bildTyp(bild.bytes),
+  ], '/events/$a/twint-qr?v=1');
   @override
   Future<void> twintQrEntfernen(String a) => _merken('twintQrEntfernen', [a], null);
   @override
@@ -1235,6 +1238,27 @@ void main() {
     expect(find.widgetWithText(ActionChip, 'Organisatoren'), findsNothing);
     expect(find.widgetWithText(ActionChip, 'Informieren'), findsOneWidget);
     expect(find.byTooltip('Anlass bearbeiten'), findsOneWidget);
+  });
+
+  testWidgets('Einladung: Knopf nur mit einladen (Vorstand), uebergibt den Anlass', (tester) async {
+    await anlass(tester, _chilbi);
+    expect(find.widgetWithText(ActionChip, 'Einladung'), findsNothing);
+
+    final eingeladen = <String>[];
+    final v = verwaltung();
+    await zeigen(
+      tester,
+      VerwaltungsAnlassScreen(
+        verwaltung: AnlassVerwaltung(
+          zugang: v.zugang,
+          umgebung: v.umgebung,
+          einladen: (context, a) async => eingeladen.add(a.id),
+        ),
+        anlassId: _chilbi,
+      ),
+    );
+    await tippen(tester, find.widgetWithText(ActionChip, 'Einladung'));
+    expect(eingeladen, [_chilbi]);
   });
 
   testWidgets('Externer Organisator: nur bestaetigen/ablehnen, keine Reiter', (tester) async {

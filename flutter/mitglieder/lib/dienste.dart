@@ -299,9 +299,14 @@ class Dienste {
   /// Beitraege, Nachricht, Audit.
   VorstandDienste get vorstand {
     final umgebung = _verwaltungsUmgebung;
-    return VorstandDienste(
+    late final VorstandDienste dienste;
+    return dienste = VorstandDienste(
       api: sitzung.api,
-      anlaesse: AnlassVerwaltung(zugang: VorstandZugang(sitzung.api), umgebung: umgebung),
+      anlaesse: AnlassVerwaltung(
+        zugang: VorstandZugang(sitzung.api),
+        umgebung: umgebung,
+        einladen: (context, anlass) => einladungVerfassen(context, dienste, anlass),
+      ),
       umgebung: umgebung,
     );
   }

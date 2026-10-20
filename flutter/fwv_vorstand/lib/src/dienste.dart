@@ -12,6 +12,7 @@ import 'audit/audit_dienst.dart';
 import 'email/mailcow_dienst.dart';
 import 'geraete/app_geraete.dart';
 import 'geplant/geplante_auftraege.dart';
+import 'mitglieder/export.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
 import 'mitglieder/zugangs_dokumente.dart';
 import 'push_dienst.dart';
@@ -59,6 +60,9 @@ class VorstandDienste {
   /// Mitglieder, Kennzahlen, Passwoerter, Cloud-Gruppen, Benachrichtigen.
   MitgliederVerwaltung get mitglieder =>
       MitgliederVerwaltung(api, fotoVerkleinern: fotoVerkleinern);
+
+  /// CSV-Export und Telefonliste (api-members).
+  MitgliederExportDienst get export => MitgliederExportDienst(api);
 
   /// Mitgliederbeitraege (api-accounting).
   BeitraegeDienst get beitraege => BeitraegeDienst(api);
