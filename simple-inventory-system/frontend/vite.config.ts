@@ -36,6 +36,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Druckseiten (Speisekarte, Kisten-Inhaltsblatt, QR-Etikett, CSV)
+        // oeffnen /api/... als eigene Seite. Ohne diese Ausnahme beantwortet
+        // der Service-Worker jede Seiten-Navigation mit index.html - man
+        // landet auf der Startseite statt beim Druck.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/inventory\.fwv-raura\.ch\/api\/.*/i,
