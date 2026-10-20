@@ -24,7 +24,10 @@ ENT="$2"
 ARBEIT="$(mktemp -d)"
 KC="$ARBEIT/signieren.keychain-db"
 KCPW="$(openssl rand -hex 16)"
-trap 'security delete-keychain "$KC" 2>/dev/null || true; rm -rf "$ARBEIT"' EXIT
+# Bisherige Suchliste merken, am Ende wiederherstellen.
+read -r -a VORHER <<< "$(security list-keychains -d user | tr -d '"' | tr '\n' ' ')"
+trap 'security list-keychains -d user -s "${VORHER[@]}" 2>/dev/null || true
+      security delete-keychain "$KC" 2>/dev/null || true; rm -rf "$ARBEIT"' EXIT
 
 echo "$MACOS_SIGNATUR_P12" | base64 --decode > "$ARBEIT/zert.p12"
 security create-keychain -p "$KCPW" "$KC"
@@ -32,8 +35,15 @@ security set-keychain-settings -lut 3600 "$KC"
 security unlock-keychain -p "$KCPW" "$KC"
 security import "$ARBEIT/zert.p12" -k "$KC" -P "$MACOS_SIGNATUR_PASSWORT" -T /usr/bin/codesign
 security set-key-partition-list -S apple-tool:,apple: -s -k "$KCPW" "$KC" >/dev/null
-# Selbst ausgestellt = nicht vertrauenswuerdig, darum ohne -v suchen;
-# codesign signiert trotzdem.
+# codesign sucht nur in der Suchliste - --keychain allein reicht nicht
+# ("no identity found").
+security list-keychains -d user -s "$KC" "${VORHER[@]}"
+# Selbst ausgestellt = nicht vertrauenswuerdig. Auf dem (Wegwerf-)Runner
+# fuers Code-Signieren vertrauen; bei den Nutzern aendert das nichts.
+security find-certificate -c "FWV Raura Code Signing" -p "$KC" > "$ARBEIT/zert.pem"
+sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$KC" "$ARBEIT/zert.pem" ||
+  echo "::warning::Vertrauen fuer das Zertifikat nicht gesetzt - versuche trotzdem"
+security find-identity -p codesigning "$KC"
 ID="$(security find-identity -p codesigning "$KC" | awk '/FWV Raura Code Signing/{print $2; exit}')"
 [ -n "$ID" ] || { echo "Zertifikat nicht im Schluesselbund" >&2; exit 1; }
 
