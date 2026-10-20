@@ -45,6 +45,9 @@ Desktop-Releases werden **nie** «Latest» (`--latest=false`):
   `SichererSpeicher(null, 'ch.fwvraura.<name>')`. Mit dem gemeinsamen
   Standardnamen liest eine App die Eintraege einer anderen, und macOS fragt
   fuer jeden der ~7 Eintraege einzeln nach dem Passwort (FWV Musik 1.0.2).
+- **macOS-Kategorie:** `LSApplicationCategoryType` in
+  `macos/Runner/Info.plist` setzen (Musik: `public.app-category.music`),
+  sonst fehlt die App in der Programm-Uebersicht von macOS 26.
 - **Windows:** Installer mit Inno Setup, ein Skript fuer alle:
   `flutter/packaging/windows-setup.iss`, aufgerufen per `pwsh` (Git-Bash
   verbiegt `/D…`). Jede App hat eine **eigene, nie geaenderte AppId**
