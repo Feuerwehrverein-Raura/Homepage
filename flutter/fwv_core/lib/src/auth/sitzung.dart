@@ -110,13 +110,19 @@ abstract interface class GeheimSpeicher {
 
 /// Geraete-Schluesselbund (Android Keystore, iOS/macOS Keychain, ...).
 class SichererSpeicher implements GeheimSpeicher {
-  SichererSpeicher([FlutterSecureStorage? speicher])
+  /// [macDienst]: eigener Name der Eintraege im macOS-Schluesselbund
+  /// (kSecAttrService). Ohne ihn teilen sich alle Apps
+  /// "flutter_secure_storage_service" - dann liest z.B. FWV Musik Eintraege,
+  /// die die Mitglieder-App oder eine aeltere Version angelegt hat, und
+  /// macOS fragt fuer jeden einzelnen nach dem Passwort. Die Mitglieder-App
+  /// behaelt den alten Namen, damit niemand abgemeldet wird.
+  SichererSpeicher([FlutterSecureStorage? speicher, String? macDienst])
     : _speicher =
           speicher ??
-          const FlutterSecureStorage(
+          FlutterSecureStorage(
             // Wie die alte iOS-App: lesbar ab dem ersten Entsperren nach
             // dem Neustart, damit Hintergrund-Aufrufe (Push) funktionieren.
-            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+            iOptions: const IOSOptions(accessibility: KeychainAccessibility.first_unlock),
             // macOS (Desktop-Programm): der alte Datei-Schluesselbund. Der
             // "Data Protection"-Schluesselbund verlangt Keychain Sharing und
             // damit ein Provisioning-Profil - ein unsigniertes Programm
@@ -124,6 +130,7 @@ class SichererSpeicher implements GeheimSpeicher {
             mOptions: MacOsOptions(
               accessibility: KeychainAccessibility.first_unlock,
               usesDataProtectionKeychain: false,
+              accountName: macDienst ?? AppleOptions.defaultAccountName,
             ),
           );
 

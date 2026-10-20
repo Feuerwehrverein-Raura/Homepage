@@ -25,7 +25,10 @@ class Dienste {
   factory Dienste.echt() {
     return Dienste(
       sitzung: SitzungsVerwaltung(
-        speicher: SitzungsSpeicher(SichererSpeicher()),
+        // Eigener Bereich im macOS-Schluesselbund (siehe SichererSpeicher):
+        // sonst fragt macOS fuer jeden Eintrag der Mitglieder-App nach dem
+        // Passwort.
+        speicher: SitzungsSpeicher(SichererSpeicher(null, 'ch.fwvraura.musik')),
         http: http.Client(),
       ),
       authentik: LoopbackAnmeldung(
