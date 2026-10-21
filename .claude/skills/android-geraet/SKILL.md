@@ -20,6 +20,18 @@ $ADB shell input keyevent KEYCODE_WAKEUP
 ```
 Zurueck auf normal: `$ADB shell svc power stayon false`.
 
+**Kabellos (Wireless Debugging, `ip:port` vom Nutzer):** `stayon usb` wirkt
+ohne Kabel nicht - der Bildschirm geht aus, die Verbindung bricht ab und
+der Port wechselt. Darum gleich nach dem Verbinden:
+
+```sh
+$ADB connect <ip:port>
+$ADB -s <ip:port> shell svc power stayon true    # an, auch ohne Kabel
+$ADB -s <ip:port> shell input keyevent KEYCODE_WAKEUP
+```
+Am Ende der Sitzung unbedingt `stayon false`, sonst leert sich der Akku.
+Neue Adresse nach Abbruch: `$ADB mdns services` zeigt `_adb-tls-connect`.
+
 ## Sehen, was das Handy zeigt
 
 ```sh
