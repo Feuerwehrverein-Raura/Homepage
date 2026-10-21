@@ -4109,6 +4109,26 @@ async function vorschauPdfRendern(html, pdf_margin, showZones) {
     return pdfBuffer;
 }
 
+const { sammelPdfRendern } = require('./sammel-pdf');
+
+// Sammel-PDF aus mehreren Brief-HTMLs (nur Vorstand bzw. interne Dienste).
+app.post('/dispatch/preview-pdf-sammel', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { htmls, pdf_margin } = req.body || {};
+        if (!Array.isArray(htmls) || htmls.length === 0 || htmls.some(h => typeof h !== 'string' || !h)) {
+            return res.status(400).json({ error: 'htmls (Liste von Brief-HTMLs) erforderlich' });
+        }
+        if (htmls.length > 500) return res.status(400).json({ error: 'Hoechstens 500 Briefe auf einmal' });
+        const pdfBuffer = await sammelPdfRendern(htmls, pdf_margin);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="briefe.pdf"');
+        res.send(pdfBuffer);
+    } catch (error) {
+        logError('Sammel-PDF failed', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Brief-Vorschau als PDF rendern (ohne Pingen-Versand)
 // Nimmt HTML entgegen und liefert ein PDF zurueck - fuer Vorschau-Anzeige im Frontend
 // Query-Param ?zones=1 fuegt Pingen-Zonen-Overlay (Frankier/Adressbereich) hinzu

@@ -630,6 +630,21 @@ const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 const MEMBERS_API_URL = process.env.MEMBERS_API_URL || 'http://api-members:3000';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
+// Kassier als Absender der Beitragsbriefe: auf Wunsch ein bestimmter
+// (kassier_id, wie die Auswahl in vorstand.html), sonst der erste.
+async function alleKassiere() {
+    const r = await pool.query(
+        "SELECT id, vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members " +
+        "WHERE funktion ILIKE '%kassier%' AND status NOT IN ('Ausgetreten', 'Verstorben') ORDER BY nachname, vorname");
+    return r.rows;
+}
+
+async function kassierFuer(kassierId) {
+    const liste = await alleKassiere();
+    const gewaehlt = kassierId ? liste.filter(k => String(k.id) === String(kassierId)) : [];
+    return getKassier(gewaehlt.length ? gewaehlt : liste);
+}
+
 // DEUTSCH: App-Push an ein Mitglied ueber api-members (respektiert dort
 // notification_preferences). Fire-and-forget; ohne INTERNAL_API_KEY uebersprungen.
 async function pushToMember(memberId, notificationType, title, body, data = {}) {
@@ -647,7 +662,7 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
         if (!year) return res.status(400).json({ error: 'year erforderlich' });
 
         // Settings, Zahlungen + Mitglieder + Kassier laden (alles aus der gemeinsamen DB)
-        const [settingsRes, paymentsRes, kassiersRes] = await Promise.all([
+        const [settingsRes, paymentsRes, kassier] = await Promise.all([
             pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [year]),
             pool.query(`
                 SELECT p.*, m.id as m_id, m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort,
@@ -656,14 +671,13 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
                 JOIN members m ON p.member_id = m.id
                 WHERE p.year = $1
             `, [year]),
-            pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'")
+            kassierFuer(req.body?.kassier_id)
         ]);
 
         if (settingsRes.rows.length === 0) {
             return res.status(400).json({ error: `Keine Einstellungen fuer ${year} hinterlegt` });
         }
         const settings = settingsRes.rows[0];
-        const kassier = getKassier(kassiersRes.rows);
 
         // Filtern: offen + Email-Praeferenz + email vorhanden + nicht-Ehren + Ref vorhanden
         const candidates = paymentsRes.rows.filter(r =>
@@ -761,8 +775,7 @@ app.post('/membership-fees/payments/:id/send', authenticateAny, requireRole('vor
             return res.status(400).json({ error: `Keine Einstellungen fuer ${r.year} hinterlegt` });
         }
         const settings = settingsRes.rows[0];
-        const kassiersRes = await pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'");
-        const kassier = getKassier(kassiersRes.rows);
+        const kassier = await kassierFuer(req.body?.kassier_id);
 
         const member = { vorname: r.vorname, nachname: r.nachname, strasse: r.strasse, plz: r.plz, ort: r.ort };
         const payment = { reference_nr: r.reference_nr, amount: r.amount };
@@ -813,7 +826,7 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
         const year = parseInt(req.body?.year || req.query?.year);
         if (!year) return res.status(400).json({ error: 'year erforderlich' });
 
-        const [settingsRes, paymentsRes, kassiersRes] = await Promise.all([
+        const [settingsRes, paymentsRes, kassier] = await Promise.all([
             pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [year]),
             pool.query(`
                 SELECT p.*, m.id as m_id, m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort,
@@ -822,14 +835,13 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
                 JOIN members m ON p.member_id = m.id
                 WHERE p.year = $1
             `, [year]),
-            pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'")
+            kassierFuer(req.body?.kassier_id)
         ]);
 
         if (settingsRes.rows.length === 0) {
             return res.status(400).json({ error: `Keine Einstellungen fuer ${year} hinterlegt` });
         }
         const settings = settingsRes.rows[0];
-        const kassier = getKassier(kassiersRes.rows);
 
         const candidates = paymentsRes.rows.filter(r =>
             r.status === 'offen' &&
@@ -886,6 +898,97 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
         });
     } catch (error) {
         logError('send-post-bulk error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Kassiere zur Auswahl als Absender (vorstand.html zeigt die Auswahl nur bei
+// mehreren). [{id, name}]
+app.get('/membership-fees/kassiere', vorstand, async (req, res) => {
+    try {
+        const liste = await alleKassiere();
+        res.json(liste.map(k => ({ id: k.id, name: `${k.vorname || ''} ${k.nachname || ''}`.trim() })));
+    } catch (error) {
+        logError('kassiere error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Beitragsbriefe als PDF (Flutter-App): derselbe Brief wie beim Versand per
+// Post (buildBeitragLetterForPayment), gerendert von api-dispatch.
+function beitragsBriefDaten(r) {
+    return {
+        member: { vorname: r.vorname, nachname: r.nachname, strasse: r.strasse, plz: r.plz, ort: r.ort },
+        payment: { reference_nr: r.reference_nr, amount: r.amount }
+    };
+}
+
+async function briefePdf(htmls) {
+    const antwort = await axios.post(`${DISPATCH_API}/dispatch/preview-pdf-sammel`, { htmls }, {
+        headers: { 'x-api-key': process.env.API_KEY },
+        responseType: 'arraybuffer',
+        timeout: 600000,
+        maxContentLength: 200 * 1024 * 1024
+    });
+    return Buffer.from(antwort.data);
+}
+
+// GET /membership-fees/payments/:id/brief.pdf?kassier_id= — Vorschau eines Briefs.
+app.get('/membership-fees/payments/:id/brief.pdf', vorstand, async (req, res) => {
+    try {
+        const r = (await pool.query(`
+            SELECT p.*, m.vorname, m.nachname, m.strasse, m.plz, m.ort
+            FROM membership_fee_payments p JOIN members m ON p.member_id = m.id
+            WHERE p.id = $1`, [req.params.id])).rows[0];
+        if (!r) return res.status(404).json({ error: 'Zahlung nicht gefunden' });
+        if ((r.reference_nr || '').replace(/\D/g, '').length === 0) {
+            return res.status(400).json({ error: 'Keine Referenznummer hinterlegt — QR-Rechnung waere unbrauchbar.' });
+        }
+        const settings = (await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [r.year])).rows[0];
+        if (!settings) return res.status(400).json({ error: `Keine Einstellungen fuer ${r.year} hinterlegt` });
+        const kassier = await kassierFuer(req.query.kassier_id);
+        const html = await buildBeitragLetterForPayment({ ...beitragsBriefDaten(r), settings, kassier });
+        const pdf = await briefePdf([html]);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Beitrag_${r.year}_${r.nachname || 'Brief'}.pdf"`);
+        res.send(pdf);
+    } catch (error) {
+        logError('brief.pdf error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /membership-fees/briefe.pdf?year=YYYY&kassier_id= — alle beitragspflichtigen
+// Briefe in einem PDF zum Drucken (wie "Alle drucken" in vorstand.html: offen,
+// kein Ehrenmitglied, mit Referenznummer; nach Name sortiert).
+app.get('/membership-fees/briefe.pdf', vorstand, async (req, res) => {
+    try {
+        const year = parseInt(req.query.year);
+        if (!year) return res.status(400).json({ error: 'year erforderlich' });
+        const settings = (await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [year])).rows[0];
+        if (!settings) return res.status(400).json({ error: `Keine Einstellungen fuer ${year} hinterlegt` });
+        const zeilen = (await pool.query(`
+            SELECT p.*, m.vorname, m.nachname, m.strasse, m.plz, m.ort, m.status AS member_status
+            FROM membership_fee_payments p JOIN members m ON p.member_id = m.id
+            WHERE p.year = $1 AND p.status = 'offen'
+            ORDER BY m.nachname, m.vorname`, [year])).rows
+            .filter(r => (r.member_status || '') !== 'Ehrenmitglied' &&
+                (r.reference_nr || '').replace(/\D/g, '').length > 0);
+        if (zeilen.length === 0) {
+            return res.status(404).json({ error: 'Keine offenen Beitragsbriefe mit Referenznummer.' });
+        }
+        const kassier = await kassierFuer(req.query.kassier_id);
+        const htmls = [];
+        for (const r of zeilen) {
+            htmls.push(await buildBeitragLetterForPayment({ ...beitragsBriefDaten(r), settings, kassier }));
+        }
+        const pdf = await briefePdf(htmls);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Beitragsbriefe_${year}.pdf"`);
+        res.setHeader('X-Anzahl-Briefe', String(zeilen.length));
+        res.send(pdf);
+    } catch (error) {
+        logError('briefe.pdf error', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

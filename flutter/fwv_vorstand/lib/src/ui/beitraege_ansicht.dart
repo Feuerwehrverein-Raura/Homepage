@@ -3,8 +3,8 @@
 // Filter, bezahlt/offen/Referenz setzen, Beitragsbrief fuer EINE Zahlung.
 // Phase 2 (beitraege/jahreslauf.dart): Jahresbeitrag festlegen, Beitraege
 // erzeugen, Briefe an alle per E-Mail/Post, Zahlungserinnerungen, Versand
-// planen und geplante Auftraege stornieren. Briefvorschau und Kassier-Wahl
-// gibt es nur auf der Website.
+// planen und geplante Auftraege stornieren. Briefe als PDF (einer zum
+// Ansehen, alle zum Drucken) und Kassier als Absender (nur bei mehreren).
 //
 // Vorbild: vorstand.html (Reiter Mitgliedsbeitrag) und vorstand-desktop
 // (pages/membership-fees). Backend: api-accounting /membership-fees/...
@@ -44,7 +44,20 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
   /// Zahlung, an der gerade eine Aktion laeuft.
   String? _arbeitetAn;
 
-  BeitraegeDienst get _dienst => widget.dienste.beitraege;
+  /// Absender der Briefe; Auswahl nur, wenn es mehrere Kassiere gibt.
+  String? _kassierId;
+  List<Kassier> _kassiere = const [];
+  var _druckt = false;
+
+  BeitraegeDienst get _dienst => widget.dienste.beitraege.mitKassier(_kassierId);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.dienste.beitraege.kassiere().then((k) {
+      if (mounted) setState(() => _kassiere = k);
+    }, onError: (_) {});
+  }
 
   @override
   void dispose() {
@@ -77,9 +90,15 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
     return true;
   }
 
-  Future<void> _websiteOeffnen() async {
-    final ok = await widget.dienste.umgebung.linkOeffnen(vorstandWebseite);
-    if (!ok && mounted) meldung(context, 'Die Website liess sich nicht öffnen.');
+  Future<void> _allePdf(BeitragsJahr daten) async {
+    setState(() => _druckt = true);
+    await pdfTeilen(
+      context,
+      widget.dienste.umgebung,
+      () => _dienst.allePdf(daten.jahr),
+      'Beitragsbriefe_${daten.jahr}.pdf',
+    );
+    if (mounted) setState(() => _druckt = false);
   }
 
   @override
@@ -132,7 +151,6 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
     final alle = daten.zahlungen;
     final liste = beitraegeFiltern(alle, filter: _filter, suche: _suche.text);
     final offen = alle.where((z) => !z.bezahlt).length;
-    final t = Theme.of(context);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 12, 16, 24)),
@@ -212,23 +230,16 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
           daten: daten,
           neuLaden: neuLaden,
           einstellungBearbeiten: () => _einstellungBearbeiten(daten, neuLaden),
+          kassierId: _kassierId,
           heute: widget.heute ?? DateTime.now(),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Briefvorschau, alle drucken und Kassier wählen: auf der Website.',
-                style: t.textTheme.bodySmall,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: _websiteOeffnen,
-              icon: const Icon(Icons.open_in_new, size: 18),
-              label: const Text('Website öffnen'),
-            ),
-          ],
+        _BriefeKarte(
+          kassiere: _kassiere,
+          kassierId: _kassierId,
+          kassierWaehlen: (id) => setState(() => _kassierId = id),
+          druckt: _druckt,
+          alleDrucken: () => _allePdf(daten),
         ),
       ],
     );
@@ -272,6 +283,13 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
           () => _dienst.referenzSetzen(z.id, r),
           r.isEmpty ? 'Referenz gelöscht.' : 'Referenz gespeichert.',
           neuLaden,
+        );
+      case ZahlungsAktion.briefAnsehen:
+        await pdfTeilen(
+          context,
+          widget.dienste.umgebung,
+          () => _dienst.briefPdf(z.id),
+          pdfName('Beitrag ${z.jahr}', z.anzeigeName),
         );
       case ZahlungsAktion.briefEmail:
         final ok = await nachfragen(
@@ -376,6 +394,74 @@ class _EinstellungZeile extends StatelessWidget {
           icon: const Icon(Icons.edit_outlined),
         ),
       ],
+    );
+  }
+}
+
+/// Briefe: alle offenen als ein PDF zum Drucken; Absender waehlen, wenn es
+/// mehrere Kassiere gibt (sonst nimmt das Backend den einen).
+class _BriefeKarte extends StatelessWidget {
+  const _BriefeKarte({
+    required this.kassiere,
+    required this.kassierId,
+    required this.kassierWaehlen,
+    required this.druckt,
+    required this.alleDrucken,
+  });
+
+  final List<Kassier> kassiere;
+  final String? kassierId;
+  final ValueChanged<String?> kassierWaehlen;
+  final bool druckt;
+  final VoidCallback alleDrucken;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Beitragsbriefe', style: t.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            const Text(
+              'Alle offenen Briefe (ohne Ehrenmitglieder, nur mit Referenz) als ein PDF '
+              'zum Drucken. Einen einzelnen Brief: Zahlung antippen.',
+            ),
+            if (kassiere.length > 1) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                key: const Key('kassier-wahl'),
+                initialValue: kassierId ?? kassiere.first.id,
+                decoration: const InputDecoration(
+                  labelText: 'Absender (Kassier)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  for (final k in kassiere) DropdownMenuItem(value: k.id, child: Text(k.name)),
+                ],
+                onChanged: kassierWaehlen,
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              key: const Key('alle-briefe-pdf'),
+              onPressed: druckt ? null : alleDrucken,
+              icon: druckt
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.print_outlined),
+              label: Text(druckt ? 'Briefe werden erstellt …' : 'Alle Briefe als PDF'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

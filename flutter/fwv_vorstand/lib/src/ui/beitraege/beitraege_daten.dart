@@ -5,6 +5,8 @@
 // "12", DECIMAL als "50.00". DATE kommt als ISO-Zeitpunkt
 // ("2026-03-15T00:00:00.000Z"). Alles wird hier tolerant gelesen.
 
+import 'dart:typed_data';
+
 import 'package:fwv_core/fwv_core.dart';
 
 /// Zahl aus JSON - Zahl oder Text ("50.00"); sonst 0.
@@ -429,10 +431,43 @@ typedef Erzeugt = ({int mitglieder});
 const massenversandZeitlimit = Duration(minutes: 10);
 
 /// Aufrufe rund um die Mitgliederbeitraege (api-accounting, nur Vorstand).
+/// Ein Kassier zur Auswahl als Absender der Beitragsbriefe.
+typedef Kassier = ({String id, String name});
+
 class BeitraegeDienst {
-  const BeitraegeDienst(this.api);
+  const BeitraegeDienst(this.api, {this.kassierId});
 
   final ApiClient api;
+
+  /// Absender der Beitragsbriefe (GET membership-fees/kassiere); null = das
+  /// Backend nimmt den ersten Kassier.
+  final String? kassierId;
+
+  /// Derselbe Dienst mit [id] als Absender.
+  BeitraegeDienst mitKassier(String? id) => BeitraegeDienst(api, kassierId: id);
+
+  Map<String, String> get _kassier => {'kassier_id': ?kassierId};
+
+  /// Kassiere zur Auswahl (Ausgetretene nicht), nach Name.
+  Future<List<Kassier>> kassiere() async => [
+    for (final k in jsonListe(await api.get('membership-fees/kassiere'), (m) => m))
+      if (jsonText(k['id']) case final id?) (id: id, name: jsonText(k['name']) ?? 'Kassier'),
+  ];
+
+  /// Beitragsbrief einer Zahlung als PDF (wie der Brief per Post, mit
+  /// Swiss-QR).
+  Future<Uint8List> briefPdf(String id) => api.datei(
+    'membership-fees/payments/${_e(id)}/brief.pdf',
+    abfrage: _kassier.isEmpty ? null : _kassier,
+  );
+
+  /// Alle offenen Beitragsbriefe [jahr] (ohne Ehrenmitglieder, nur mit
+  /// Referenz) in einem PDF zum Drucken.
+  Future<Uint8List> allePdf(int jahr) => api.datei(
+    'membership-fees/briefe.pdf',
+    abfrage: {'year': '$jahr', ..._kassier},
+    zeitlimit: massenversandZeitlimit,
+  );
 
   static String _e(String id) => Uri.encodeComponent(id);
 
@@ -480,8 +515,10 @@ class BeitraegeDienst {
 
   /// Beitragsbrief fuer eine Zahlung sofort versenden (echte E-Mail bzw.
   /// echter Brief ueber Pingen).
-  Future<void> briefSenden(String id, BriefKanal kanal) =>
-      api.post('membership-fees/payments/${_e(id)}/send', daten: {'channel': kanal.wert});
+  Future<void> briefSenden(String id, BriefKanal kanal) => api.post(
+    'membership-fees/payments/${_e(id)}/send',
+    daten: {'channel': kanal.wert, ..._kassier},
+  );
 
   /// Jahreseinstellung anlegen oder ersetzen (alle Felder).
   Future<BeitragsEinstellung> einstellungSpeichern({
@@ -524,7 +561,7 @@ class BeitraegeDienst {
           kanal == BriefKanal.email
               ? 'membership-fees/send-email-bulk'
               : 'membership-fees/send-post-bulk',
-          daten: {'year': jahr},
+          daten: {'year': jahr, ..._kassier},
           zeitlimit: massenversandZeitlimit,
         ),
       );

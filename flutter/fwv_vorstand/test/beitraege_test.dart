@@ -304,7 +304,7 @@ void main() {
       expect(find.text('Für 2025 ist noch kein Jahresbeitrag hinterlegt.'), findsOneWidget);
     });
 
-    testWidgets('Keine Beitraege im Jahr: Hinweis, Website-Link', (tester) async {
+    testWidgets('Keine Beitraege im Jahr: Hinweis, Knoepfe gesperrt', (tester) async {
       backend.antwort = (a) => switch (a.url.path) {
         '/membership-fees/payments' => <Object>[],
         '/membership-fees/summary' => {'total': '0', 'paid': '0', 'open': '0'},
@@ -314,20 +314,15 @@ void main() {
       expect(find.textContaining('noch keine Beiträge erfasst'), findsOneWidget);
       // Briefe an alle und Planen brauchen Beitraege.
       await tester.scrollUntilVisible(
-        find.text('Website öffnen'),
+        find.byKey(const Key('alle-briefe-pdf')),
         300,
         scrollable: find.byType(Scrollable).first,
       );
       expect(
-        tester
-            .widget<OutlinedButton>(find.byKey(const Key('jahreslauf-an-alle-email')))
-            .onPressed,
+        tester.widget<OutlinedButton>(find.byKey(const Key('jahreslauf-an-alle-email'))).onPressed,
         isNull,
       );
-      await tester.ensureVisible(find.text('Website öffnen'));
-      await tester.pumpAndSettle();
-      await tippen(tester, find.text('Website öffnen'));
-      expect(backend.links, [Uri.parse('https://www.fwv-raura.ch/vorstand.html')]);
+      expect(find.text('Website öffnen'), findsNothing);
     });
   });
 }

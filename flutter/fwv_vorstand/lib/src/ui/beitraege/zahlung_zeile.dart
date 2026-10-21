@@ -8,7 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'beitraege_daten.dart';
 
 /// Was mit einer Zahlung geschehen soll.
-enum ZahlungsAktion { bezahlt, zuruecksetzen, referenz, briefEmail, briefPost }
+enum ZahlungsAktion { bezahlt, zuruecksetzen, referenz, briefAnsehen, briefEmail, briefPost }
 
 class ZahlungZeile extends StatelessWidget {
   const ZahlungZeile({
@@ -122,6 +122,14 @@ Future<ZahlungsAktion?> zahlungsAktionWaehlen(BuildContext context, Beitragszahl
                 title: const Text('Referenz setzen'),
                 subtitle: Text(z.hatReferenz ? 'Jetzt: ${z.referenz}' : 'Noch keine QR-Referenz'),
                 onTap: () => waehlen(ZahlungsAktion.referenz),
+              ),
+              ListTile(
+                key: const Key('brief-ansehen'),
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('Beitragsbrief ansehen'),
+                subtitle: Text(z.hatReferenz ? 'PDF mit QR-Rechnung, wie per Post' : ohneReferenz),
+                enabled: z.hatReferenz,
+                onTap: () => waehlen(ZahlungsAktion.briefAnsehen),
               ),
               if (!z.bezahlt) ...[
                 const Divider(),

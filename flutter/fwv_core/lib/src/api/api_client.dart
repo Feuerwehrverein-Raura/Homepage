@@ -131,10 +131,15 @@ class ApiClient {
   );
 
   /// Laedt eine Datei (z.B. ein PDF) als Bytes. Fehler wie bei den
-  /// JSON-Aufrufen ([ApiFehler] mit der Meldung des Backends).
-  Future<Uint8List> datei(String pfad, {Map<String, String>? abfrage}) async {
+  /// JSON-Aufrufen ([ApiFehler] mit der Meldung des Backends). [zeitlimit]
+  /// fuer Dateien, die das Backend erst lange erzeugt (z.B. viele Briefe).
+  Future<Uint8List> datei(
+    String pfad, {
+    Map<String, String>? abfrage,
+    Duration? zeitlimit,
+  }) async {
     final antwort = await _mitErneuern(
-      (token) => _schicken(() {
+      (token) => _schicken(zeitlimit: zeitlimit, () {
         final anfrage = http.Request('GET', adresse(pfad, abfrage));
         if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
         return anfrage;

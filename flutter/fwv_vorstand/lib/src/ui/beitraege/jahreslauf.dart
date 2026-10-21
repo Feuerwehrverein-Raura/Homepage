@@ -23,9 +23,13 @@ class JahresAufgaben extends StatefulWidget {
     required this.neuLaden,
     required this.einstellungBearbeiten,
     required this.heute,
+    this.kassierId,
   });
 
   final VorstandDienste dienste;
+
+  /// Absender der Briefe (Auswahl in der Beitragsansicht), null = erster.
+  final String? kassierId;
   final BeitragsJahr daten;
   final Future<void> Function() neuLaden;
 
@@ -44,7 +48,7 @@ class _JahresAufgabenState extends State<JahresAufgaben> {
 
   BeitragsJahr get _d => widget.daten;
   int get _jahr => _d.jahr;
-  BeitraegeDienst get _dienst => widget.dienste.beitraege;
+  BeitraegeDienst get _dienst => widget.dienste.beitraege.mitKassier(widget.kassierId);
 
   /// Zustellwunsch aller Mitglieder (GET /members); null, wenn es nicht ging.
   Future<Map<String, Zustellwunsch>?> _zustellung() async {
