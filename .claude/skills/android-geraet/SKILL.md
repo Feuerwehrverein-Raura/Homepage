@@ -20,16 +20,20 @@ $ADB shell input keyevent KEYCODE_WAKEUP
 ```
 Zurueck auf normal: `$ADB shell svc power stayon false`.
 
-**Kabellos (Wireless Debugging, `ip:port` vom Nutzer):** `stayon usb` wirkt
-ohne Kabel nicht - der Bildschirm geht aus, die Verbindung bricht ab und
-der Port wechselt. Darum gleich nach dem Verbinden:
+**Kabellos (Wireless Debugging, `ip:port` vom Nutzer):** `svc power stayon`
+wirkt nur, solange das Handy an Strom haengt (auch `true`) - ohne Kabel
+geht der Bildschirm aus, die Verbindung bricht ab und der Port wechselt.
+Darum gleich nach dem Verbinden die Bildschirm-Zeit hochsetzen und den
+alten Wert merken:
 
 ```sh
 $ADB connect <ip:port>
-$ADB -s <ip:port> shell svc power stayon true    # an, auch ohne Kabel
+$ADB -s <ip:port> shell settings get system screen_off_timeout > $SCRATCH/timeout.alt   # A37: 30000
+$ADB -s <ip:port> shell settings put system screen_off_timeout 1800000                 # 30 min
 $ADB -s <ip:port> shell input keyevent KEYCODE_WAKEUP
 ```
-Am Ende der Sitzung unbedingt `stayon false`, sonst leert sich der Akku.
+Am Ende der Sitzung unbedingt den alten Wert zuruecksetzen
+(`settings put system screen_off_timeout <alt>`).
 Neue Adresse nach Abbruch: `$ADB mdns services` zeigt `_adb-tls-connect`.
 
 ## Sehen, was das Handy zeigt
