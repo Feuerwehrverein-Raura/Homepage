@@ -62,6 +62,54 @@ async function pushToMember(memberId, notificationType, title, body, data = {}) 
 }
 
 /**
+ * DEUTSCH: Ist der Anlass zur Anmeldung offen? Anmeldepflichtig, kein Vorschlag,
+ * Entwurf, abgesagt oder abgeschlossen, Anmeldeschluss und Anlass nicht vorbei.
+ */
+function anmeldungOffen(e) {
+    if (!e || !e.registration_required) return false;
+    if (['proposed', 'draft', 'cancelled', 'completed'].includes(e.status)) return false;
+    const jetzt = new Date();
+    if (e.registration_deadline && new Date(e.registration_deadline) < jetzt) return false;
+    const ende = e.end_date || e.start_date;
+    if (ende && !e.datum_offen) {
+        const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+        if (new Date(ende) < heute) return false;
+    }
+    return true;
+}
+
+/**
+ * DEUTSCH: Push an alle Mitglieder, dass man sich fuer den Anlass anmelden kann
+ * (Kanal 'event_update', Antippen fuehrt zum Anlass). Hoechstens einmal je
+ * Anlass: events.anmeldung_gemeldet_at (Migration 031). Fire-and-forget.
+ */
+async function anmeldungOffenMelden(e, titel) {
+    if (!anmeldungOffen(e) || !process.env.INTERNAL_API_KEY) return;
+    try {
+        const frei = await pool.query(
+            'UPDATE events SET anmeldung_gemeldet_at = NOW() WHERE id = $1 AND anmeldung_gemeldet_at IS NULL RETURNING id',
+            [e.id]);
+        if (frei.rows.length === 0) return;
+        const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
+        const dateStr = e.start_date && !e.datum_offen
+            ? new Date(e.start_date).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })
+            : '';
+        await axios.post(membersUrl, {
+            notificationType: 'event_update',
+            title: `${titel}: ${e.title}`,
+            body: `${dateStr ? dateStr + ' — ' : ''}Jetzt in der App anmelden.`,
+            data: mitZiel('event_update', { eventId: e.id })
+        }, { headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY }, timeout: 10000 });
+    } catch (err) {
+        console.error('Anmeldung-offen-Broadcast fehlgeschlagen:', err.message);
+    }
+}
+
+async function ensureAnmeldungGemeldetSchema() {
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS anmeldung_gemeldet_at TIMESTAMP');
+}
+
+/**
  * DEUTSCH: Push an den Vorstand ueber api-members /internal/vorstand-meldung
  * (src/vorstand-melder.js dort: Empfaenger nach Funktion, Abschalter, Sperrfrist
  * und Buendeln je Anlass). Fire-and-forget - die Anmeldung haengt nie daran.
@@ -343,12 +391,12 @@ async function notifyShiftRegistrations(shift, event, changeType, oldShiftData =
             ? `${reg.vorname} ${reg.nachname}`
             : reg.guest_name;
 
-        if (!email) continue;
-
-        let subject, body;
+        let subject, body, pushText = null;
+        const zeit = [shift.start_time, shift.end_time].filter(Boolean).map(t => String(t).substring(0, 5)).join('-');
 
         if (changeType === 'deleted') {
             subject = `Schicht abgesagt - ${event.title}`;
+            pushText = `${shift.name} · ${formatDateDE(shift.date)}${zeit ? ` ${zeit}` : ''}`;
             body = `
 Guten Tag ${name},
 
@@ -385,6 +433,7 @@ Feuerwehrverein Raura
             if (changes.length === 0) return { sent: 0, errors: [] };
 
             subject = `Schicht geändert - ${event.title}`;
+            pushText = `${shift.name}: ${changes.join(', ')}`;
             body = `
 Guten Tag ${name},
 
@@ -408,6 +457,13 @@ Mit freundlichen Grüssen
 Feuerwehrverein Raura
             `.trim();
         }
+
+        // Push an Mitglieder (auch ohne E-Mail-Adresse); Antippen fuehrt zum Anlass.
+        if (reg.member_id && pushText) {
+            pushToMember(reg.member_id, 'shift_reminder', subject, pushText, { eventId: event.id }).catch(() => {});
+        }
+
+        if (!email) continue;
 
         try {
             await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
@@ -527,6 +583,13 @@ async function checkAndSendArbeitsplan(eventId, options = {}) {
 
         for (const reg of empfaenger) {
             const name = reg.member_id ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+
+            // Push an Mitglieder, unabhaengig von der Zustellung des PDFs
+            // (E-Mail oder Brief); Antippen fuehrt zum Anlass.
+            if (reg.member_id) {
+                pushToMember(reg.member_id, 'event_update', `Arbeitsplan: ${event.title}`,
+                    'Der Arbeitsplan ist fertig.', { eventId: event.id }).catch(() => {});
+            }
 
             // Bei Mitgliedern: Zustellpräferenz prüfen
             if (reg.member_id && reg.zustellung_email === false) {
@@ -1570,19 +1633,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         // Neuer Anlass MIT Anmeldung: alle Mitglieder per App-Push informieren
         // (Kanal 'event_update'). Bewusst nur Anmelde-Anlaesse und keine Vorschlaege
         // ('proposed'), damit nicht jede Sitzung einen Push ausloest.
-        if (newEvent.registration_required && newEvent.status !== 'proposed' && process.env.INTERNAL_API_KEY) {
-            const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
-            const dateStr = newEvent.start_date
-                ? new Date(newEvent.start_date).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })
-                : '';
-            axios.post(membersUrl, {
-                notificationType: 'event_update',
-                title: `Neuer Anlass: ${newEvent.title}`,
-                body: `${dateStr ? dateStr + ' — ' : ''}Jetzt in der App anmelden.`,
-                data: mitZiel('event_update', { eventId: newEvent.id })
-            }, { headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY }, timeout: 10000 })
-                .catch(e => console.error('Neuer-Anlass-Broadcast fehlgeschlagen:', e.message));
-        }
+        anmeldungOffenMelden(newEvent, 'Neuer Anlass');
 
         // Organisator benachrichtigen (immer wenn organizer_email gesetzt)
         if (organizer_email && !create_access && !vorstandOrganisiert) {
@@ -1669,7 +1720,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         values.push(id);
 
         // Vorherigen Organisator laden (um Änderung zu erkennen)
-        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title, status, event_password_encrypted FROM events WHERE id = $1', [id]);
+        const oldEvent = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
         const oldOrgEmail = oldEvent.rows[0]?.organizer_email;
         const oldStatus = oldEvent.rows[0]?.status;
         const oldEncryptedPw = oldEvent.rows[0]?.event_password_encrypted;
@@ -1699,6 +1750,12 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                 'Dein Event-Vorschlag wurde vom Vorstand genehmigt — du bist als Organisator eingetragen.',
                 { eventId: id }
             ).catch(() => {});
+        }
+
+        // Erst jetzt zur Anmeldung offen (Vorschlag genehmigt, Anmeldung
+        // eingeschaltet, Anmeldeschluss verlaengert): alle Mitglieder informieren.
+        if (updatedEvent && !anmeldungOffen(oldEvent.rows[0])) {
+            anmeldungOffenMelden(updatedEvent, 'Anmeldung offen');
         }
 
         // Organisator benachrichtigen wenn neu zugewiesen
@@ -3895,11 +3952,16 @@ app.put('/events/:id/as-organizer', authenticateAny, async (req, res) => {
         }
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
+        const vorher = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
         const result = await pool.query(`
             UPDATE events SET ${setClause}, updated_at = NOW()
             WHERE id = $${values.length}
             RETURNING *
         `, values);
+        // Erst jetzt zur Anmeldung offen: alle Mitglieder informieren.
+        if (result.rows[0] && !anmeldungOffen(vorher.rows[0])) {
+            anmeldungOffenMelden(result.rows[0], 'Anmeldung offen');
+        }
         res.json(result.rows[0]);
     } catch (error) {
         console.error('PUT /events/:id/as-organizer error:', error.message);
@@ -6706,6 +6768,11 @@ Feuerwehrverein Raura
                         INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
                         VALUES ($1, $2, 'day_before', $3)
                     `, [reg.registration_id, shift.shift_id, email]);
+                    if (reg.member_id) {
+                        pushToMember(reg.member_id, 'shift_reminder', subject,
+                            `${shift.event_title} · ${dateFormatted} ${startTime}-${endTime}`,
+                            { eventId: shift.event_id }).catch(() => {});
+                    }
 
                     totalSent++;
                 } catch (err) {
@@ -6959,6 +7026,9 @@ app.listen(PORT, () => {
     // 1 Minute). Bewusst nur mit ARBEITSPLAN_REMINDER_ENABLED=true: der Versand
     // schickt echte Mails und kostenpflichtige Briefe, das soll niemand durch
     // ein blosses Deploy ausloesen.
+    ensureAnmeldungGemeldetSchema()
+        .catch(e => console.error('Schema anmeldung_gemeldet_at:', e.message));
+
     ensureArbeitsplanReminderSchema()
         .then(() => {
             if (process.env.ARBEITSPLAN_REMINDER_ENABLED !== 'true') {
