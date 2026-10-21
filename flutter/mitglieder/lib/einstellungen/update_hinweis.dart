@@ -1,6 +1,9 @@
 // Hinweis unten am Bildschirm, wenn es eine neue App-Version gibt (siehe
-// app_update.dart). Einmal pro Start, nie blockierend. Beim APK-Update
-// erklaert vor dem Herunterladen ein kurzer Dialog die Rueckfrage von Chrome.
+// app_update.dart). Beim Start, bei der Rueckkehr in die App (hauptseite.dart,
+// hoechstens alle paar Stunden) und auf Wunsch unter Mehr > Version; nie
+// blockierend. Mit Schaltflaeche bleibt der Hinweis stehen, bis man sie oder
+// das Kreuz antippt - immer nur einer auf einmal. Beim APK-Update erklaert
+// vor dem Herunterladen ein kurzer Dialog die Rueckfrage von Chrome.
 
 import 'dart:async';
 
@@ -9,13 +12,32 @@ import 'package:material_ui/material_ui.dart';
 import '../dienste.dart';
 import 'app_update.dart';
 
-Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste) async {
+/// Der gerade sichtbare Update-Hinweis samt seinem ScaffoldMessenger; ein
+/// neuer ersetzt ihn statt sich dahinter einzureihen. Den Messenger braucht
+/// es, weil ein Hinweis eines inzwischen abgebauten Bildschirms nicht mehr
+/// geschlossen werden darf.
+(ScaffoldMessengerState, ScaffoldFeatureController<SnackBar, SnackBarClosedReason>)? _offen;
+
+/// [auchOhneUpdate]: von Hand gesucht - dann auch "neueste Version" melden.
+Future<void> updateHinweisZeigen(
+  BuildContext context,
+  Dienste dienste, {
+  bool auchOhneUpdate = false,
+}) async {
   final messenger = ScaffoldMessenger.of(context);
   final update = dienste.update;
   final stand = await update.pruefen();
 
-  void neuStartenAnbieten() => messenger.showSnackBar(
+  void zeigen(SnackBar hinweis) {
+    if (_offen case (final bei, final alt) when bei == messenger && bei.mounted) alt.close();
+    final c = messenger.showSnackBar(hinweis);
+    _offen = (messenger, c);
+    unawaited(c.closed.then((_) => _offen?.$2 == c ? _offen = null : null));
+  }
+
+  void neuStartenAnbieten() => zeigen(
     SnackBar(
+      showCloseIcon: true,
       content: const Text('Neue Version geladen.'),
       duration: const Duration(minutes: 10),
       action: SnackBarAction(
@@ -27,21 +49,23 @@ Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste) async {
 
   switch (stand) {
     case KeinUpdate():
-      return;
+      if (auchOhneUpdate) zeigen(const SnackBar(content: Text('Du hast die neueste Version.')));
     case PlayUpdate(geladen: true):
       neuStartenAnbieten();
     case PlayUpdate():
       update.beiGeladen = neuStartenAnbieten;
-      messenger.showSnackBar(
+      zeigen(
         SnackBar(
+          showCloseIcon: true,
           content: const Text('Eine neue Version der App ist verfügbar.'),
           duration: const Duration(seconds: 15),
           action: SnackBarAction(label: 'Laden', onPressed: () => unawaited(update.playLaden())),
         ),
       );
     case ApkUpdate(:final version, :final apk):
-      messenger.showSnackBar(
+      zeigen(
         SnackBar(
+          showCloseIcon: true,
           content: Text('Version $version ist verfügbar.'),
           duration: const Duration(seconds: 15),
           action: SnackBarAction(
@@ -57,8 +81,9 @@ Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste) async {
         ),
       );
     case DownloadUpdate(:final version, :final seite):
-      messenger.showSnackBar(
+      zeigen(
         SnackBar(
+          showCloseIcon: true,
           content: Text('Neue Version verfügbar: $version'),
           duration: const Duration(seconds: 30),
           action: SnackBarAction(

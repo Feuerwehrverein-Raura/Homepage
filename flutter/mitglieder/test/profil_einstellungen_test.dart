@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/dienste.dart';
+import 'package:fwv_mitglieder/einstellungen/app_update.dart';
 import 'package:fwv_mitglieder/einstellungen/geraet_meldung.dart';
 import 'package:fwv_mitglieder/einstellungen/kontakte_abgleich.dart';
 import 'package:fwv_mitglieder/main.dart';
@@ -15,6 +16,27 @@ import 'package:fwv_mitglieder/push/push_dienst.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// Play-Update nach Wunsch: [stand] sagt, was [pruefen] liefert.
+class _FalschesUpdate implements AppUpdate {
+  UpdateStand stand = const KeinUpdate();
+  int geprueft = 0;
+
+  @override
+  Future<UpdateStand> pruefen() async {
+    geprueft++;
+    return stand;
+  }
+
+  @override
+  Future<bool> playLaden() async => true;
+
+  @override
+  set beiGeladen(void Function()? f) {}
+
+  @override
+  Future<void> playAbschliessen() async {}
+}
 
 class _KeinBrowser implements AuthentikAnmeldung {
   @override
@@ -213,6 +235,8 @@ void main() {
     KontakteAbgleich kontakte = const KontakteAbgleich(),
     Size groesse = const Size(360, 800),
     GeraeteAngabenLesen? geraeteAngaben,
+    AppUpdate update = const KeinAppUpdate(),
+    DateTime Function()? jetzt,
   }) async {
     // Ohne nativen Kontakt-Abgleich (wie heute): der Kanal meldet
     // MissingPluginException — sofort, nicht erst ueber die echte Engine.
@@ -253,6 +277,8 @@ void main() {
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, utf8.decode(bytes))),
       plattform: plattform,
       geraeteAngaben: geraeteAngaben,
+      update: update,
+      jetzt: jetzt,
     );
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
@@ -552,6 +578,62 @@ void main() {
       expect(tester.widget<SwitchListTile>(find.byKey(const Key('newsletter'))).value, isTrue);
       // Unter "Hilfe" ganz unten.
       await sichtbar(tester, find.text('1.2.3 (45)'));
+    });
+
+    testWidgets('Update: Hinweis beim Start bleibt stehen, Kreuz schliesst', (tester) async {
+      final update = _FalschesUpdate()..stand = const PlayUpdate(geladen: false);
+      await starten(tester, update: update);
+      expect(find.text('Eine neue Version der App ist verfügbar.'), findsOneWidget);
+      await tester.pump(const Duration(minutes: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('Eine neue Version der App ist verfügbar.'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Eine neue Version der App ist verfügbar.'), findsNothing);
+    });
+
+    testWidgets('Update: Version antippen sucht, meldet auch "neueste"', (tester) async {
+      final update = _FalschesUpdate();
+      await starten(tester, update: update);
+      expect(update.geprueft, 1);
+      await reiter(tester, 'Mehr');
+      await sichtbar(tester, find.text('1.2.3 (45) · Antippen sucht nach Updates'));
+      await tippen(tester, find.byKey(const Key('version')));
+      expect(update.geprueft, 2);
+      expect(find.text('Du hast die neueste Version.'), findsOneWidget);
+
+      // Ein neuer Hinweis ersetzt den alten, statt sich anzustellen.
+      update.stand = const PlayUpdate(geladen: false);
+      await tippen(tester, find.byKey(const Key('version')));
+      expect(find.text('Du hast die neueste Version.'), findsNothing);
+      expect(find.text('Eine neue Version der App ist verfügbar.'), findsOneWidget);
+    });
+
+    testWidgets('Update: Rueckkehr in die App prueft hoechstens alle 6 Stunden', (tester) async {
+      final update = _FalschesUpdate();
+      var jetzt = DateTime(2026, 10, 21, 8);
+      await starten(tester, update: update, jetzt: () => jetzt);
+      expect(update.geprueft, 1);
+
+      Future<void> zurueck() async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pumpAndSettle();
+      }
+
+      jetzt = jetzt.add(const Duration(hours: 1));
+      await zurueck();
+      expect(update.geprueft, 1);
+
+      update.stand = const PlayUpdate(geladen: false);
+      jetzt = jetzt.add(const Duration(hours: 5));
+      await zurueck();
+      expect(update.geprueft, 2);
+      expect(find.text('Eine neue Version der App ist verfügbar.'), findsOneWidget);
     });
 
     testWidgets('Newsletter: Fehler setzt den Schalter zurueck', (tester) async {

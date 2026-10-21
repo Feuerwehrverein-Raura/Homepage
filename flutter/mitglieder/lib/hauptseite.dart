@@ -96,17 +96,38 @@ class _HauptseiteState extends State<Hauptseite> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _pushZiel());
     }
     widget.dienste.pushZiel.addListener(_pushZiel);
+    _lebenszyklus;
     widget.dienste.organisator.pruefen();
     widget.dienste.schopfPruefung.pruefen();
     // Nach dem (ersten) Login einmal nach dem Adressbuch fragen (Android).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) kontakteFrageStellen(context, widget.dienste);
-      if (mounted) unawaited(updateHinweisZeigen(context, widget.dienste));
+      if (mounted) _updatePruefen();
     });
+  }
+
+  /// Android behaelt die App oft tagelang im Hintergrund - ohne Kaltstart
+  /// kaeme der Update-Hinweis nie. Darum auch bei der Rueckkehr pruefen,
+  /// aber hoechstens alle [_updateAbstand].
+  static const _updateAbstand = Duration(hours: 6);
+  DateTime? _updateGeprueft;
+  late final AppLifecycleListener _lebenszyklus = AppLifecycleListener(
+    onResume: () {
+      final zuletzt = _updateGeprueft;
+      if (zuletzt == null || widget.dienste.jetzt().difference(zuletzt) >= _updateAbstand) {
+        _updatePruefen();
+      }
+    },
+  );
+
+  void _updatePruefen() {
+    _updateGeprueft = widget.dienste.jetzt();
+    unawaited(updateHinweisZeigen(context, widget.dienste));
   }
 
   @override
   void dispose() {
+    _lebenszyklus.dispose();
     widget.dienste.pushZiel.removeListener(_pushZiel);
     super.dispose();
   }

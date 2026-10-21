@@ -1,5 +1,5 @@
 // Reiter "Einstellungen": Benachrichtigungen, Zugaenge, Newsletter,
-// Adressbuch, App-Version und Abmelden. Aufbau wie members-ios SettingsView
+// Adressbuch, App-Version (Antippen sucht nach Updates) und Abmelden. Aufbau wie members-ios SettingsView
 // (die Android-App hat ihn uebernommen).
 //
 // "Musik" (hoeren, Playlists, Radiosender) fuer jedes Mitglied.
@@ -7,6 +7,8 @@
 // Externe Organisatoren haben kein Mitgliederkonto; sie sehen nur, wer
 // angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
 // zusaetzlich "Gruppen verwalten" (Authentik-Gruppen, gruppen_screen.dart).
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
@@ -19,8 +21,10 @@ import '../gemeinsam.dart';
 import '../hauptseite.dart';
 import '../web/browser.dart' show websiteAbmelden;
 import 'adressbuch.dart';
+import 'app_update.dart' show KeinAppUpdate;
 import 'bildschirm.dart';
 import 'gruppen_screen.dart';
+import 'update_hinweis.dart';
 
 /// Anleitungen auf der Website - fuer die App, die Website, das erste
 /// Passwort und die Cloud.
@@ -215,11 +219,20 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
           const Abschnitt('App'),
           FutureBuilder<String>(
             future: _version,
-            builder: (context, v) => ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Version'),
-              subtitle: Text(v.data ?? (v.hasError ? 'unbekannt' : '…')),
-            ),
+            builder: (context, v) {
+              final version = v.data ?? (v.hasError ? 'unbekannt' : '…');
+              // iOS und Web: keine Update-Pruefung (KeinAppUpdate).
+              final suchen = _d.update is! KeinAppUpdate;
+              return ListTile(
+                key: const Key('version'),
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Version'),
+                subtitle: Text(suchen ? '$version · Antippen sucht nach Updates' : version),
+                onTap: suchen
+                    ? () => unawaited(updateHinweisZeigen(context, _d, auchOhneUpdate: true))
+                    : null,
+              );
+            },
           ),
           const SizedBox(height: 16),
           Padding(
