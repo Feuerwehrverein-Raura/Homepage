@@ -15,6 +15,7 @@ import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getA
 import { generateQRCodeWithLogo, getItemUrl, getKisteUrl, qrCodeMitLogo } from './qrcode.js';
 import { ausleiheEinrichten, ausleiheTabellen, erinnerungenPlanen } from './ausleihe-routen.js';
 import { karteAufbauen, speisekarteHtml } from './speisekarte.js';
+import { kassenAbgleichEinrichten, kassenAbgleichTabellen } from './kassen-abgleich.js';
 
 const app = express();
 const server = createServer(app);
@@ -392,6 +393,8 @@ async function initDB() {
 
   // Ausleihe (Tabellen und Spalte "ausleihbar", idempotent)
   await ausleiheTabellen(pool);
+  // Lagerbuchung der Kasse pro Bestellung (transactions.order_id)
+  await kassenAbgleichTabellen(pool);
 
   console.log('Database initialized');
 }
@@ -2036,6 +2039,8 @@ async function authenticateEventAccess(req: AuthenticatedRequest, res: express.R
 
 // Ausleihe (src/ausleihe-routen.ts) — vor den allgemeinen /api/items/:id-Routen
 ausleiheEinrichten({ app, pool, upload, uploadDir, broadcast, orderApiKey: ORDER_API_KEY });
+// Kasse: Soll-Stand je Bestellung, gebucht wird die Differenz (src/kassen-abgleich.ts)
+kassenAbgleichEinrichten({ app, pool, nurKasse: authenticateOrderSystem, broadcast });
 
 // Create item from order system (API key authentication)
 app.post('/api/items/from-order', authenticateOrderSystem, async (req, res) => {
@@ -2071,6 +2076,8 @@ app.post('/api/items/from-order', authenticateOrderSystem, async (req, res) => {
   }
 });
 
+// Alt (bis Oktober 2026): bucht einmal aus, ohne Storno. Die Kasse nutzt
+// jetzt PUT /api/kasse/bestellungen/:id (src/kassen-abgleich.ts).
 app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -2121,15 +2128,16 @@ app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
           );
 
           await client.query(`
-            INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
-            VALUES ($1, 'out', $2, $3, $4, $5, $6)
+            INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email, order_id)
+            VALUES ($1, 'out', $2, $3, $4, $5, $6, $7)
           `, [
             ing.item_id,
             deductQty,
             ing.item_stock,
             newStock,
             `Verkauf Rezept "${recipe.name}" - Bestellung #${order_id} (${order_source || 'kasse'})`,
-            'kasse@fwv-raura.ch'
+            'kasse@fwv-raura.ch',
+            Number.isInteger(Number(order_id)) ? Number(order_id) : null
           ]);
 
           affectedItemIds.push(ing.item_id);
@@ -2172,15 +2180,16 @@ app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
         );
 
         await client.query(`
-          INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
-          VALUES ($1, 'out', $2, $3, $4, $5, $6)
+          INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email, order_id)
+          VALUES ($1, 'out', $2, $3, $4, $5, $6, $7)
         `, [
           item.id,
           item.quantity,
           currentItem.quantity,
           newQuantity,
           `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
-          'kasse@fwv-raura.ch'
+          'kasse@fwv-raura.ch',
+          Number.isInteger(Number(order_id)) ? Number(order_id) : null
         ]);
 
         affectedItemIds.push(item.id);

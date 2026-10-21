@@ -37,7 +37,8 @@
       "new_quantity": 8,
       "reason": "Apéro Vorstand",
       "user_email": "erika@example.ch",
-      "created_at": "2026-10-11T08:00:00.000Z"
+      "created_at": "2026-10-11T08:00:00.000Z",
+      "order_id": null
     },
     "new_quantity": 8
   },
@@ -224,6 +225,7 @@
       "reason": "Apéro Vorstand",
       "user_email": "erika@example.ch",
       "created_at": "2026-10-11T08:00:00.000Z",
+      "order_id": null,
       "item_name": "Mineral 1.5l",
       "custom_barcode": "FWV000001",
       "ean_code": "7610000000001"
@@ -238,6 +240,7 @@
       "reason": "Einkauf eingebucht: chilbi",
       "user_email": "org@example.ch",
       "created_at": "2026-10-11T08:00:00.000Z",
+      "order_id": null,
       "item_name": "Mineral 1.5l",
       "custom_barcode": "FWV000001",
       "ean_code": "7610000000001"
@@ -252,6 +255,7 @@
       "reason": "Fest",
       "user_email": "erika@example.ch",
       "created_at": "2026-10-11T08:00:00.000Z",
+      "order_id": null,
       "item_name": "Mineral 1.5l",
       "custom_barcode": "FWV000001",
       "ean_code": "7610000000001"
@@ -266,6 +270,7 @@
       "reason": "Lieferung",
       "user_email": "erika@example.ch",
       "created_at": "2026-10-11T08:00:00.000Z",
+      "order_id": null,
       "item_name": "Mineral 1.5l",
       "custom_barcode": "FWV000001",
       "ean_code": "7610000000001"

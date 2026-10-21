@@ -184,9 +184,17 @@ Falls der Artikel bereits einen Barcode hat:
 - Preise und Kategorien aus Inventar
 
 ### Bei Verkauf
-- Bestand wird automatisch reduziert
-- Transaktion wird protokolliert
-- Mindestbestand-Warnung bei Unterschreitung
+- Die Kasse meldet pro Bestellung, was verkauft ist; das Lager bucht nur
+  die Differenz zur letzten Meldung (Buchungsgrund "Verkauf - Bestellung #…")
+- **Stornos buchen zurück** ("Storno - Bestellung #…"): gelöschte
+  Positionen und abgebrochene Bestellungen. Was Küche oder Bar bei einer
+  abgebrochenen Bestellung schon erledigt hatte, bleibt ausgebucht – die
+  Ware ist draussen.
+- Rezepte buchen ihre Zutaten aus (angebrochene Einheiten aufgerundet)
+- Sonderposten (Preis von Hand) buchen nichts aus
+- Der Bestand kann durch Verkäufe unter null fallen: Dann stimmt die
+  Zählung nicht – Bestand korrigieren
+- Ist das Lager nicht erreichbar, holt die Kasse die Buchung nach
 
 ## Berichte
 

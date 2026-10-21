@@ -14,6 +14,7 @@ import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } 
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
+import { lagerSchema, lagerEinrichten } from './lager.js';
 import { qrCodeLesen } from './qrcode.js';
 import { barlichtMelden, barlichtStoppen } from './barlicht.js';
 import { quittungXml } from './quittung.js';
@@ -712,6 +713,8 @@ async function initDB() {
   `);
 
   await vorOrtSchema(pool);
+  // Lagerbuchung: nur die Cloud (src/lager.ts)
+  if (!VOR_ORT) await lagerSchema(pool);
   await kassenbonSchema(pool);
   await geraeteSchema(pool);
 
@@ -1009,9 +1012,13 @@ if (VOR_ORT) {
   kassenbonDruckdienst({ pool, cloud: CLOUD_ORDER_URL, schluessel: ORDER_API_KEY!, drucken: kassenbonDrucken });
 }
 
+// Lagerbuchung pro Bestellung (nur Cloud) - src/lager.ts
+const lager = lagerEinrichten({ pool, inventoryApiUrl: INVENTORY_API_URL, orderApiKey: ORDER_API_KEY });
+const lagerAnstossen = (id: number | string) => { if (!VOR_ORT) lager.anstossen(id); };
+
 // Kasse vor Ort (T400) und Annahme ihrer Bestellungen in der Cloud - src/vorort.ts
 vorOrtEinrichten({
-  app, pool, orderApiKey: ORDER_API_KEY, inventoryApiUrl: INVENTORY_API_URL, broadcast, setSetting, getSetting,
+  app, pool, orderApiKey: ORDER_API_KEY, broadcast, setSetting, getSetting, lagerAnstossen,
   bonDrucken: async (orderId, tableNumber, items) => {
     const f = await printReceipt(orderId, tableNumber, items);
     meldeDruckfehler(f, orderId);
@@ -1100,13 +1107,15 @@ async function artikelListe(): Promise<any[]> {
     const inventoryItems = await response.json() as any[];
     // Map inventory items to order system format
     const items = inventoryItems.map((item) => ({
-      id: item.id, // Use actual inventory ID (no prefix needed)
+      // Rezepte negativ: eigene Nummern, die sonst mit Artikeln zusammenfallen
+      // (das Lager loest -id in Zutaten auf, src/lager.ts)
+      id: item.source === 'recipe' ? -item.id : item.id,
       name: item.name,
       price: parseFloat(item.price),
       category: item.category,
       printer_station: item.printer_station || 'bar',
       stock: item.stock,
-      source: 'inventory'
+      source: item.source === 'recipe' ? 'recipe' : 'inventory'
     }));
 
     // Sort by category then name
@@ -1429,29 +1438,8 @@ app.post('/api/orders', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // Reduce inventory stock (all items come from inventory now)
-    try {
-      const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
-
-      // T400: Das Lager bucht die Cloud, wenn die Bestellung dort ankommt.
-      if (inventoryItems.length > 0 && !VOR_ORT) {
-        await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Order-API-Key': ORDER_API_KEY
-          },
-          body: JSON.stringify({
-            items: inventoryItems,
-            order_id: order.id,
-            order_source: 'kasse'
-          })
-        });
-      }
-    } catch (inventoryError) {
-      console.error('Failed to update inventory:', inventoryError);
-      // Don't fail the order, just log the error
-    }
+    // Lager (src/lager.ts; T400: bucht die Cloud, wenn die Bestellung ankommt)
+    lagerAnstossen(order.id);
 
     // Bon drucken. Ein Fehlschlag darf die Bestellung nicht zurueckrollen —
     // sie ist bezahlt und im Buch. Er muss aber sichtbar werden, deshalb
@@ -1569,28 +1557,7 @@ app.post('/api/orders/:id/items', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // Reduce inventory stock (all items come from inventory now)
-    try {
-      const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
-
-      // T400: Das Lager bucht die Cloud, wenn die Bestellung dort ankommt.
-      if (inventoryItems.length > 0 && !VOR_ORT) {
-        await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Order-API-Key': ORDER_API_KEY
-          },
-          body: JSON.stringify({
-            items: inventoryItems,
-            order_id: id,
-            order_source: 'kasse'
-          })
-        });
-      }
-    } catch (inventoryError) {
-      console.error('Failed to update inventory:', inventoryError);
-    }
+    lagerAnstossen(id);
 
     // Bon fuer die Nachbestellung. Fehler wie oben: nicht verschlucken.
     let druckfehler: Druckfehler[] = [];
@@ -1701,6 +1668,7 @@ app.delete('/api/orders/:orderId/items/:itemId', async (req, res) => {
 
     // Queue for cloud sync
     queueOrderSync(parseInt(orderId), 'update');
+    lagerAnstossen(orderId);
 
     res.json({ success: true, message: 'Artikel storniert', new_total: newTotal });
   } catch (error) {
@@ -1759,6 +1727,7 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ error: 'Bestellung nicht gefunden oder schon storniert' });
     broadcast({ type: 'order_completed', order_id: id });
     broadcast({ type: 'order_updated', order_id: id, status: 'cancelled' });
+    lagerAnstossen(id);
     res.json({ success: true });
   } catch (error) {
     console.error('Cancel order error:', error);
@@ -3348,6 +3317,7 @@ initDB()
     // Auth-Schicht setzen; danach regelmaessig auf faellige Rotation pruefen.
     await loadOrRotatePosPassword();
     setInterval(loadOrRotatePosPassword, 6 * 60 * 60 * 1000);
+    if (!VOR_ORT) lager.starten();
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

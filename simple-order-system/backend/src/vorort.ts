@@ -18,7 +18,7 @@
 // Positionen und Zahlungen werden mit ihrer Nummer angelegt, Status nie
 // zurueckgestuft, "bezahlt"/"fertig" einer Position bleibt, Total = Summe.
 // Gedruckt wird nur, wo eine Bestellung entsteht - nie beim Uebernehmen.
-// Das Lager bucht nur die Cloud (beim ersten Eintreffen einer T400-Position).
+// Das Lager bucht nur die Cloud (src/lager.ts), auch fuer T400-Bestellungen.
 //
 // Druckvermerk (orders.bon_fehler): NULL = noch unbekannt, '' = alle Bons
 // gedruckt, sonst die Stationen mit Fehler ("kitchen", "bar,kitchen"). Konnte
@@ -59,7 +59,8 @@ interface Abhaengigkeiten {
   app: express.Express;
   pool: pg.Pool;
   orderApiKey: string;
-  inventoryApiUrl: string;
+  // Cloud: Lagerbuchung fuer eine uebernommene Bestellung anstossen
+  lagerAnstossen: (orderId: number) => void;
   broadcast: (d: any) => void;
   // Bon fuer die genannten Positionen drucken; liefert die Stationen mit Fehler.
   bonDrucken: (orderId: number, tableNumber: number, items: any[]) => Promise<string[]>;
@@ -172,7 +173,6 @@ async function bestellungenLesen(db: pg.Pool | pg.PoolClient, where: string, par
 interface MischErgebnis {
   id: number;
   neu: boolean;
-  neueArtikel: { id: any; quantity: number }[];
   statusVorher: string | null;
   statusNachher: string;
   fertigeArtikel: number[];
@@ -194,7 +194,7 @@ export function bonMischen(a: string | null | undefined, b: string | null | unde
 export async function mischen(client: pg.PoolClient, b: any, quelle: string | null): Promise<MischErgebnis> {
   const id = Number(b?.id);
   if (!Number.isInteger(id) || id <= 0) throw new Error('ungueltige id');
-  const erg: MischErgebnis = { id, neu: false, neueArtikel: [], statusVorher: null, statusNachher: b.status || 'pending', fertigeArtikel: [], geaendert: false };
+  const erg: MischErgebnis = { id, neu: false, statusVorher: null, statusNachher: b.status || 'pending', fertigeArtikel: [], geaendert: false };
 
   const da = (await client.query('SELECT id, status, bon_fehler, geaendert::text AS stand FROM orders WHERE id = $1 FOR UPDATE', [id])).rows[0];
   if (!da && typeof b.client_ref === 'string' && b.client_ref) {
@@ -254,7 +254,6 @@ export async function mischen(client: pg.PoolClient, b: any, quelle: string | nu
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamp, $11, $12::timestamp)`,
         [pid, id, p.item_id ?? null, p.item_name || null, p.quantity, p.price, p.notes || null, p.printer_station || 'bar',
          !!p.paid, p.paid_at || null, !!p.completed, p.completed_at || null]);
-      if (p.item_id) erg.neueArtikel.push({ id: Number(p.item_id) || p.item_id, quantity: p.quantity });
     }
   }
   for (const z of (Array.isArray(b.payments) ? b.payments : [])) {
@@ -342,14 +341,7 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
       if (alsGesendet && e.id < T400_AB.orders) {
         await bonNachdrucken(e.id).catch((err) => console.error(`Nachdruck #${e?.id}:`, err?.message || err));
       }
-      if (lagerBuchen && e.neueArtikel.length) {
-        fetch(`${d.inventoryApiUrl}/api/items/sell`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': orderApiKey },
-          body: JSON.stringify({ items: e.neueArtikel, order_id: e.id, order_source: 'kasse' }),
-          signal: mitLimit(10000),
-        }).catch((err) => console.error('Lager (Vor-Ort-Bestellung):', err?.message || err));
-      }
+      if (lagerBuchen && e.geaendert) d.lagerAnstossen(e.id);
     }
     if (fehler.length) {
       console.error('Abgleich: nicht uebernommen:', JSON.stringify(fehler));
