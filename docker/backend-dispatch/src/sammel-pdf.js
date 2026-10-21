@@ -15,17 +15,24 @@ async function sammelPdfRendern(htmls, pdf_margin) {
     });
     try {
         const gesamt = await PDFDocument.create();
-        const page = await browser.newPage();
         for (const html of htmls) {
-            await page.setContent(html, { waitUntil: 'networkidle0' });
-            const pdf = await page.pdf({
-                format: 'A4',
-                printBackground: true,
-                margin,
-                displayHeaderFooter: true,
-                headerTemplate: '<div></div>',
-                footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
-            });
+            // Je Brief eine frische Seite: ein zweites setContent auf derselben
+            // Seite wartet vergeblich auf networkidle0 (21.10.2026, Timeout).
+            const page = await browser.newPage();
+            let pdf;
+            try {
+                await page.setContent(html, { waitUntil: 'networkidle0' });
+                pdf = await page.pdf({
+                    format: 'A4',
+                    printBackground: true,
+                    margin,
+                    displayHeaderFooter: true,
+                    headerTemplate: '<div></div>',
+                    footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
+                });
+            } finally {
+                await page.close();
+            }
             const einzeln = await PDFDocument.load(pdf);
             const seiten = await gesamt.copyPages(einzeln, einzeln.getPageIndices());
             seiten.forEach(seite => gesamt.addPage(seite));
