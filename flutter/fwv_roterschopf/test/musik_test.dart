@@ -3,6 +3,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
@@ -561,6 +562,58 @@ void main() {
     expect(wiedergabe.aufrufe.skip(1), ['zufall true', 'spielen']);
     final mini = find.byKey(const Key('mini-player'));
     expect(find.descendant(of: mini, matching: find.textContaining('Alle Titel')), findsOneWidget);
+  });
+
+  testWidgets('Titelsuche: Treffer abspielen, weitere Treffer folgen, zu Playlist hinzufuegen', (
+    tester,
+  ) async {
+    final z = await zeigen(tester);
+    await tester.tap(find.byKey(const Key('titel-suchen')));
+    await tester.pumpAndSettle();
+    expect(find.text('Titel suchen'), findsOneWidget);
+    expect(find.text('1153 Titel in der Sammlung'), findsOneWidget);
+
+    // Zweiten Treffer antippen: laedt alle Treffer, ab dem angetippten.
+    await tester.tap(find.text('Gib mer e Chance'));
+    await tester.pumpAndSettle();
+    expect(z.freigaben.single, ['Queen/Bohemian Rhapsody.mp3', 'Baschi/Gib mer e Chance.mp3']);
+    expect(wiedergabe.aufrufe.first, 'laden 2 ab 1');
+    expect(wiedergabe.aufrufe, contains('spielen'));
+
+    // Zu Playlist: neuer Titel wird angehaengt, alle bisherigen bleiben.
+    await tester.tap(find.byTooltip('Mehr').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zu Playlist hinzufügen…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chilbi Abend  (2)'));
+    await tester.pumpAndSettle();
+    final (id, name, pfade) = z.gespeichert.single;
+    expect((id, name), ('p1', 'Chilbi Abend'));
+    expect(pfade, [
+      'Queen/Bohemian Rhapsody.mp3',
+      'Weg/Alter Titel.mp3',
+      'Baschi/Gib mer e Chance.mp3',
+    ]);
+    expect(find.text('Zu «Chilbi Abend» hinzugefügt.'), findsOneWidget);
+
+    // Schon drin: nichts speichern.
+    await tester.tap(find.byTooltip('Mehr').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zu Playlist hinzufügen…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chilbi Abend  (2)'));
+    await tester.pumpAndSettle();
+    expect(z.gespeichert, hasLength(1));
+    expect(find.text('Schon in «Chilbi Abend».'), findsOneWidget);
+  });
+
+  testWidgets('Titelsuche auch mit Ctrl+F', (tester) async {
+    await zeigen(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Titel suchen'), findsOneWidget);
   });
 
   testWidgets('Radio im grossen Player: laufender Titel und andere Sender', (tester) async {

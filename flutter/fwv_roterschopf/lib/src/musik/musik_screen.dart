@@ -17,11 +17,13 @@ import 'package:fwv_anlass/fwv_anlass.dart'
         nachfragen,
         reiterAufRot,
         mitSystemleiste;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
 import 'modelle.dart';
 import 'laptop.dart';
 import 'player.dart';
+import 'titelsuche.dart';
 import 'zugang.dart';
 
 class MusikScreen extends StatefulWidget {
@@ -74,31 +76,55 @@ class _MusikScreenState extends State<MusikScreen> {
     super.dispose();
   }
 
+  void _titelSuchen(BuildContext context) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => TitelSucheSeite(zugang: widget.zugang, player: _player),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final zugang = widget.zugang;
-    return DefaultTabController(
-      length: widget.laptopSteuern ? 3 : 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Musik'),
-          actions: widget.aktionen,
-          bottom: reiterAufRot(
-            tabs: [
-              const Tab(text: 'Playlists'),
-              const Tab(text: 'Radiosender'),
-              if (widget.laptopSteuern) const Tab(text: 'Im Schopf'),
-            ],
+    // Am Computer: Cmd+F (macOS) bzw. Ctrl+F oeffnet die Titelsuche.
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () => _titelSuchen(context),
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () => _titelSuchen(context),
+      },
+      child: Focus(
+        autofocus: true,
+        child: DefaultTabController(
+          length: widget.laptopSteuern ? 3 : 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Musik'),
+              actions: [
+                IconButton(
+                  key: const Key('titel-suchen'),
+                  tooltip: 'Titel suchen',
+                  icon: const Icon(Icons.search),
+                  onPressed: () => _titelSuchen(context),
+                ),
+                ...widget.aktionen,
+              ],
+              bottom: reiterAufRot(
+                tabs: [
+                  const Tab(text: 'Playlists'),
+                  const Tab(text: 'Radiosender'),
+                  if (widget.laptopSteuern) const Tab(text: 'Im Schopf'),
+                ],
+              ),
+            ),
+            body: TabBarView(
+              children: [
+                _PlaylistsSeite(zugang: zugang, player: _player),
+                _SenderSeite(zugang: zugang, player: _player),
+                if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
+              ],
+            ),
+            bottomNavigationBar: MiniPlayer(player: _player),
           ),
         ),
-        body: TabBarView(
-          children: [
-            _PlaylistsSeite(zugang: zugang, player: _player),
-            _SenderSeite(zugang: zugang, player: _player),
-            if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
-          ],
-        ),
-        bottomNavigationBar: MiniPlayer(player: _player),
       ),
     );
   }
