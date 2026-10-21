@@ -92,10 +92,11 @@ void main() {
     expect(oben('1.0.25'), lessThan(oben('1.0.23')));
     expect(oben('1.0.23'), lessThan(oben('1.0.0')));
     await tester.scrollUntilVisible(
-      find.byKey(const Key('gruppe-Version unbekannt (vor 1.0.24)')),
+      find.text('Xaver Alt'),
       200,
       scrollable: find.byType(Scrollable).last,
     );
+    expect(find.byKey(const Key('gruppe-Version unbekannt (vor 1.0.24)')), findsOneWidget);
     expect(find.text('Xaver Alt'), findsOneWidget);
     expect(find.text('vor 2 Monaten'), findsOneWidget);
   });

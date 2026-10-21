@@ -2,7 +2,8 @@
 // App-Version auf welchem Geraet (GET /vorstand/app-geraete)? Gruppiert nach
 // Version, neuste zuerst; veraltete markiert; Filter "Nur veraltete" und
 // Suche (Name, Modell, Version) - beides ohne neuen Abruf. Auf breiten
-// Bildschirmen die Karten in Spalten ([KartenSpalten]).
+// Bildschirmen die Karten in Spalten ([KartenSpalten]). Oben umschaltbar
+// auf "Kassen" ([KassenAnsicht]: Anmeldebon, Kassen-Geraete freigeben).
 
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import '../dienste.dart';
 import '../geraete/app_geraete.dart';
 import '../zeit.dart';
+import 'geraete/kassen_ansicht.dart';
 
 class GeraeteAnsicht extends StatefulWidget {
   const GeraeteAnsicht({super.key, required this.dienste, this.jetzt = DateTime.now});
@@ -26,6 +28,8 @@ class GeraeteAnsicht extends StatefulWidget {
 class _GeraeteAnsichtState extends State<GeraeteAnsicht> with AutomaticKeepAliveClientMixin {
   final _suche = TextEditingController();
   bool _nurVeraltete = false;
+  bool _kassen = false;
+  bool _kassenBesucht = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -44,6 +48,43 @@ class _GeraeteAnsichtState extends State<GeraeteAnsicht> with AutomaticKeepAlive
       const EdgeInsets.fromLTRB(12, 12, 12, 0),
       maxBreite: kartenBreite,
     ).copyWith(bottom: 4);
+    final umschalter = Padding(
+      padding: kopf,
+      child: SegmentedButton<bool>(
+        key: const Key('geraete-teil'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: false, label: Text('Mitglieder-Apps')),
+          ButtonSegment(value: true, label: Text('Kassen')),
+        ],
+        selected: {_kassen},
+        onSelectionChanged: (s) => setState(() {
+          _kassen = s.first;
+          _kassenBesucht |= _kassen;
+        }),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        umschalter,
+        Expanded(
+          child: IndexedStack(
+            index: _kassen ? 1 : 0,
+            children: [
+              _appVersionen(context, kopf),
+              if (_kassenBesucht)
+                KassenAnsicht(dienste: widget.dienste, jetzt: widget.jetzt)
+              else
+                const SizedBox.shrink(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _appVersionen(BuildContext context, EdgeInsets kopf) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

@@ -11,6 +11,7 @@ import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
 import 'email/mailcow_dienst.dart';
 import 'geraete/app_geraete.dart';
+import 'geraete/kassen_geraete.dart';
 import 'geplant/geplante_auftraege.dart';
 import 'mitglieder/export.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
@@ -87,6 +88,10 @@ class VorstandDienste {
 
   /// Geraete und App-Versionen der Mitglieder (GET vorstand/app-geraete).
   AppGeraeteDienst get appGeraete => AppGeraeteDienst(api);
+
+  /// Kassen-Geraete freigeben/sperren und Kassen-Anmeldebon (api-members,
+  /// weitergeleitet ans order-backend).
+  KassenGeraeteDienst get kassenGeraete => KassenGeraeteDienst(api);
 }
 
 /// Vorstand-Seite der Website - fuer alles, was die App noch nicht kann.
