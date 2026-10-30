@@ -92,6 +92,7 @@ void main() {
   late _Zugang zugang;
   late List<String> geholt;
   late Set<String> kaputt;
+  Completer<void>? sperre; // haelt den naechsten Download an
 
   MusikAblage neueAblage() => MusikAblage(
     ordner: () async => ordner,
@@ -99,6 +100,7 @@ void main() {
     client: MockClient((r) async {
       final pfad = r.url.queryParameters['pfad']!;
       geholt.add(pfad);
+      if (sperre case final s?) await s.future;
       if (kaputt.contains(pfad)) return http.Response('weg', 404);
       return http.Response('ton:$pfad', 200);
     }),
@@ -115,6 +117,7 @@ void main() {
     zugang = _Zugang();
     geholt = [];
     kaputt = {};
+    sperre = null;
   });
 
   tearDown(() => ordner.delete(recursive: true));
@@ -201,13 +204,17 @@ void main() {
 
   test('Alles speichern: ganze Sammlung zuletzt geladen, beim Abgleich neue Titel dazu', () async {
     final a = neueAblage();
+    // Der erste Titel haengt, bis auch der Interpret eingetragen ist.
+    sperre = Completer<void>();
     await a.allesSpeichern();
     await a.interpretSpeichern('Span', [_span]);
+    sperre!.complete();
+    sperre = null;
     await fertig(a);
     expect(a.sammlung(GespeicherteSammlung.alleId)!.titel, hasLength(3));
     expect(a.anzahlTitel, 3);
-    // Der erste Titel gehoerte schon der ganzen Sammlung; danach kam Span vor dem Rest.
-    expect(geholt.indexOf(_span.pfad), lessThan(geholt.indexOf(_queen2.pfad)));
+    // Der erste Titel lief schon; danach kam der Interpret vor dem Rest.
+    expect(geholt, [_queen.pfad, _span.pfad, _queen2.pfad]);
 
     const neu = MusikTitel(pfad: 'Baschi/Gib mer e Chance.mp3', interpret: 'Baschi');
     zugang.alle = [...zugang.alle, neu];
