@@ -44,6 +44,15 @@ abstract class MusikZugang {
     Duration position = Duration.zero,
   });
 
+  /// Songs ergaenzen (Gruppe Roter Schopf, Vorstand, admin): YouTube
+  /// durchsuchen, Link oder Suchbegriff laden lassen, Auftraege sehen.
+  Future<List<YoutubeTreffer>> youtubeSuchen(String begriff) =>
+      throw UnsupportedError('Songs ergaenzen gibt es hier nicht');
+  Future<ErgaenzenAuftrag> ergaenzen(String quelle) =>
+      throw UnsupportedError('Songs ergaenzen gibt es hier nicht');
+  Future<List<ErgaenzenAuftrag>> ergaenzenAuftraege() =>
+      throw UnsupportedError('Songs ergaenzen gibt es hier nicht');
+
   Future<List<Radiosender>> sender();
   Future<void> senderAnlegen({required String name, required String url});
   Future<void> senderLoeschen(String id);
@@ -167,6 +176,25 @@ class ApiMusikZugang extends MusikZugang {
       if (e.status == 404) return null;
       rethrow;
     }
+  }
+
+  @override
+  Future<List<YoutubeTreffer>> youtubeSuchen(String begriff) async {
+    final json = await api.get('kiosk/ergaenzen/suche', abfrage: {'q': begriff});
+    return _maps(json is Map ? json['treffer'] : null).map(YoutubeTreffer.ausJson).toList();
+  }
+
+  @override
+  Future<ErgaenzenAuftrag> ergaenzen(String quelle) async {
+    final json = await api.post('kiosk/ergaenzen', daten: {'quelle': quelle});
+    if (json is! Map) throw const FormatException('Unerwartete Antwort vom Server.');
+    return ErgaenzenAuftrag.ausJson(Map<String, dynamic>.from(json));
+  }
+
+  @override
+  Future<List<ErgaenzenAuftrag>> ergaenzenAuftraege() async {
+    final json = await api.get('kiosk/ergaenzen');
+    return _maps(json is Map ? json['auftraege'] : null).map(ErgaenzenAuftrag.ausJson).toList();
   }
 
   @override

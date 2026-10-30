@@ -254,6 +254,46 @@ void main() {
     expect(groesseText(6200000000), '6,2 GB');
   });
 
+  test('Eingeschlafene Verbindung: neuer Versuch, nach dem dritten Mal Schluss', () async {
+    var anfragen = 0;
+    final a =
+        MusikAblage(
+            ordner: () async => ordner,
+            zugang: zugang,
+            client: MockClient.streaming((r, _) async {
+              anfragen++;
+              // Erster Versuch: ein Stueck, dann nichts mehr. Danach klappt es.
+              if (anfragen == 1) {
+                final c = StreamController<List<int>>()..add([1, 2, 3]);
+                return http.StreamedResponse(c.stream, 200);
+              }
+              return http.StreamedResponse(Stream.value('ton'.codeUnits), 200);
+            }),
+          )
+          ..stillstand = const Duration(milliseconds: 50)
+          ..nochmalsNach = Duration.zero;
+    await a.interpretSpeichern('Span', [_span]);
+    await fertig(a);
+    expect(anfragen, 2);
+    expect(await a.datei(_span.pfad)!.readAsString(), 'ton');
+
+    // Bleibt es still, hoert es nach drei Versuchen auf.
+    final b =
+        MusikAblage(
+            ordner: () async => ordner,
+            zugang: zugang,
+            client: MockClient.streaming(
+              (r, _) async => http.StreamedResponse(StreamController<List<int>>().stream, 200),
+            ),
+          )
+          ..stillstand = const Duration(milliseconds: 20)
+          ..nochmalsNach = Duration.zero;
+    await b.interpretSpeichern('Queen', [_queen]);
+    await fertig(b);
+    expect(b.fehler, contains('steht still'));
+    expect(b.datei(_queen.pfad), isNull);
+  });
+
   test('Player: Gespeichertes von der Platte, ohne Netz nur Gespeichertes', () async {
     final a = neueAblage();
     await a.interpretSpeichern('Span', [_span]);

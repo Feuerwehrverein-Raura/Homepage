@@ -146,7 +146,11 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
                 subtitle: const Text('Hören, Playlists und Radio'),
                 trailing: const Icon(Icons.chevron_right),
                 // Den Laptop fernbedienen gibt es im Reiter "Schopf".
-                onTap: () => _oeffnen(MusikScreen(zugang: _d.musik, player: _d.musikPlayer)),
+                onTap: () => _oeffnen(MusikScreen(
+                  zugang: _d.musik,
+                  player: _d.musikPlayer,
+                  ergaenzen: hatRoterSchopfZugang(_d.sitzung.sitzung),
+                )),
               ),
             ],
             // Mit Reiter "Schopf" steht der Bildschirm dort.

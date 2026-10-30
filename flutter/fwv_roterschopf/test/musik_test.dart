@@ -178,6 +178,51 @@ class _Zugang extends MusikZugang {
   final gespeichert = <(String?, String, List<String>)>[];
   final senderNeu = <(String, String)>[];
   final geloescht = <String>[];
+  final ergaenzt = <String>[];
+  var auftraege = <ErgaenzenAuftrag>[
+    ErgaenzenAuftrag.ausJson({
+      'id': 'a1',
+      'quelle': 'https://open.spotify.com/playlist/xyz',
+      'stand': 'fertig',
+      'wer': 'Erika Muster',
+      'dateien': ['Span - Louenesee.mp3', 'Queen - Bohemian Rhapsody.mp3'],
+      'neu': 1,
+      'schon_da': 1,
+    }),
+  ];
+
+  @override
+  Future<List<YoutubeTreffer>> youtubeSuchen(String begriff) async => [
+    YoutubeTreffer.ausJson({
+      'url': 'https://www.youtube.com/watch?v=uoym8LBzsPs',
+      'titel': 'Louenesee',
+      'kanal': 'Span - Topic',
+      'dauer': 256,
+      'offiziell': true,
+    }),
+    YoutubeTreffer.ausJson({
+      'url': 'https://www.youtube.com/watch?v=DuPrNQY6tqY',
+      'titel': 'Span - Louenesee - live - 1983',
+      'kanal': 'SwissMusic80',
+      'dauer': 299,
+    }),
+  ];
+
+  @override
+  Future<ErgaenzenAuftrag> ergaenzen(String quelle) async {
+    ergaenzt.add(quelle);
+    final a = ErgaenzenAuftrag.ausJson({
+      'id': 'n${ergaenzt.length}',
+      'quelle': quelle,
+      'stand': 'wartet',
+    });
+    auftraege = [a, ...auftraege];
+    return a;
+  }
+
+  @override
+  Future<List<ErgaenzenAuftrag>> ergaenzenAuftraege() async => auftraege;
+
   var senderListe = [
     const Radiosender(
       id: 's1',
@@ -286,7 +331,7 @@ void main() {
 
   late _Wiedergabe wiedergabe;
 
-  Future<_Zugang> zeigen(WidgetTester tester, {bool laptop = false}) async {
+  Future<_Zugang> zeigen(WidgetTester tester, {bool laptop = false, bool ergaenzen = false}) async {
     final z = _Zugang();
     wiedergabe = _Wiedergabe();
     tester.view.physicalSize = const Size(1080, 2400);
@@ -298,6 +343,7 @@ void main() {
           zugang: z,
           wiedergabe: wiedergabe,
           laptopSteuern: laptop,
+          ergaenzen: ergaenzen,
           senderAdresse: (u) async => u,
         ),
       ),
@@ -732,6 +778,61 @@ void main() {
   testWidgets('Ohne Berechtigung kein Reiter Im Schopf', (tester) async {
     await zeigen(tester);
     expect(find.text('Im Schopf'), findsNothing);
+    expect(find.text('Ergänzen'), findsNothing);
+  });
+
+  testWidgets('Ergänzen: YouTube suchen, Link einfügen, Auftrag als Playlist anlegen', (
+    tester,
+  ) async {
+    // Handy-Breite (360 pt) mit allen Reitern: nichts darf ueberlaufen.
+    final z = await zeigen(tester, laptop: true, ergaenzen: true);
+    // Ab vier Reitern ist die Leiste schiebbar.
+    await tester.ensureVisible(find.text('Ergänzen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ergänzen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Span - Louenesee'), findsNothing);
+    expect(find.textContaining('1 neu, 1 schon in der Sammlung'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('ergaenzen-eingabe')), 'Span Louenesee');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Offizielle Tonspur · 4:16'), findsOneWidget);
+    await tester.tap(find.byTooltip('In die Sammlung').first);
+    await tester.pumpAndSettle();
+    expect(z.ergaenzt, ['https://www.youtube.com/watch?v=uoym8LBzsPs']);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+
+    // Ein Link wird nicht gesucht, sondern gleich geladen.
+    await tester.enterText(
+      find.byKey(const Key('ergaenzen-eingabe')),
+      'https://open.spotify.com/album/abc',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(z.ergaenzt.last, 'https://open.spotify.com/album/abc');
+
+    await tester.scrollUntilVisible(
+      find.byTooltip('Als Playlist anlegen'),
+      200,
+      scrollable: find
+          .descendant(of: find.byType(ErgaenzenSeite), matching: find.byType(Scrollable))
+          .first,
+    );
+    await tester.pumpAndSettle();
+    // Die Einblendung "Wird geladen" liegt sonst ueber dem Knopf.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Als Playlist anlegen'));
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Neu im Schopf');
+    await tester.tap(find.text('Anlegen'));
+    await tester.pumpAndSettle();
+    expect(z.gespeichert.last.$2, 'Neu im Schopf');
+    expect(z.gespeichert.last.$3, ['Span - Louenesee.mp3', 'Queen - Bohemian Rhapsody.mp3']);
+    // Laufende Auftraege nicht weiter abfragen, wenn der Test endet.
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('Im Schopf: nur mit Berechtigung, steuern, Playlist erst nach Rueckfrage', (

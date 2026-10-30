@@ -44,6 +44,12 @@ die Mitglieder-App zeigt davon nichts.
 - Der Player spielt Gespeichertes von der Platte; ohne Netz nur das
   Gespeicherte.
 - **Abmelden löscht alles Gespeicherte** (Musik nur für Mitglieder).
+- Steht die Verbindung 30 s still (z.B. nach einem Netzwechsel), bricht
+  die App den Titel ab und versucht ihn bis zu dreimal neu.
+- Auf dem Mac liegt die Anmeldung in **einem** Schlüsselbund-Eintrag
+  (`GebuendelterSpeicher`): Unser Zertifikat hat keine Team-ID, macOS
+  bindet jeden Eintrag an genau eine Version und fragt nach einem Update
+  je Eintrag – so nur einmal.
 
 Die Bildschirme kommen unverändert aus `flutter/fwv_roterschopf`
 (`MusikScreen`). Was dort geändert wird, landet in beiden Apps. Die App
@@ -89,6 +95,27 @@ Lokal:
     cd flutter/musik
     flutter test
     flutter run -d macos
+
+## Songs ergänzen (spotDL)
+
+Reiter «Ergänzen» in FWV Musik, in der Mitglieder-App und auf mein.html –
+nur Gruppe Roter Schopf, Vorstand, admin (api-members prüft dasselbe).
+
+- Auf YouTube suchen (yt-dlp) oder einen Link einfügen: YouTube oder
+  Spotify, Song, Album oder Playlist. «Offizielle Tonspur» = Kanal
+  «… - Topic».
+- Geladen wird auf dem Server im Container `fwv-musik-dl`
+  (`docker/musik-dl`, spotDL 4.6.0, mp3, Bitrate wie die Quelle) und per
+  WebDAV in den Nextcloud-Gruppenordner **9 «Musik»** gelegt (Konto
+  `musik-bot`, darf nur dort schreiben). Was dort liegt, wird nicht
+  überschrieben.
+- Fertige Aufträge mit mehreren Songs: «Als Playlist anlegen».
+- Der Laptop spiegelt den Ordner alle 5 Minuten nach `/Musik`
+  (`kiosk-abgleich`), danach stehen die Songs überall zur Auswahl.
+
+Aufrufe (api-members): `GET /kiosk/ergaenzen/suche?q=`,
+`GET|POST /kiosk/ergaenzen`; für den Laptop `GET /kiosk/sammlung` und
+`GET /kiosk/sammlung/datei?pfad=` (X-Kiosk-Key).
 
 ## Offen
 

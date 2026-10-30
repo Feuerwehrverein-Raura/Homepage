@@ -125,7 +125,31 @@ async function dateienGroesse(wurzel, pfade) {
     return { bytes, anzahl: pfade.length, gefunden };
 }
 
+// Die Sammlung fuer den Abgleich des Laptops: jede Musikdatei mit Groesse
+// und Aenderungszeit. Versteckte Dateien (Nextcloud-Reste, ".teil") nicht.
+const MUSIK_ENDUNGEN = new Set(['.mp3', '.m4a', '.aac', '.flac', '.ogg', '.opus', '.wav']);
+
+async function sammlungListe(wurzel) {
+    const path = require('path');
+    const fs = require('fs/promises');
+    const liste = [];
+    async function lesen(ordner, vorn) {
+        for (const e of await fs.readdir(ordner, { withFileTypes: true })) {
+            if (e.name.startsWith('.')) continue;
+            const pfad = vorn ? `${vorn}/${e.name}` : e.name;
+            if (e.isDirectory()) {
+                await lesen(path.join(ordner, e.name), pfad);
+            } else if (e.isFile() && MUSIK_ENDUNGEN.has(path.extname(e.name).toLowerCase())) {
+                const info = await fs.stat(path.join(ordner, e.name));
+                liste.push({ pfad, groesse: info.size, geaendert: Math.floor(info.mtimeMs / 1000) });
+            }
+        }
+    }
+    await lesen(path.resolve(wurzel), '');
+    return liste.sort((a, b) => a.pfad.localeCompare(b.pfad));
+}
+
 module.exports = {
     hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, dateienGroesse,
-    AKTIONEN, HOER_DAUER_S
+    sammlungListe, AKTIONEN, HOER_DAUER_S
 };

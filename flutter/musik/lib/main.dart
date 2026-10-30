@@ -90,6 +90,8 @@ class _MusikAppState extends State<MusikApp> {
                     player: dienste.player,
                     ablage: dienste.ablage,
                     laptopSteuern: dienste.laptopSteuern,
+                    // Dieselbe Regel: Gruppe Roter Schopf, Vorstand, admin.
+                    ergaenzen: dienste.laptopSteuern,
                     aktionen: [_AbmeldenKnopf(dienste: dienste)],
                   )
                 : AnmeldeSeite(dienste: dienste),

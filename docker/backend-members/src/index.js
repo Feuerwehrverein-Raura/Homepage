@@ -21,7 +21,7 @@ const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = 
 const { vorstandsRollen } = require('./vorstand-rolle');
 const { roterSchopf, hatRoterSchopfZugang, VORGABE: ROTER_SCHOPF_VORGABE } = require('./roter-schopf');
 const { schopfVerlauf, grenzenAus } = require('./schopf-verlauf');
-const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung, dateienGroesse } = require('./kiosk-musik');
+const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung, dateienGroesse, sammlungListe } = require('./kiosk-musik');
 const { kioskZeileSaeubern, kioskKandidat, kioskAbgleichen } = require('./kiosk-abgleich');
 const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
@@ -6660,6 +6660,66 @@ app.post('/kiosk/hoeren/groesse', authenticateToken, async (req, res) => {
         console.error('POST /kiosk/hoeren/groesse:', error.message);
         res.status(500).json({ error: 'Groesse konnte nicht bestimmt werden' });
     }
+});
+
+// --- Songs ergaenzen (spotDL) -------------------------------------------------
+// Der Container musik-dl (docker/musik-dl) sucht auf YouTube und laedt mit
+// spotDL in den Nextcloud-Ordner "Musik"; von dort holt der Laptop die
+// Sammlung. Ergaenzen duerfen nur Gruppe Roter Schopf, Vorstand, admin -
+// nicht, wer bloss Schicht hat.
+const MUSIK_DL_URL = process.env.MUSIK_DL_URL || 'http://fwv-musik-dl:8080';
+
+function musikErgaenzenZugang(req, res, next) {
+    if (hatRoterSchopfZugang(req.user?.groups)) return next();
+    return res.status(403).json({ error: 'Songs ergaenzen nur Gruppe Roter Schopf, Vorstand und admin' });
+}
+
+async function musikDl(req, res, methode, pfad, daten) {
+    try {
+        const antwort = await fetch(MUSIK_DL_URL + pfad, {
+            method: methode,
+            headers: { 'X-Intern-Key': process.env.MUSIK_DL_KEY || '', 'Content-Type': 'application/json' },
+            body: daten ? JSON.stringify(daten) : undefined,
+            signal: AbortSignal.timeout(70000),
+        });
+        res.status(antwort.status).json(await antwort.json());
+    } catch (error) {
+        console.error(`musik-dl ${pfad}:`, error.message);
+        res.status(502).json({ error: 'Der Dienst zum Ergaenzen antwortet nicht' });
+    }
+}
+
+app.get('/kiosk/ergaenzen/suche', authenticateToken, musikErgaenzenZugang, (req, res) =>
+    musikDl(req, res, 'GET', '/suche?q=' + encodeURIComponent(String(req.query.q || '').slice(0, 200))));
+
+app.get('/kiosk/ergaenzen', authenticateToken, musikErgaenzenZugang, (req, res) =>
+    musikDl(req, res, 'GET', '/auftraege'));
+
+app.post('/kiosk/ergaenzen', authenticateToken, musikErgaenzenZugang, (req, res) =>
+    musikDl(req, res, 'POST', '/auftraege', {
+        quelle: req.body?.quelle,
+        wer: req.user?.name || req.user?.preferred_username || req.user?.email || '?',
+    }));
+
+// Der Laptop spiegelt die Sammlung (kiosk-abgleich): erst die Liste, dann
+// jede fehlende oder geaenderte Datei einzeln.
+app.get('/kiosk/sammlung', kioskSchluessel, async (req, res) => {
+    try {
+        res.json({ titel: await sammlungListe(process.env.KIOSK_MUSIK_PFAD || '/app/musik') });
+    } catch (error) {
+        console.error('GET /kiosk/sammlung:', error.message);
+        res.status(500).json({ error: 'Sammlung konnte nicht gelesen werden' });
+    }
+});
+
+app.get('/kiosk/sammlung/datei', kioskSchluessel, (req, res) => {
+    const path = require('path');
+    const wurzel = path.resolve(process.env.KIOSK_MUSIK_PFAD || '/app/musik');
+    const ziel = path.resolve(wurzel, String(req.query.pfad || ''));
+    if (!ziel.startsWith(wurzel + path.sep)) return res.status(400).json({ error: 'Ungueltiger Pfad' });
+    res.sendFile(ziel, (err) => {
+        if (err && !res.headersSent) res.status(err.statusCode === 404 ? 404 : 500).end();
+    });
 });
 
 // Der Player der App meldet, wenn ein Titel nicht abspielt - der Server

@@ -13,7 +13,7 @@ const path = require('node:path');
 const jwt = require('jsonwebtoken');
 const {
     hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, dateienGroesse,
-    HOER_DAUER_S
+    sammlungListe, HOER_DAUER_S
 } = require('../src/kiosk-musik');
 
 const GEHEIM = 'test-geheimnis';
@@ -126,5 +126,22 @@ test('Platzbedarf: zaehlt vorhandene Dateien, nichts ausserhalb der Sammlung', a
     } finally {
         fs.rmSync(wurzel, { recursive: true, force: true });
         fs.rmSync(path.join(wurzel, '..', 'geheim.mp3'), { force: true });
+    }
+});
+
+test('Sammlung fuer den Laptop: Musikdateien mit Groesse, ohne Versteckte', async () => {
+    const os = require('node:os');
+    const wurzel = fs.mkdtempSync(path.join(os.tmpdir(), 'kiosk-sammlung-'));
+    try {
+        fs.writeFileSync(path.join(wurzel, 'Span - Louenesee.mp3'), Buffer.alloc(10));
+        fs.writeFileSync(path.join(wurzel, 'Playlists.md'), 'x');
+        fs.writeFileSync(path.join(wurzel, '.sync_123.db'), 'x');
+        fs.mkdirSync(path.join(wurzel, 'Live'));
+        fs.writeFileSync(path.join(wurzel, 'Live', 'Baschi.FLAC'), Buffer.alloc(3));
+        const liste = await sammlungListe(wurzel);
+        assert.deepEqual(liste.map(t => [t.pfad, t.groesse]), [['Live/Baschi.FLAC', 3], ['Span - Louenesee.mp3', 10]]);
+        assert.ok(liste.every(t => Number.isInteger(t.geaendert)));
+    } finally {
+        fs.rmSync(wurzel, { recursive: true, force: true });
     }
 });

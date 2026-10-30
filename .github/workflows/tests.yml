@@ -14,6 +14,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  musik-python:
+    # spotDL-Dienst (docker/musik-dl) und Spiegel des Laptops
+    # (roterschopf-kiosk/bin/kiosk-abgleich) - ohne Netz, nur Python.
+    name: Musik (spotDL-Dienst, Laptop-Spiegel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: musik-dl
+        run: python -m unittest discover -s docker/musik-dl/test -v
+      - name: kiosk-abgleich
+        run: python -m unittest discover -s roterschopf-kiosk/test -v
+
   backend-events:
     name: Backend Events
     runs-on: ubuntu-latest

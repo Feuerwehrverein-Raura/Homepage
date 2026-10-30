@@ -76,6 +76,15 @@ class MusikAblage extends ChangeNotifier {
   final MusikZugang zugang;
   final http.Client _http;
 
+  /// Kommt so lange kein Byte, gilt die Verbindung als eingeschlafen.
+  Duration stillstand = const Duration(seconds: 30);
+
+  /// So oft wird ein Titel nach einem Stillstand neu versucht.
+  static const versucheJeTitel = 3;
+
+  /// Pause vor dem neuen Versuch (in Tests null).
+  Duration nochmalsNach = const Duration(seconds: 5);
+
   Directory? _ort;
   final _sammlungen = <GespeicherteSammlung>[];
 
@@ -420,14 +429,25 @@ class MusikAblage extends ChangeNotifier {
     _laeuft = true;
     _fehler = null;
     notifyListeners();
+    var versuch = 0;
     try {
       while (true) {
         final pfad = _naechsterFehlender();
         if (pfad == null) break;
+        if (_holt != pfad) versuch = 0;
         _holt = pfad;
         notifyListeners();
         try {
           await _einenLaden(pfad);
+        } on TimeoutException catch (_) {
+          // Verbindung eingeschlafen (kommt nach einem Netzwechsel vor): mit
+          // frischer Verbindung nochmals, nach dem dritten Mal aufhoeren.
+          if (++versuch < versucheJeTitel) {
+            await Future<void>.delayed(nochmalsNach);
+            continue;
+          }
+          _fehler = 'Die Verbindung steht still – später nochmals abgleichen.';
+          break;
         } on _TitelFehlt catch (e) {
           // Nur dieser Titel: weiter mit dem naechsten.
           _gescheitert.add(pfad);
@@ -463,7 +483,7 @@ class MusikAblage extends ChangeNotifier {
   Future<void> _einenLaden(String pfad) async {
     final ort = _ort!;
     final adresse = (await zugang.hoerAdressen([pfad])).single;
-    final antwort = await _http.send(http.Request('GET', adresse));
+    final antwort = await _http.send(http.Request('GET', adresse)).timeout(stillstand);
     if (antwort.statusCode != 200) {
       await antwort.stream.drain<void>();
       throw _TitelFehlt('„${pfad.split('/').last}“ liess sich nicht laden.');
@@ -478,7 +498,8 @@ class MusikAblage extends ChangeNotifier {
     _holtGesamt = antwort.contentLength;
     var gemeldet = 0;
     try {
-      await for (final stueck in antwort.stream) {
+      // Kommt eine Weile nichts mehr, nicht ewig warten.
+      await for (final stueck in antwort.stream.timeout(stillstand)) {
         aus.add(stueck);
         _holtBytes += stueck.length;
         if (_holtBytes - gemeldet >= 64 * 1024) {

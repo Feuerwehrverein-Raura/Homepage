@@ -23,7 +23,7 @@
 import 'dart:async';
 
 import 'package:fwv_core/fwv_core.dart';
-import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen;
+import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen, hatRoterSchopfZugang;
 import 'package:fwv_vorstand/fwv_vorstand.dart' show istVorstand;
 import 'package:material_ui/material_ui.dart';
 
@@ -220,7 +220,11 @@ class _HauptseiteState extends State<Hauptseite> {
     Reiter.lager => LagerTab(dienste: widget.dienste),
     Reiter.roterSchopf => RoterSchopfTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
-    Reiter.musik => MusikScreen(zugang: widget.dienste.musik, player: widget.dienste.musikPlayer),
+    Reiter.musik => MusikScreen(
+        zugang: widget.dienste.musik,
+        player: widget.dienste.musikPlayer,
+        ergaenzen: hatRoterSchopfZugang(widget.dienste.sitzung.sitzung),
+      ),
     Reiter.gruppen => GruppenScreen(zugang: GruppenZugang(widget.dienste.sitzung.api)),
     Reiter.einstellungen => EinstellungenTab(
       dienste: widget.dienste,

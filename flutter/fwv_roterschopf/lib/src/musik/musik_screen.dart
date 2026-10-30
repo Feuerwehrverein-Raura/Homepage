@@ -21,6 +21,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
 import 'ablage.dart';
+import 'ergaenzen.dart';
 import 'modelle.dart';
 import 'laptop.dart';
 import 'offline.dart';
@@ -35,6 +36,7 @@ class MusikScreen extends StatefulWidget {
     this.player,
     this.wiedergabe,
     this.laptopSteuern = false,
+    this.ergaenzen = false,
     this.senderAdresse,
     this.aktionen = const [],
     this.ablage,
@@ -60,6 +62,10 @@ class MusikScreen extends StatefulWidget {
   /// Reiter "Im Schopf": den Laptop fernbedienen (Gruppe Roter Schopf,
   /// Vorstand, admin).
   final bool laptopSteuern;
+
+  /// Reiter "Ergänzen": Songs per YouTube-Suche oder Link in die Sammlung
+  /// holen (Gruppe Roter Schopf, Vorstand, admin).
+  final bool ergaenzen;
 
   /// Knoepfe rechts in der Titelleiste (Desktop-App: Abmelden).
   final List<Widget> aktionen;
@@ -104,7 +110,11 @@ class _MusikScreenState extends State<MusikScreen> {
       child: Focus(
         autofocus: true,
         child: DefaultTabController(
-          length: 2 + (ablage != null ? 2 : 0) + (widget.laptopSteuern ? 1 : 0),
+          length:
+              2 +
+              (ablage != null ? 2 : 0) +
+              (widget.ergaenzen ? 1 : 0) +
+              (widget.laptopSteuern ? 1 : 0),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Musik'),
@@ -122,6 +132,7 @@ class _MusikScreenState extends State<MusikScreen> {
                   const Tab(text: 'Playlists'),
                   if (ablage != null) const Tab(text: 'Interpreten'),
                   const Tab(text: 'Radiosender'),
+                  if (widget.ergaenzen) const Tab(text: 'Ergänzen'),
                   if (ablage != null) const Tab(text: 'Gespeichert'),
                   if (widget.laptopSteuern) const Tab(text: 'Im Schopf'),
                 ],
@@ -133,6 +144,7 @@ class _MusikScreenState extends State<MusikScreen> {
                 if (ablage != null)
                   InterpretenSeite(zugang: zugang, player: _player, ablage: ablage),
                 _SenderSeite(zugang: zugang, player: _player),
+                if (widget.ergaenzen) ErgaenzenSeite(zugang: zugang),
                 if (ablage != null) GespeichertSeite(player: _player, ablage: ablage),
                 if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
               ],

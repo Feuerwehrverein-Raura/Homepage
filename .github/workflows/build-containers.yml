@@ -87,6 +87,7 @@ jobs:
       inventory-frontend: ${{ steps.filter.outputs.inventory-frontend }}
       einkauf-frontend: ${{ steps.filter.outputs.einkauf-frontend }}
       spam-manager: ${{ steps.filter.outputs.spam-manager }}
+      musik-dl: ${{ steps.filter.outputs.musik-dl }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -125,6 +126,8 @@ jobs:
               - 'simple-inventory-system/shopping-pwa/**'
             spam-manager:
               - 'docker/spam-manager/**'
+            musik-dl:
+              - 'docker/musik-dl/**'
 
   build-backend-events:
     needs: [release, detect-changes]
@@ -609,3 +612,31 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:${{ github.sha }}
+
+  build-musik-dl:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.musik-dl == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/musik-dl
+          push: true
+          no-cache: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-musik-dl:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-musik-dl:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-musik-dl:${{ github.sha }}

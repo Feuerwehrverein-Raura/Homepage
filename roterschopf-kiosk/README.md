@@ -39,7 +39,7 @@ Server steht.
   Vaultwarden.
 - **Die VNC-Passwortdateien** `/etc/x11vnc-schauen.pass` und
   `/etc/x11vnc-steuern.pass`.
-- **Die Musik** unter `/Musik` (1153 Titel, 3.7 GB).
+- **Die Musik** unter `/Musik` - gespiegelt aus dem Nextcloud-Ordner "Musik" (kiosk-abgleich).
 
 ## Wie es zusammenhaengt
 
@@ -50,6 +50,13 @@ weiter.
 
 Der **Abgleich** (`kiosk-abgleich`, Timer alle fuenf Minuten) holt vom
 Vereinsserver, was sich dort aendert: Playlists, Radiosender, Arbeitsplan.
+Seit 30.10.2026 spiegelt er auch die **Musik**: Der Nextcloud-Ordner
+"Musik" (Gruppenordner 9) ist die Hauptablage, `/Musik` die Kopie, von der
+MPD spielt - auch ohne Internet. Neues und Geaendertes wird geholt (erst
+als versteckte `.teil`-Datei), Weggefallenes entfernt. Bremsen: hoechstens
+4 Minuten Laden je Lauf; geloescht wird nichts, wenn der Server weniger
+als 90 % der hiesigen Titel meldet, und nie mehr als 10 % auf einmal.
+Tests: `python3 -m unittest discover -s roterschopf-kiosk/test`.
 Und er meldet dorthin, welche Titel der Laptop hat — sonst wuesste der
 Mitgliederbereich nicht, woraus man Playlists bauen kann. Die Richtung ist
 Absicht: Der Laptop holt, der Server schiebt nicht. So braucht der Laptop

@@ -236,3 +236,80 @@ class LaptopZustand {
   final List<String> playlists;
   final List<Radiosender> sender;
 }
+
+/// Ein Treffer der YouTube-Suche beim Songs ergaenzen (musik-dl).
+class YoutubeTreffer {
+  const YoutubeTreffer({
+    required this.url,
+    required this.titel,
+    this.kanal,
+    this.dauer,
+    this.bild,
+    this.offiziell = false,
+  });
+
+  factory YoutubeTreffer.ausJson(Map<String, dynamic> j) => YoutubeTreffer(
+    url: '${j['url']}',
+    titel: '${j['titel'] ?? ''}',
+    kanal: _text(j['kanal']),
+    dauer: j['dauer'] is num ? Duration(seconds: (j['dauer'] as num).round()) : null,
+    bild: _logo(j['bild']),
+    offiziell: j['offiziell'] == true,
+  );
+
+  final String url;
+  final String titel;
+  final String? kanal;
+  final Duration? dauer;
+  final Uri? bild;
+
+  /// Kanal `<Interpret> - Topic`: die offizielle Tonspur.
+  final bool offiziell;
+}
+
+enum AuftragsStand { wartet, laedt, fertig, fehler }
+
+/// Ein Auftrag "Song ergaenzen": Link oder Suchbegriff, den spotDL auf dem
+/// Server laedt und in den Nextcloud-Ordner Musik legt.
+class ErgaenzenAuftrag {
+  const ErgaenzenAuftrag({
+    required this.id,
+    required this.quelle,
+    required this.stand,
+    this.wer,
+    this.meldung,
+    this.dateien = const [],
+    this.neu = 0,
+    this.schonDa = 0,
+  });
+
+  factory ErgaenzenAuftrag.ausJson(Map<String, dynamic> j) => ErgaenzenAuftrag(
+    id: '${j['id']}',
+    quelle: '${j['quelle']}',
+    stand: AuftragsStand.values.firstWhere(
+      (s) => s.name == j['stand'],
+      orElse: () => AuftragsStand.fehler,
+    ),
+    wer: _text(j['wer']),
+    meldung: _text(j['meldung']),
+    dateien: [
+      for (final d in (j['dateien'] as List? ?? const []))
+        if (_text(d) != null) _text(d)!,
+    ],
+    neu: (j['neu'] as num?)?.toInt() ?? 0,
+    schonDa: (j['schon_da'] as num?)?.toInt() ?? 0,
+  );
+
+  final String id;
+  final String quelle;
+  final AuftragsStand stand;
+  final String? wer;
+  final String? meldung;
+
+  /// Dateinamen in der Sammlung, z.B. "Span - Louenesee.mp3".
+  final List<String> dateien;
+  final int neu;
+  final int schonDa;
+
+  bool get laeuft => stand == AuftragsStand.wartet || stand == AuftragsStand.laedt;
+}
