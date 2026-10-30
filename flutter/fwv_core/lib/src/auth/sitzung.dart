@@ -3,6 +3,8 @@
 // Die Schluessel heissen wie in der alten Android-App (TokenManager.kt), damit
 // man beim Vergleichen und bei der Uebernahme nicht umdenken muss.
 
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'jwt.dart';
@@ -146,6 +148,63 @@ class SichererSpeicher implements GeheimSpeicher {
 
   @override
   Future<void> loeschen(String schluessel) => _speicher.delete(key: schluessel);
+}
+
+/// Alle Werte in EINEM Eintrag des [innen]-Speichers (als JSON) - fuer das
+/// Mac-Programm. Unser Zertifikat hat keine Apple-Team-ID; macOS bindet
+/// jeden Schluesselbund-Eintrag darum an den Pruefwert (cdhash) genau einer
+/// Programmversion und fragt nach jedem Update fuer jeden Eintrag einzeln
+/// nach dem Passwort. Mit einem Eintrag nur noch einmal.
+///
+/// Die frueheren Einzel-Eintraege werden nicht uebernommen: Sie zu lesen,
+/// kostete ein letztes Mal eine Abfrage je Eintrag - einmal neu anmelden
+/// ist einfacher.
+class GebuendelterSpeicher implements GeheimSpeicher {
+  GebuendelterSpeicher(this.innen, {this.schluessel = 'fwv_daten'});
+
+  final GeheimSpeicher innen;
+
+  /// Name des einen Eintrags.
+  final String schluessel;
+
+  Map<String, String>? _werte;
+
+  Future<Map<String, String>> _laden() async {
+    final da = _werte;
+    if (da != null) return da;
+    final roh = await innen.lesen(schluessel);
+    var werte = <String, String>{};
+    if (roh != null && roh.isNotEmpty) {
+      try {
+        final j = jsonDecode(roh);
+        if (j is Map) werte = {for (final e in j.entries) '${e.key}': '${e.value}'};
+      } on FormatException {
+        // Kaputt: wie abgemeldet.
+      }
+    }
+    return _werte = werte;
+  }
+
+  Future<void> _sichern(Map<String, String> werte) =>
+      werte.isEmpty ? innen.loeschen(schluessel) : innen.schreiben(schluessel, jsonEncode(werte));
+
+  @override
+  Future<String?> lesen(String schluessel) async => (await _laden())[schluessel];
+
+  @override
+  Future<void> schreiben(String schluessel, String wert) async {
+    final werte = await _laden();
+    if (werte[schluessel] == wert) return;
+    werte[schluessel] = wert;
+    await _sichern(werte);
+  }
+
+  @override
+  Future<void> loeschen(String schluessel) async {
+    final werte = await _laden();
+    if (werte.remove(schluessel) == null) return;
+    await _sichern(werte);
+  }
 }
 
 /// Fuer Tests und Vorschauen: vergisst alles beim Beenden.

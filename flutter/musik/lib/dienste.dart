@@ -36,8 +36,12 @@ class Dienste {
         // Passwort.
         // Test-Builds eigener Bereich: Sie sind anders signiert, und macOS
         // fragte sonst bei jedem Eintrag der echten App nach dem Passwort.
+        // Auf dem Mac alles in einem Eintrag: Nach einem Update fragt macOS
+        // dann nur einmal nach dem Passwort (GebuendelterSpeicher).
         speicher: SitzungsSpeicher(
-          SichererSpeicher(null, kDebugMode ? 'ch.fwvraura.musik.test' : 'ch.fwvraura.musik'),
+          _macEinEintrag(
+            SichererSpeicher(null, kDebugMode ? 'ch.fwvraura.musik.test' : 'ch.fwvraura.musik'),
+          ),
         ),
         http: http.Client(),
       ),
@@ -108,3 +112,5 @@ class Dienste {
     await sitzung.abmelden();
   }
 }
+
+GeheimSpeicher _macEinEintrag(GeheimSpeicher s) => Platform.isMacOS ? GebuendelterSpeicher(s) : s;

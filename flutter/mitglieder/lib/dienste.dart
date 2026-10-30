@@ -113,7 +113,13 @@ class Dienste {
   factory Dienste.echt() {
     // Eigener Bereich im macOS-Schluesselbund (siehe SichererSpeicher) -
     // betrifft nur das Mac-Programm; Android, iOS, Windows, Linux bleiben.
-    final geheim = kIsWeb ? browserSpeicher() : SichererSpeicher(null, 'ch.fwvraura.members');
+    // Auf dem Mac zudem alles in einem Eintrag: Nach einem Update fragt
+    // macOS dann nur einmal nach dem Passwort (GebuendelterSpeicher).
+    final geheim = kIsWeb
+        ? browserSpeicher()
+        : defaultTargetPlatform == TargetPlatform.macOS
+        ? GebuendelterSpeicher(SichererSpeicher(null, 'ch.fwvraura.members'))
+        : SichererSpeicher(null, 'ch.fwvraura.members');
     final speicher = SitzungsSpeicher(geheim);
     final push = FirebasePush();
     const kontakte = KontakteAbgleich();
