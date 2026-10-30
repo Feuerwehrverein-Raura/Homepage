@@ -30,6 +30,10 @@ abstract class MusikZugang {
   /// Adressen zum Streamen der Titel (mit Hoer-Freigabe, ohne Anmeldung).
   Future<List<Uri>> hoerAdressen(List<String> pfade);
 
+  /// Bytes, die [pfade] zusammen belegen (Speichern in der Desktop-App);
+  /// null, wenn der Server es nicht sagen kann.
+  Future<int?> platzbedarf(List<String> pfade) async => null;
+
   /// Meldet dem Server, dass ein Titel auf dem Handy nicht spielt.
   Future<void> fehlerMelden({
     String? pfad,
@@ -151,6 +155,18 @@ class ApiMusikZugang extends MusikZugang {
     return [
       for (final p in pfade) api.adresse('kiosk/hoeren', {'pfad': p, 't': _freigabe!}),
     ];
+  }
+
+  @override
+  Future<int?> platzbedarf(List<String> pfade) async {
+    try {
+      final json = await api.post('kiosk/hoeren/groesse', daten: {'pfade': pfade});
+      return json is Map ? (json['bytes'] as num?)?.toInt() : null;
+    } on ApiFehler catch (e) {
+      // Aelteres Backend ohne die Route: speichern geht trotzdem.
+      if (e.status == 404) return null;
+      rethrow;
+    }
   }
 
   @override

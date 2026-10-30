@@ -24,6 +24,14 @@ class _Zugang extends MusikZugang {
   bool offline = false;
   final freigaben = <List<String>>[];
 
+  final groessen = <List<String>>[];
+
+  @override
+  Future<int?> platzbedarf(List<String> pfade) async {
+    groessen.add(pfade);
+    return pfade.length * 4000000;
+  }
+
   ApiFehler? get _netz => offline ? const ApiFehler.keineVerbindung() : null;
 
   @override
@@ -124,7 +132,7 @@ void main() {
 
   test('Playlist speichern: laedt die vorhandenen Titel, uebersteht einen Neustart', () async {
     final a = neueAblage();
-    await a.playlistSpeichern('p1');
+    await a.playlistSpeichern(await zugang.playlist('p1'));
     await fertig(a);
 
     final s = a.sammlung(GespeicherteSammlung.playlistId('p1'))!;
@@ -146,7 +154,7 @@ void main() {
     'Interpret speichern; gemeinsamer Titel liegt einmal da und bleibt beim Entfernen',
     () async {
       final a = neueAblage();
-      await a.playlistSpeichern('p1');
+      await a.playlistSpeichern(await zugang.playlist('p1'));
       await fertig(a);
       await a.interpretSpeichern('Queen', [_queen, _queen2]);
       await fertig(a);
@@ -169,7 +177,7 @@ void main() {
   test('Kaputter Titel wird uebersprungen; ohne Netz bricht das Laden ab', () async {
     kaputt.add(_queen.pfad);
     final a = neueAblage();
-    await a.playlistSpeichern('p1');
+    await a.playlistSpeichern(await zugang.playlist('p1'));
     await fertig(a);
     final s = a.sammlungen.single;
     expect(a.vorhanden(s), 1);
@@ -188,7 +196,7 @@ void main() {
 
   test('Aktualisieren: neue Titel kommen dazu, entfernte verschwinden', () async {
     final a = neueAblage();
-    await a.playlistSpeichern('p1');
+    await a.playlistSpeichern(await zugang.playlist('p1'));
     await a.interpretSpeichern('Queen', [_queen]);
     await fertig(a);
 
@@ -206,7 +214,7 @@ void main() {
     final a = neueAblage();
     // Der erste Titel haengt, bis auch der Interpret eingetragen ist.
     sperre = Completer<void>();
-    await a.allesSpeichern();
+    await a.allesSpeichern(zugang.alle);
     await a.interpretSpeichern('Span', [_span]);
     sperre!.complete();
     sperre = null;
@@ -221,6 +229,29 @@ void main() {
     await a.aktualisieren();
     await fertig(a);
     expect(a.datei(neu.pfad), isNotNull);
+  });
+
+  test('Platzbedarf: nur was noch fehlt, freier Platz gemessen, zu wenig Platz erkannt', () async {
+    final a = neueAblage();
+    await a.interpretSpeichern('Span', [_span]);
+    await fertig(a);
+    final b = await a.platzbedarf([
+      _queen,
+      _span,
+      const MusikTitel(pfad: 'x.mp3', vorhanden: false),
+    ]);
+    expect(zugang.groessen.last, [_queen.pfad]);
+    expect(b.titel, 1);
+    expect(b.bytes, 4000000);
+    // df gibt es auf dem Testrechner (macOS, Linux).
+    expect(b.frei, greaterThan(0));
+    expect(a.frei, b.frei);
+    expect(b.reicht, isTrue);
+    expect(const Platzbedarf(titel: 9, bytes: 9000000000, frei: 10000000000).reicht, isFalse);
+    expect(const Platzbedarf(titel: 9, bytes: 9000000000).reicht, isTrue);
+    expect(groesseText(4200000), '4,2 MB');
+    expect(groesseText(800000), '800 KB');
+    expect(groesseText(6200000000), '6,2 GB');
   });
 
   test('Player: Gespeichertes von der Platte, ohne Netz nur Gespeichertes', () async {

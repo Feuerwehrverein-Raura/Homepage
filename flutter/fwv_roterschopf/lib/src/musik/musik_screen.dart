@@ -270,7 +270,11 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
                         ablage: ablage,
                         id: GespeicherteSammlung.playlistId(p.id),
                         name: p.name,
-                        speichern: () => ablage.playlistSpeichern(p.id),
+                        // Die Playlist einmal holen: Titel fuer die
+                        // Rueckfrage, dieselben werden gespeichert.
+                        titelHolen: () async => (await widget.zugang.playlist(p.id)).titel,
+                        speichern: (t) =>
+                            ablage.playlistSpeichern(Playlist(id: p.id, name: p.name, titel: t)),
                       ),
                     IconButton(
                       tooltip: 'Löschen',

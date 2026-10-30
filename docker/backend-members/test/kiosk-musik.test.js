@@ -12,7 +12,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const jwt = require('jsonwebtoken');
 const {
-    hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, HOER_DAUER_S
+    hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, dateienGroesse,
+    HOER_DAUER_S
 } = require('../src/kiosk-musik');
 
 const GEHEIM = 'test-geheimnis';
@@ -110,4 +111,20 @@ test('Fernbedienung: Laptop aus oder nicht eingerichtet', async () => {
 test('Vertragsdatei passt zum nachgebauten Laptop', () => {
     const datei = path.join(__dirname, 'fixtures', 'kiosk-musik-app.json');
     assert.deepEqual(JSON.parse(fs.readFileSync(datei, 'utf8')), { zustand: ZUSTAND });
+});
+
+test('Platzbedarf: zaehlt vorhandene Dateien, nichts ausserhalb der Sammlung', async () => {
+    const os = require('node:os');
+    const wurzel = fs.mkdtempSync(path.join(os.tmpdir(), 'kiosk-musik-'));
+    try {
+        fs.mkdirSync(path.join(wurzel, 'Queen'));
+        fs.writeFileSync(path.join(wurzel, 'Queen', 'a.mp3'), Buffer.alloc(1000));
+        fs.writeFileSync(path.join(wurzel, 'b.flac'), Buffer.alloc(234));
+        fs.writeFileSync(path.join(wurzel, '..', 'geheim.mp3'), 'x');
+        const g = await dateienGroesse(wurzel, ['Queen/a.mp3', 'b.flac', 'weg.mp3', '../geheim.mp3', 'Queen']);
+        assert.deepEqual(g, { bytes: 1234, anzahl: 5, gefunden: 2 });
+    } finally {
+        fs.rmSync(wurzel, { recursive: true, force: true });
+        fs.rmSync(path.join(wurzel, '..', 'geheim.mp3'), { force: true });
+    }
 });

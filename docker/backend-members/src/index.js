@@ -21,7 +21,7 @@ const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = 
 const { vorstandsRollen } = require('./vorstand-rolle');
 const { roterSchopf, hatRoterSchopfZugang, VORGABE: ROTER_SCHOPF_VORGABE } = require('./roter-schopf');
 const { schopfVerlauf, grenzenAus } = require('./schopf-verlauf');
-const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
+const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung, dateienGroesse } = require('./kiosk-musik');
 const { kioskZeileSaeubern, kioskKandidat, kioskAbgleichen } = require('./kiosk-abgleich');
 const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
@@ -6639,6 +6639,26 @@ app.post('/kiosk/hoeren/freigabe', authenticateToken, (req, res) => {
     } catch (error) {
         console.error('POST /kiosk/hoeren/freigabe:', error.message);
         res.status(500).json({ error: 'Freigabe nicht moeglich' });
+    }
+});
+
+// Desktop-App: wie viel Platz das Speichern braucht, bevor es losgeht. Nur
+// Titel der Sammlung, hoechstens 20000 auf einmal.
+app.post('/kiosk/hoeren/groesse', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const pfade = Array.isArray(req.body?.pfade) ? req.body.pfade.map(String) : null;
+        if (!pfade) return res.status(400).json({ error: 'pfade fehlt' });
+        if (pfade.length > 20000) return res.status(400).json({ error: 'Zu viele Titel' });
+        const bekannt = await pool.query('SELECT pfad FROM kiosk_titel WHERE pfad = ANY($1)', [pfade]);
+        const ergebnis = await dateienGroesse(
+            process.env.KIOSK_MUSIK_PFAD || '/app/musik',
+            bekannt.rows.map(r => r.pfad)
+        );
+        res.json({ ...ergebnis, anzahl: pfade.length });
+    } catch (error) {
+        console.error('POST /kiosk/hoeren/groesse:', error.message);
+        res.status(500).json({ error: 'Groesse konnte nicht bestimmt werden' });
     }
 });
 

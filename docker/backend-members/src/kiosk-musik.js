@@ -101,6 +101,31 @@ function kioskFernbedienung({
     };
 }
 
+// Wie viel Platz die Titel [pfade] brauchen - damit die Desktop-App vor dem
+// Speichern sagen kann, was auf den Computer kommt. Nur Pfade innerhalb von
+// [wurzel]; was fehlt oder ausserhalb liegt, zaehlt nicht.
+async function dateienGroesse(wurzel, pfade) {
+    const path = require('path');
+    const fs = require('fs/promises');
+    const basis = path.resolve(wurzel) + path.sep;
+    let bytes = 0;
+    let gefunden = 0;
+    for (const pfad of pfade) {
+        const ziel = path.resolve(wurzel, String(pfad));
+        if (!ziel.startsWith(basis)) continue;
+        try {
+            const info = await fs.stat(ziel);
+            if (!info.isFile()) continue;
+            bytes += info.size;
+            gefunden++;
+        } catch {
+            // Datei weg: zaehlt nicht.
+        }
+    }
+    return { bytes, anzahl: pfade.length, gefunden };
+}
+
 module.exports = {
-    hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, AKTIONEN, HOER_DAUER_S
+    hoerFreigabe, hoerFreigabeGueltig, befehlPruefen, kioskFernbedienung, dateienGroesse,
+    AKTIONEN, HOER_DAUER_S
 };

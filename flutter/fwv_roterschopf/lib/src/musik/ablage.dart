@@ -97,6 +97,31 @@ class MusikAblage extends ChangeNotifier {
   /// Pfad des Titels, der gerade geladen wird.
   String? get holt => _holt;
 
+  /// Der Titel, der gerade geladen wird (fuer die Anzeige).
+  MusikTitel? get holtTitel {
+    for (final s in _sammlungen) {
+      for (final t in s.titel) {
+        if (t.pfad == _holt) return t;
+      }
+    }
+    return null;
+  }
+
+  /// Wie weit der aktuelle Titel ist; [holtGesamt] null, wenn der Server
+  /// die Groesse nicht mitschickt. Bei langsamer Leitung dauert ein Titel
+  /// Minuten - ohne das saehe es aus, als passiere nichts.
+  int get holtBytes => _holtBytes;
+  int? get holtGesamt => _holtGesamt;
+  int _holtBytes = 0;
+  int? _holtGesamt;
+
+  /// Titel, die noch fehlen (alle Sammlungen, jeder Titel einmal).
+  int get offen => {
+    for (final s in _sammlungen)
+      for (final t in s.titel)
+        if (!_dateien.containsKey(t.pfad)) t.pfad,
+  }.length;
+
   /// Letzter Grund, warum das Laden abbrach (meist: kein Netz).
   String? get fehler => _fehler;
 
@@ -152,6 +177,7 @@ class MusikAblage extends ChangeNotifier {
     _dateien.removeWhere(
       (_, d) => !File('${ort.path}${Platform.pathSeparator}${d.$1}').existsSync(),
     );
+    _frei = await _freierPlatz();
     notifyListeners();
   }
 
@@ -177,9 +203,9 @@ class MusikAblage extends ChangeNotifier {
   }
 
   /// Playlist holen und speichern (oder auf Stand bringen).
-  Future<void> playlistSpeichern(String id) async {
+  /// Playlist speichern (oder auf Stand bringen); [p] vom Server geholt.
+  Future<void> playlistSpeichern(Playlist p) async {
     await laden();
-    final p = await zugang.playlist(id);
     await _merken(
       GespeicherteSammlung(
         id: GespeicherteSammlung.playlistId(p.id),
@@ -211,7 +237,7 @@ class MusikAblage extends ChangeNotifier {
 
   /// Die ganze Sammlung speichern - zuletzt geladen, nach Playlists und
   /// Interpreten.
-  Future<void> allesSpeichern() async {
+  Future<void> allesSpeichern(List<MusikTitel> alle) async {
     await laden();
     await _merken(
       GespeicherteSammlung(
@@ -219,11 +245,55 @@ class MusikAblage extends ChangeNotifier {
         name: 'Alle Titel',
         interpret: false,
         titel: [
-          for (final t in await zugang.alleTitel())
+          for (final t in alle)
             if (t.vorhanden) t,
         ],
       ),
     );
+  }
+
+  /// Was das Speichern von [titel] braucht: nur Titel, die noch nicht da
+  /// sind. Bytes und freier Platz null, wenn sie sich nicht bestimmen
+  /// lassen (aelteres Backend, kein df).
+  Future<Platzbedarf> platzbedarf(List<MusikTitel> titel) async {
+    await laden();
+    final neu = {
+      for (final t in titel)
+        if (t.vorhanden && !_dateien.containsKey(t.pfad)) t.pfad,
+    }.toList();
+    final bytes = neu.isEmpty ? 0 : await zugang.platzbedarf(neu);
+    _frei = await _freierPlatz();
+    notifyListeners();
+    return Platzbedarf(titel: neu.length, bytes: bytes, frei: _frei);
+  }
+
+  int? _frei;
+
+  /// Freier Platz auf der Platte der Ablage (zuletzt gemessen), null wenn
+  /// unbekannt.
+  int? get frei => _frei;
+
+  Future<int?> _freierPlatz() async {
+    final ort = _ort;
+    if (ort == null) return null;
+    try {
+      if (Platform.isWindows) {
+        final r = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          "(Get-Item -LiteralPath '${ort.path.replaceAll("'", "''")}').PSDrive.Free",
+        ]);
+        return int.tryParse('${r.stdout}'.trim());
+      }
+      // df -P: eine Zeile pro Laufwerk, 4. Spalte = frei in KB.
+      final r = await Process.run('df', ['-Pk', ort.path]);
+      final zeilen = '${r.stdout}'.trim().split('\n');
+      final spalten = zeilen.last.trim().split(RegExp(r'\s+'));
+      final kb = spalten.length > 3 ? int.tryParse(spalten[3]) : null;
+      return kb == null ? null : kb * 1024;
+    } on Object {
+      return null;
+    }
   }
 
   Future<void> _merken(GespeicherteSammlung s) async {
@@ -339,6 +409,7 @@ class MusikAblage extends ChangeNotifier {
       }
     }
     await _schreiben();
+    _frei = await _freierPlatz();
     notifyListeners();
   }
 
@@ -371,6 +442,7 @@ class MusikAblage extends ChangeNotifier {
         }
       }
     } finally {
+      _frei = await _freierPlatz();
       _laeuft = false;
       _holt = null;
       _inArbeit = null;
@@ -402,9 +474,21 @@ class MusikAblage extends ChangeNotifier {
     _inArbeit = name;
     final teil = File('${ort.path}${Platform.pathSeparator}$name.teil');
     final aus = teil.openWrite();
+    _holtBytes = 0;
+    _holtGesamt = antwort.contentLength;
+    var gemeldet = 0;
     try {
-      await antwort.stream.pipe(aus);
+      await for (final stueck in antwort.stream) {
+        aus.add(stueck);
+        _holtBytes += stueck.length;
+        if (_holtBytes - gemeldet >= 64 * 1024) {
+          gemeldet = _holtBytes;
+          notifyListeners();
+        }
+      }
+      await aus.close();
     } on Object {
+      await aus.close().catchError((Object _) {});
       if (await teil.exists()) await teil.delete();
       rethrow;
     }
@@ -425,16 +509,32 @@ class MusikAblage extends ChangeNotifier {
   }
 }
 
+class Platzbedarf {
+  const Platzbedarf({required this.titel, this.bytes, this.frei});
+
+  /// Titel, die neu auf den Computer kommen.
+  final int titel;
+  final int? bytes;
+  final int? frei;
+
+  /// Etwas Luft lassen: Ein ganz voller Computer laeuft nicht mehr rund.
+  static const reserve = 2 * 1000 * 1000 * 1000;
+
+  /// false nur, wenn sicher zu wenig Platz ist.
+  bool get reicht => bytes == null || frei == null || bytes! + reserve <= frei!;
+}
+
 class _TitelFehlt implements Exception {
   const _TitelFehlt(this.meldung);
 
   final String meldung;
 }
 
-/// "1,2 GB", "350 MB".
+/// "1,2 GB", "350 MB", "4,2 MB", "800 KB".
 String groesseText(int bytes) {
-  if (bytes >= 1000 * 1000 * 1000) {
-    return '${(bytes / 1e9).toStringAsFixed(1).replaceAll('.', ',')} GB';
-  }
-  return '${(bytes / 1e6).round()} MB';
+  String komma(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+  if (bytes >= 1e9) return '${komma(bytes / 1e9)} GB';
+  if (bytes >= 1e7) return '${(bytes / 1e6).round()} MB';
+  if (bytes >= 1e6) return '${komma(bytes / 1e6)} MB';
+  return '${(bytes / 1e3).round()} KB';
 }

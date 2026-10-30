@@ -13,61 +13,118 @@ import 'player.dart';
 import 'zugang.dart';
 
 /// Speichern, Fortschritt, Entfernen - neben einer Playlist oder einem
-/// Interpreten. [speichern] holt die Titel und legt sie in die Ablage.
-class SpeichernKnopf extends StatelessWidget {
+/// Interpreten. Vor dem Speichern sagt eine Rueckfrage, wie viel Platz es
+/// braucht und wie viel frei ist; reicht es nicht, geht es nicht los.
+class SpeichernKnopf extends StatefulWidget {
   const SpeichernKnopf({
     super.key,
     required this.ablage,
     required this.id,
     required this.name,
+    required this.titelHolen,
     required this.speichern,
-    this.rueckfrage,
+    this.hinweis,
   });
 
   final MusikAblage ablage;
 
-  /// Vorher nachfragen, mit diesem Text (die ganze Sammlung braucht Platz).
-  final String? rueckfrage;
-
-  /// Id der Sammlung (GespeicherteSammlung.playlistId/interpretId).
+  /// Id der Sammlung (GespeicherteSammlung.playlistId/interpretId/alleId).
   final String id;
   final String name;
-  final Future<void> Function() speichern;
+
+  /// Die Titel, die gespeichert wuerden (vom Server).
+  final Future<List<MusikTitel>> Function() titelHolen;
+  final Future<void> Function(List<MusikTitel> titel) speichern;
+
+  /// Zusatz in der Rueckfrage.
+  final String? hinweis;
+
+  @override
+  State<SpeichernKnopf> createState() => _SpeichernKnopfState();
+}
+
+class _SpeichernKnopfState extends State<SpeichernKnopf> {
+  bool _bereitet = false;
+
+  Future<void> _speichern() async {
+    setState(() => _bereitet = true);
+    try {
+      final titel = await widget.titelHolen();
+      final bedarf = await widget.ablage.platzbedarf(titel);
+      if (!mounted) return;
+      setState(() => _bereitet = false);
+      final bytes = bedarf.bytes;
+      final frei = bedarf.frei;
+      final umfang = [
+        bedarf.titel == 1 ? '1 Titel' : '${bedarf.titel} Titel',
+        if (bytes != null) groesseText(bytes),
+      ].join(' · ');
+      final platz = frei == null
+          ? 'Wie viel auf diesem Computer frei ist, lässt sich nicht feststellen.'
+          : 'Frei auf diesem Computer: ${groesseText(frei)}.';
+      if (!bedarf.reicht) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Zu wenig Platz'),
+            content: Text(
+              '„${widget.name}“ braucht $umfang. $platz Es sollen mindestens '
+              '${groesseText(Platzbedarf.reserve)} frei bleiben.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            ],
+          ),
+        );
+        return;
+      }
+      final ja = await nachfragen(
+        context,
+        titel: '„${widget.name}“ speichern?',
+        text: [
+          bedarf.titel == 0 ? 'Alle Titel sind schon auf diesem Computer.' : 'Braucht $umfang.',
+          platz,
+          ?widget.hinweis,
+        ].join('\n\n'),
+        ja: 'Speichern',
+      );
+      if (!ja) return;
+      await widget.speichern(titel);
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted && _bereitet) setState(() => _bereitet = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final ablage = widget.ablage;
     return ListenableBuilder(
       listenable: ablage,
       builder: (context, _) {
-        final s = ablage.sammlung(id);
+        final s = ablage.sammlung(widget.id);
         if (s == null) {
+          if (_bereitet) {
+            return const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            );
+          }
           return IconButton(
-            key: Key('speichern-$id'),
+            key: Key('speichern-${widget.id}'),
             tooltip: 'Auf diesem Computer speichern',
             icon: const Icon(Icons.download_for_offline_outlined),
-            onPressed: () async {
-              if (rueckfrage case final text?) {
-                final ja = await nachfragen(
-                  context,
-                  titel: '„$name“ speichern?',
-                  text: text,
-                  ja: 'Speichern',
-                );
-                if (!ja) return;
-              }
-              try {
-                await speichern();
-                if (context.mounted) meldung(context, '„$name“ wird gespeichert');
-              } on Object catch (e) {
-                if (context.mounted) meldung(context, fehlerText(e));
-              }
-            },
+            onPressed: _speichern,
           );
         }
         final da = ablage.vorhanden(s);
         final fertig = da >= s.titel.length;
         return IconButton(
-          key: Key('gespeichert-$id'),
+          key: Key('gespeichert-${widget.id}'),
           tooltip: fertig
               ? 'Gespeichert – vom Computer entfernen'
               : '$da von ${s.titel.length} Titeln geladen – vom Computer entfernen',
@@ -77,7 +134,8 @@ class SpeichernKnopf extends StatelessWidget {
                   dimension: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    value: s.titel.isEmpty ? null : da / s.titel.length,
+                    // Noch kein Titel fertig: drehen, damit man sieht, dass es laeuft.
+                    value: da == 0 ? null : da / s.titel.length,
                   ),
                 ),
           onPressed: () => entfernenNachfragen(context, ablage, s),
@@ -87,14 +145,13 @@ class SpeichernKnopf extends StatelessWidget {
   }
 }
 
-/// Knopf "die ganze Sammlung speichern" - mit Rueckfrage.
+/// Knopf "die ganze Sammlung speichern".
 Widget alleSpeichernKnopf(MusikAblage ablage) => SpeichernKnopf(
   ablage: ablage,
   id: GespeicherteSammlung.alleId,
   name: 'Alle Titel',
-  rueckfrage:
-      'Jeder Titel der Sammlung kommt auf diesen Computer. Das braucht viel Platz '
-      'und dauert eine Weile; Playlists und Interpreten werden zuerst geladen.',
+  hinweis: 'Das dauert eine Weile; Playlists und Interpreten werden zuerst geladen.',
+  titelHolen: ablage.zugang.alleTitel,
   speichern: ablage.allesSpeichern,
 );
 
@@ -203,7 +260,8 @@ class _InterpretenSeiteState extends State<InterpretenSeite> {
                       ablage: widget.ablage,
                       id: GespeicherteSammlung.interpretId(name),
                       name: name,
-                      speichern: () => widget.ablage.interpretSpeichern(name, titel),
+                      titelHolen: () async => titel,
+                      speichern: (t) => widget.ablage.interpretSpeichern(name, t),
                     ),
                   ],
                 ),
@@ -245,7 +303,8 @@ class _InterpretSeite extends StatelessWidget {
             ablage: ablage,
             id: GespeicherteSammlung.interpretId(name),
             name: name,
-            speichern: () => ablage.interpretSpeichern(name, titel),
+            titelHolen: () async => titel,
+            speichern: (t) => ablage.interpretSpeichern(name, t),
           ),
         ],
       ),
@@ -306,10 +365,11 @@ class GespeichertSeite extends StatelessWidget {
               ),
               subtitle: Text(
                 ablage.laedtHerunter
-                    ? 'Lädt … · ${groesseText(ablage.belegt)} auf diesem Computer'
+                    ? _laedtText()
                     : [
                         '${groesseText(ablage.belegt)} auf diesem Computer',
                         ?ablage.fehler,
+                        if (ablage.frei case final f?) '${groesseText(f)} frei',
                       ].join(' · '),
               ),
               trailing: ablage.laedtHerunter
@@ -374,6 +434,22 @@ class GespeichertSeite extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// "Lädt „Queen – Bohemian Rhapsody“ · 1,8 von 4,2 MB · noch 1150 Titel"
+  String _laedtText() {
+    final t = ablage.holtTitel;
+    final gesamt = ablage.holtGesamt;
+    return [
+      t == null ? 'Lädt …' : 'Lädt „${t.anzeige}“',
+      if (t != null)
+        gesamt == null
+            ? groesseText(ablage.holtBytes)
+            : '${groesseText(ablage.holtBytes)} von ${groesseText(gesamt)}',
+      'noch ${ablage.offen} Titel',
+      '${groesseText(ablage.belegt)} auf diesem Computer',
+      if (ablage.frei case final f?) '${groesseText(f)} frei',
+    ].join(' · ');
   }
 
   String _stand(GespeicherteSammlung s) {

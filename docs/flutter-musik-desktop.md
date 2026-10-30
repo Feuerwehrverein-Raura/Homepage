@@ -35,6 +35,12 @@ die Mitglieder-App zeigt davon nichts.
 - **Alles speichern** (bei «Alle Titel» und im Reiter «Gespeichert»,
   mit Rückfrage): die ganze Sammlung. Sie wird zuletzt geladen, Playlists
   und Interpreten kommen zuerst.
+- **Vor dem Speichern** fragt die App nach: Anzahl Titel, Platzbedarf
+  (`POST /kiosk/hoeren/groesse`, zählt die Dateien auf dem Server) und
+  freier Platz auf dem Computer (`df -Pk`, Windows PowerShell). Bleiben
+  weniger als 2 GB frei, geht es nicht los. «Gespeichert» zeigt laufend
+  Titel, MB des aktuellen Titels, wie viele noch fehlen und den freien
+  Platz.
 - Der Player spielt Gespeichertes von der Platte; ohne Netz nur das
   Gespeicherte.
 - **Abmelden löscht alles Gespeicherte** (Musik nur für Mitglieder).
