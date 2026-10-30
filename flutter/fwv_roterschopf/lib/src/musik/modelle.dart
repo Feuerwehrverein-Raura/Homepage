@@ -27,6 +27,9 @@ class MusikTitel {
     vorhanden: j['vorhanden'] != false,
   );
 
+  /// Fuer die Ablage auf dem Computer (ablage.dart) - wie [MusikTitel.ausJson].
+  Map<String, Object?> zuJson() => {'pfad': pfad, 'interpret': interpret, 'titel': titel};
+
   final String pfad;
   final String? interpret;
   final String? titel;

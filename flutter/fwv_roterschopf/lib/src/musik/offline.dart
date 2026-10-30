@@ -1,0 +1,358 @@
+// Musik auf dem Computer speichern (Desktop-App FWV Musik): Knopf neben
+// Playlists und Interpreten, Reiter "Interpreten" und "Gespeichert". Nur da,
+// wenn der MusikScreen eine MusikAblage bekommt - die Mitglieder-App zeigt
+// davon nichts. Die Ablage selbst steht in ablage.dart.
+
+import 'package:fwv_anlass/fwv_anlass.dart'
+    show LadeAnsicht, fehlerText, meldung, mitSystemleiste, nachfragen;
+import 'package:material_ui/material_ui.dart';
+
+import 'ablage.dart';
+import 'modelle.dart';
+import 'player.dart';
+import 'zugang.dart';
+
+/// Speichern, Fortschritt, Entfernen - neben einer Playlist oder einem
+/// Interpreten. [speichern] holt die Titel und legt sie in die Ablage.
+class SpeichernKnopf extends StatelessWidget {
+  const SpeichernKnopf({
+    super.key,
+    required this.ablage,
+    required this.id,
+    required this.name,
+    required this.speichern,
+  });
+
+  final MusikAblage ablage;
+
+  /// Id der Sammlung (GespeicherteSammlung.playlistId/interpretId).
+  final String id;
+  final String name;
+  final Future<void> Function() speichern;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ablage,
+      builder: (context, _) {
+        final s = ablage.sammlung(id);
+        if (s == null) {
+          return IconButton(
+            key: Key('speichern-$id'),
+            tooltip: 'Auf diesem Computer speichern',
+            icon: const Icon(Icons.download_for_offline_outlined),
+            onPressed: () async {
+              try {
+                await speichern();
+                if (context.mounted) meldung(context, '„$name“ wird gespeichert');
+              } on Object catch (e) {
+                if (context.mounted) meldung(context, fehlerText(e));
+              }
+            },
+          );
+        }
+        final da = ablage.vorhanden(s);
+        final fertig = da >= s.titel.length;
+        return IconButton(
+          key: Key('gespeichert-$id'),
+          tooltip: fertig
+              ? 'Gespeichert – vom Computer entfernen'
+              : '$da von ${s.titel.length} Titeln geladen – vom Computer entfernen',
+          icon: fertig
+              ? const Icon(Icons.offline_pin)
+              : SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    value: s.titel.isEmpty ? null : da / s.titel.length,
+                  ),
+                ),
+          onPressed: () => entfernenNachfragen(context, ablage, s),
+        );
+      },
+    );
+  }
+}
+
+Future<void> entfernenNachfragen(
+  BuildContext context,
+  MusikAblage ablage,
+  GespeicherteSammlung s,
+) async {
+  final ja = await nachfragen(
+    context,
+    titel: '„${s.name}“ vom Computer entfernen?',
+    text: 'Ohne Netz lässt sich das dann nicht mehr hören. Auf dem Server bleibt alles.',
+    ja: 'Entfernen',
+  );
+  if (ja) await ablage.entfernen(s.id);
+}
+
+// ---------------------------------------------------------------------------
+// Interpreten
+
+/// Die Sammlung nach Interpret: hoeren und ganz speichern.
+class InterpretenSeite extends StatefulWidget {
+  const InterpretenSeite({
+    super.key,
+    required this.zugang,
+    required this.player,
+    required this.ablage,
+  });
+
+  final MusikZugang zugang;
+  final MusikPlayer player;
+  final MusikAblage ablage;
+
+  @override
+  State<InterpretenSeite> createState() => _InterpretenSeiteState();
+}
+
+class _InterpretenSeiteState extends State<InterpretenSeite> {
+  String _suche = '';
+
+  /// Interpret -> Titel, alphabetisch. Titel ohne Interpret fehlen.
+  static List<(String, List<MusikTitel>)> _gruppieren(List<MusikTitel> alle) {
+    final nach = <String, List<MusikTitel>>{};
+    for (final t in alle) {
+      final i = t.interpret;
+      if (i != null && t.vorhanden) (nach[i] ??= []).add(t);
+    }
+    final liste = [for (final e in nach.entries) (e.key, e.value)];
+    liste.sort((a, b) => a.$1.toLowerCase().compareTo(b.$1.toLowerCase()));
+    return liste;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LadeAnsicht<List<(String, List<MusikTitel>)>>(
+      laden: () async => _gruppieren(await widget.zugang.alleTitel()),
+      istLeer: (l) => l.isEmpty,
+      leer: 'Die Sammlung meldet keine Interpreten.',
+      bauen: (context, liste, _) {
+        final s = _suche.toLowerCase();
+        final treffer = [
+          for (final e in liste)
+            if (s.isEmpty || e.$1.toLowerCase().contains(s)) e,
+        ];
+        return ListView(
+          padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                key: const Key('interpret-suche'),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Interpret suchen',
+                ),
+                onChanged: (t) => setState(() => _suche = t.trim()),
+              ),
+            ),
+            for (final (name, titel) in treffer)
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text(name),
+                subtitle: Text(titel.length == 1 ? '1 Titel' : '${titel.length} Titel'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _InterpretSeite(
+                      name: name,
+                      titel: titel,
+                      player: widget.player,
+                      ablage: widget.ablage,
+                    ),
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Abspielen',
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: () =>
+                          widget.player.spieleListe(name, titel).catchError((Object e) {
+                            if (context.mounted) meldung(context, fehlerText(e));
+                          }),
+                    ),
+                    SpeichernKnopf(
+                      ablage: widget.ablage,
+                      id: GespeicherteSammlung.interpretId(name),
+                      name: name,
+                      speichern: () => widget.ablage.interpretSpeichern(name, titel),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _InterpretSeite extends StatelessWidget {
+  const _InterpretSeite({
+    required this.name,
+    required this.titel,
+    required this.player,
+    required this.ablage,
+  });
+
+  final String name;
+  final List<MusikTitel> titel;
+  final MusikPlayer player;
+  final MusikAblage ablage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(name),
+        actions: [
+          IconButton(
+            tooltip: 'Alle abspielen',
+            icon: const Icon(Icons.playlist_play),
+            onPressed: () => player.spieleListe(name, titel).catchError((Object e) {
+              if (context.mounted) meldung(context, fehlerText(e));
+            }),
+          ),
+          SpeichernKnopf(
+            ablage: ablage,
+            id: GespeicherteSammlung.interpretId(name),
+            name: name,
+            speichern: () => ablage.interpretSpeichern(name, titel),
+          ),
+        ],
+      ),
+      bottomNavigationBar: MiniPlayer(player: player),
+      body: ListView(
+        padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
+        children: [
+          for (final (i, t) in titel.indexed)
+            ListTile(
+              title: Text(t.titel ?? t.anzeige),
+              onTap: () => player.spieleListe(name, titel, ab: i).catchError((Object e) {
+                if (context.mounted) meldung(context, fehlerText(e));
+              }),
+              trailing: VorhoerKnopf(
+                player: player,
+                titel: t,
+                beiFehler: (e) => meldung(context, fehlerText(e)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gespeichert
+
+/// Was auf diesem Computer liegt - spielt auch ohne Netz.
+class GespeichertSeite extends StatelessWidget {
+  const GespeichertSeite({super.key, required this.player, required this.ablage});
+
+  final MusikPlayer player;
+  final MusikAblage ablage;
+
+  Future<void> _aktualisieren(BuildContext context) async {
+    try {
+      await ablage.aktualisieren();
+    } on Object catch (e) {
+      if (context.mounted) meldung(context, fehlerText(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ablage,
+      builder: (context, _) {
+        final text = Theme.of(context).textTheme;
+        final liste = ablage.sammlungen;
+        return ListView(
+          padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
+          children: [
+            ListTile(
+              title: Text(
+                ablage.anzahlTitel == 1 ? '1 Titel' : '${ablage.anzahlTitel} Titel',
+                style: text.titleSmall,
+              ),
+              subtitle: Text(
+                ablage.laedtHerunter
+                    ? 'Lädt … · ${groesseText(ablage.belegt)} auf diesem Computer'
+                    : [
+                        '${groesseText(ablage.belegt)} auf diesem Computer',
+                        ?ablage.fehler,
+                      ].join(' · '),
+              ),
+              trailing: ablage.laedtHerunter
+                  ? const SizedBox.square(
+                      dimension: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : IconButton(
+                      key: const Key('ablage-aktualisieren'),
+                      tooltip: 'Mit dem Server abgleichen',
+                      icon: const Icon(Icons.sync),
+                      onPressed: liste.isEmpty ? null : () => _aktualisieren(context),
+                    ),
+            ),
+            if (ablage.laedtHerunter) const LinearProgressIndicator(),
+            const Divider(height: 1),
+            if (liste.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Noch nichts gespeichert. Bei einer Playlist oder einem Interpreten auf '
+                  '„Auf diesem Computer speichern“ klicken – dann läuft die Musik auch ohne Netz.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            for (final s in liste)
+              ListTile(
+                leading: Icon(s.interpret ? Icons.person_outline : Icons.queue_music),
+                title: Text(s.name),
+                subtitle: Text(_stand(s)),
+                onTap: () => _abspielen(context, s),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Abspielen',
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: () => _abspielen(context, s),
+                    ),
+                    IconButton(
+                      tooltip: 'Vom Computer entfernen',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => entfernenNachfragen(context, ablage, s),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _stand(GespeicherteSammlung s) {
+    final da = ablage.vorhanden(s);
+    final n = s.titel.length;
+    final art = s.interpret ? 'Interpret' : 'Playlist';
+    return da >= n
+        ? '$art · ${n == 1 ? '1 Titel' : '$n Titel'}'
+        : '$art · $da von $n Titeln geladen';
+  }
+
+  Future<void> _abspielen(BuildContext context, GespeicherteSammlung s) async {
+    try {
+      await player.spieleListe(s.name, s.titel);
+    } on Object catch (e) {
+      if (context.mounted) meldung(context, fehlerText(e));
+    }
+  }
+}

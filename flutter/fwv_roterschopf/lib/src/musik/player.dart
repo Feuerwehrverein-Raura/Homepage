@@ -18,6 +18,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'ablage.dart';
 import 'modelle.dart';
 import 'radio.dart';
 import 'zugang.dart';
@@ -219,6 +220,7 @@ class JustAudioWiedergabe implements Wiedergabe {
 class MusikPlayer extends ChangeNotifier {
   MusikPlayer({
     required this.zugang,
+    this.ablage,
     Wiedergabe? wiedergabe,
     Future<Uri> Function(Uri adresse)? senderAdresse,
   }) : _w = wiedergabe ?? JustAudioWiedergabe(),
@@ -294,6 +296,10 @@ class MusikPlayer extends ChangeNotifier {
   }
 
   final MusikZugang zugang;
+
+  /// Auf dem Computer gespeicherte Titel (Desktop-App): spielen von der
+  /// Platte, auch ohne Netz.
+  final MusikAblage? ablage;
   final Wiedergabe _w;
 
   /// Radio-Adresse aufloesen (Weiterleitungen, https) - in Tests ersetzt.
@@ -349,32 +355,57 @@ class MusikPlayer extends ChangeNotifier {
     int ab = 0,
     bool zufall = false,
   }) async {
-    final da = [
+    var da = [
       for (final (i, t) in titel.indexed)
         if (t.vorhanden) (i, t),
     ];
     if (da.isEmpty) throw const FormatException('Keine abspielbaren Titel.');
-    final start = da.indexWhere((e) => e.$1 >= ab);
+    int start() {
+      final s = da.indexWhere((e) => e.$1 >= ab);
+      return s < 0 ? 0 : s;
+    }
+
     final nr = ++_nr;
-    _holt = da[start < 0 ? 0 : start].$2.pfad;
+    _holt = da[start()].$2.pfad;
     _fehler = null;
     notifyListeners();
     try {
-      final adressen = await zugang.hoerAdressen([for (final e in da) e.$2.pfad]);
+      final lokal = <String, Uri>{
+        for (final (_, t) in da)
+          if (ablage?.datei(t.pfad) case final f?) t.pfad: Uri.file(f.path),
+      };
+      final fern = [
+        for (final (_, t) in da)
+          if (!lokal.containsKey(t.pfad)) t.pfad,
+      ];
+      final adressen = <String, Uri>{};
+      if (fern.isNotEmpty) {
+        try {
+          final a = await zugang.hoerAdressen(fern);
+          adressen.addAll({for (final (i, p) in fern.indexed) p: a[i]});
+        } on Object {
+          // Ohne Netz: nur, was auf dem Computer gespeichert ist.
+          if (lokal.isEmpty) rethrow;
+          da = [
+            for (final e in da)
+              if (lokal.containsKey(e.$2.pfad)) e,
+          ];
+        }
+      }
       if (nr != _nr) return;
       await _starten(
         quelle,
         [
-          for (final (i, e) in da.indexed)
+          for (final (_, t) in da)
             WiedergabeEintrag(
-              id: e.$2.pfad,
-              adresse: adressen[i],
-              titel: e.$2.titel ?? e.$2.anzeige,
-              interpret: e.$2.interpret,
+              id: t.pfad,
+              adresse: lokal[t.pfad] ?? adressen[t.pfad]!,
+              titel: t.titel ?? t.anzeige,
+              interpret: t.interpret,
               album: quelle,
             ),
         ],
-        ab: zufall ? Random().nextInt(da.length) : (start < 0 ? 0 : start),
+        ab: zufall ? Random().nextInt(da.length) : start(),
         radio: false,
         zufall: zufall,
       );

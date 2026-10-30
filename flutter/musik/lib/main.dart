@@ -88,6 +88,7 @@ class _MusikAppState extends State<MusikApp> {
                     key: ValueKey(dienste.sitzung.sitzung?.accessToken.hashCode),
                     zugang: dienste.musik,
                     player: dienste.player,
+                    ablage: dienste.ablage,
                     laptopSteuern: dienste.laptopSteuern,
                     aktionen: [_AbmeldenKnopf(dienste: dienste)],
                   )
@@ -115,7 +116,9 @@ class _AbmeldenKnopf extends StatelessWidget {
         final ja = await nachfragen(
           context,
           titel: 'Abmelden?',
-          text: 'Die Musik hier am Computer hört auf.',
+          text:
+              'Die Musik hier am Computer hört auf, und was auf diesem Computer '
+              'gespeichert ist, wird gelöscht.',
           ja: 'Abmelden',
         );
         if (ja) await dienste.abmelden();

@@ -20,8 +20,10 @@ import 'package:fwv_anlass/fwv_anlass.dart'
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
+import 'ablage.dart';
 import 'modelle.dart';
 import 'laptop.dart';
+import 'offline.dart';
 import 'player.dart';
 import 'titelsuche.dart';
 import 'zugang.dart';
@@ -35,9 +37,15 @@ class MusikScreen extends StatefulWidget {
     this.laptopSteuern = false,
     this.senderAdresse,
     this.aktionen = const [],
+    this.ablage,
   });
 
   final MusikZugang zugang;
+
+  /// Musik auf dem Computer speichern (Desktop-App): Reiter "Interpreten"
+  /// und "Gespeichert", Speichern-Knopf bei den Playlists. Der [player]
+  /// sollte dieselbe Ablage haben.
+  final MusikAblage? ablage;
 
   /// Der Player der App (lebt laenger als dieser Bildschirm). Ohne ihn
   /// bringt der Bildschirm einen eigenen mit.
@@ -66,6 +74,7 @@ class _MusikScreenState extends State<MusikScreen> {
       widget.player ??
       (_eigener = MusikPlayer(
         zugang: widget.zugang,
+        ablage: widget.ablage,
         wiedergabe: widget.wiedergabe,
         senderAdresse: widget.senderAdresse,
       ));
@@ -85,6 +94,7 @@ class _MusikScreenState extends State<MusikScreen> {
   @override
   Widget build(BuildContext context) {
     final zugang = widget.zugang;
+    final ablage = widget.ablage;
     // Am Computer: Cmd+F (macOS) bzw. Ctrl+F oeffnet die Titelsuche.
     return CallbackShortcuts(
       bindings: {
@@ -94,7 +104,7 @@ class _MusikScreenState extends State<MusikScreen> {
       child: Focus(
         autofocus: true,
         child: DefaultTabController(
-          length: widget.laptopSteuern ? 3 : 2,
+          length: 2 + (ablage != null ? 2 : 0) + (widget.laptopSteuern ? 1 : 0),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Musik'),
@@ -110,15 +120,20 @@ class _MusikScreenState extends State<MusikScreen> {
               bottom: reiterAufRot(
                 tabs: [
                   const Tab(text: 'Playlists'),
+                  if (ablage != null) const Tab(text: 'Interpreten'),
                   const Tab(text: 'Radiosender'),
+                  if (ablage != null) const Tab(text: 'Gespeichert'),
                   if (widget.laptopSteuern) const Tab(text: 'Im Schopf'),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                _PlaylistsSeite(zugang: zugang, player: _player),
+                _PlaylistsSeite(zugang: zugang, player: _player, ablage: ablage),
+                if (ablage != null)
+                  InterpretenSeite(zugang: zugang, player: _player, ablage: ablage),
                 _SenderSeite(zugang: zugang, player: _player),
+                if (ablage != null) GespeichertSeite(player: _player, ablage: ablage),
                 if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
               ],
             ),
@@ -134,10 +149,11 @@ class _MusikScreenState extends State<MusikScreen> {
 // Playlists
 
 class _PlaylistsSeite extends StatefulWidget {
-  const _PlaylistsSeite({required this.zugang, required this.player});
+  const _PlaylistsSeite({required this.zugang, required this.player, this.ablage});
 
   final MusikZugang zugang;
   final MusikPlayer player;
+  final MusikAblage? ablage;
 
   @override
   State<_PlaylistsSeite> createState() => _PlaylistsSeiteState();
@@ -243,6 +259,13 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
                       icon: const Icon(Icons.play_arrow),
                       onPressed: p.anzahl == 0 ? null : () => _abspielen(p),
                     ),
+                    if (widget.ablage case final ablage? when p.anzahl > 0)
+                      SpeichernKnopf(
+                        ablage: ablage,
+                        id: GespeicherteSammlung.playlistId(p.id),
+                        name: p.name,
+                        speichern: () => ablage.playlistSpeichern(p.id),
+                      ),
                     IconButton(
                       tooltip: 'Löschen',
                       icon: const Icon(Icons.delete_outline),

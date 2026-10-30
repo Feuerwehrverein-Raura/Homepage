@@ -1,6 +1,6 @@
 # FWV Musik – Desktop-Programm
 
-Stand 20.10.2026. Der Musik-Bereich der Mitglieder-App (Playlist-Editor,
+Stand 30.10.2026. Der Musik-Bereich der Mitglieder-App (Playlist-Editor,
 Radiosender, Player, «Im Schopf») als **eigenes Programm** für macOS, Linux
 und Windows: `flutter/musik`, Paket `fwv_musik`.
 
@@ -13,6 +13,28 @@ und Windows: `flutter/musik`, Paket `fwv_musik`.
   über die Hör-Freigabe von api-members, wie auf dem Handy).
 - **Im Schopf:** den Laptop im Lokal fernbedienen – nur Gruppe Roter
   Schopf, Vorstand, admin (dieselbe Regel prüft api-members).
+- **Interpreten:** die Sammlung nach Interpret, hören und ganz speichern.
+- **Gespeichert (offline):** Playlists und Interpreten auf dem Computer
+  ablegen; sie spielen auch ohne Netz.
+
+## Offline speichern
+
+`MusikAblage` (`fwv_roterschopf/lib/src/musik/ablage.dart`), Oberfläche in
+`offline.dart`. Nur die Desktop-App gibt dem `MusikScreen` eine Ablage –
+die Mitglieder-App zeigt davon nichts.
+
+- Geladen wird über die Hör-Freigabe (`GET /kiosk/hoeren`), dieselbe wie
+  beim Streamen; am Backend ist nichts dazugekommen.
+- Ablage: `Application Support/Musik` (macOS im Container der App,
+  Windows `%APPDATA%`, Linux `~/.local/share`), nicht im Cache-Ordner.
+  `ablage.json` hält fest, welche Datei zu welchem Titel gehört und was
+  gespeichert ist. Ein Titel in mehreren Sammlungen liegt nur einmal da.
+- Beim Start und mit «Mit dem Server abgleichen»: neue Titel laden,
+  entfernte löschen. Eine auf dem Server gelöschte Playlist bleibt, bis
+  man sie selbst entfernt.
+- Der Player spielt Gespeichertes von der Platte; ohne Netz nur das
+  Gespeicherte.
+- **Abmelden löscht alles Gespeicherte** (Musik nur für Mitglieder).
 
 Die Bildschirme kommen unverändert aus `flutter/fwv_roterschopf`
 (`MusikScreen`). Was dort geändert wird, landet in beiden Apps. Die App

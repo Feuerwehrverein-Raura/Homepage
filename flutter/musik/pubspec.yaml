@@ -22,6 +22,8 @@ dependencies:
   material_ui: ^1.6.0
   http: ^1.6.0
   url_launcher: ^6.3.3
+  # Gespeicherte Musik (Application Support/Musik), siehe lib/dienste.dart.
+  path_provider: ^2.1.6
   # macOS: Bedienung ueber Medientasten und "Jetzt laeuft".
   just_audio_background: ^0.0.1-beta.17
   # Linux und Windows: just_audio hat dort kein eigenes Plugin; media_kit
