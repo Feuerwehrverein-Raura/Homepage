@@ -10,7 +10,15 @@ api-members (Gruppe Roter Schopf, Vorstand, admin).
                               Suchbegriff; kommt in die Warteschlange
   GET  /auftraege             die letzten Auftraege mit Stand
 
-Ein Auftrag laedt mit spotDL in einen eigenen Arbeitsordner und legt jede
+YouTube-Links laedt yt-dlp direkt: spotDL sucht dazu erst ein passendes
+Spotify-Stueck und griff dabei daneben (aus "Span - Louenesee" wurde ein
+fremder Song). Spotify-Links und Suchbegriffe gehen ueber spotDL.
+
+YouTube sperrt Rechenzentrums-Adressen ("Sign in to confirm you're not a
+bot"). Liegt /daten/youtube-cookies.txt (Netscape-Format, von einem eigenen
+Google-Konto), bekommen beide Programme sie mit.
+
+Ein Auftrag laedt in einen eigenen Arbeitsordner und legt jede
 fertige Datei per WebDAV in den Nextcloud-Gruppenordner "Musik" (Konto
 musik-bot). Was dort schon liegt, wird nicht ueberschrieben. Von dort holt
 sich der Laptop im Roten Schopf die Sammlung (kiosk-abgleich).
@@ -43,16 +51,15 @@ DAV_ANMELDUNG = "Basic " + b64encode(
 DATEN = os.environ.get("MUSIK_DL_DATEN", "/daten")
 ARBEIT = os.path.join(DATEN, "arbeit")
 VERZEICHNIS = os.path.join(DATEN, "auftraege.json")
+COOKIES = os.path.join(DATEN, "youtube-cookies.txt")
+YOUTUBE_SEITEN = ("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")
 
 # Wie lange ein Auftrag hoechstens laufen darf - eine grosse Playlist ueber
 # eine langsame Quelle soll die Warteschlange nicht fuer immer belegen.
 HOECHSTENS_S = 6 * 3600
 BEHALTEN = 100  # so viele Auftraege bleiben in der Liste
 
-ERLAUBTE_SEITEN = (
-    "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
-    "youtu.be", "open.spotify.com",
-)
+ERLAUBTE_SEITEN = YOUTUBE_SEITEN + ("open.spotify.com",)
 
 _auftraege = []
 _sperre = threading.Lock()
@@ -170,13 +177,30 @@ def ablegen(pfad):
 # spotDL
 # --------------------------------------------------------------------------
 
-def bearbeiten(a):
-    ordner = os.path.join(ARBEIT, a["id"])
-    shutil.rmtree(ordner, ignore_errors=True)
-    os.makedirs(ordner)
-    _setzen(a, stand="laedt", meldung=None)
-    befehl = [
-        "spotdl", "download", a["quelle"],
+def _cookies(option):
+    return [option, COOKIES] if os.path.isfile(COOKIES) else []
+
+
+def ist_youtube(quelle):
+    if not re.match(r"^https?://", quelle, re.I):
+        return False
+    return urllib.parse.urlsplit(quelle).hostname in YOUTUBE_SEITEN
+
+
+def befehl_fuer(quelle, ordner):
+    """Wie die Sammlung: "Interpret - Titel.mp3", alles in einem Ordner."""
+    if ist_youtube(quelle):
+        return [
+            "yt-dlp", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "0",
+            "--embed-metadata", "--no-progress",
+            # Offizielle Tonspuren heissen "<Interpret> - Topic".
+            "--replace-in-metadata", "uploader,channel", r" - Topic$", "",
+            "--output", os.path.join(ordner, "%(artist,uploader,channel)s - %(track,title)s.%(ext)s"),
+            *_cookies("--cookies"),
+            "--", quelle,
+        ]
+    return [
+        "spotdl", "download", quelle,
         # Wie die Sammlung: "Interpret - Titel.mp3", alles in einem Ordner.
         "--output", os.path.join(ordner, "{artists} - {title}.{output-ext}"),
         "--format", "mp3",
@@ -186,7 +210,16 @@ def bearbeiten(a):
         "--threads", "2",
         "--print-errors",
         "--simple-tui",
+        *_cookies("--cookie-file"),
     ]
+
+
+def bearbeiten(a):
+    ordner = os.path.join(ARBEIT, a["id"])
+    shutil.rmtree(ordner, ignore_errors=True)
+    os.makedirs(ordner)
+    _setzen(a, stand="laedt", meldung=None)
+    befehl = befehl_fuer(a["quelle"], ordner)
     melde("Auftrag %s: %s" % (a["id"], a["quelle"]))
     try:
         lauf = subprocess.run(befehl, cwd=ordner, capture_output=True, text=True,
@@ -210,7 +243,10 @@ def bearbeiten(a):
         shutil.rmtree(ordner, ignore_errors=True)
     if not dateien:
         melde("Auftrag %s ohne Datei:\n%s" % (a["id"], ausgabe))
-        _setzen(a, stand="fehler", meldung="Nichts gefunden oder Laden gescheitert.")
+        gesperrt = "confirm you" in ausgabe and "not a bot" in ausgabe
+        _setzen(a, stand="fehler", meldung=(
+            "YouTube sperrt den Server gerade (Anmeldung verlangt)." if gesperrt
+            else "Nichts gefunden oder Laden gescheitert."))
         return
     _setzen(a, stand="fertig", dateien=dateien, neu=neu, schon_da=schon,
             fertig=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
@@ -234,7 +270,7 @@ def youtube_suchen(begriff, anzahl=12):
     if not b:
         return []
     lauf = subprocess.run(
-        ["yt-dlp", "--flat-playlist", "-J", "--", "ytsearch%d:%s" % (anzahl, b)],
+        ["yt-dlp", "--flat-playlist", "-J", *_cookies("--cookies"), "--", "ytsearch%d:%s" % (anzahl, b)],
         capture_output=True, text=True, timeout=60,
     )
     if lauf.returncode != 0:

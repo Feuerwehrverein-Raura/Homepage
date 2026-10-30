@@ -50,20 +50,26 @@ class DienstTest(unittest.TestCase):
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), NachbauDav)
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         cls.tmp = tempfile.mkdtemp()
-        # Ersatz fuer spotdl: legt zwei Dateien an, wie spotDL sie benennt.
         bin_ = os.path.join(cls.tmp, "bin")
         os.makedirs(bin_)
-        with open(os.path.join(bin_, "spotdl"), "w") as f:
-            f.write("#!/bin/sh\n"
-                    "ziel=$(dirname \"$4\")\n"
-                    "case \"$2\" in *leer*) exit 1;; esac\n"
-                    "echo a > \"$ziel/Span - Louenesee.mp3\"\n"
-                    "echo b > \"$ziel/Queen - Bohemian Rhapsody.mp3\"\n")
-        os.chmod(os.path.join(bin_, "spotdl"), 0o755)
+        for programm in ("spotdl", "yt-dlp"):
+            cls._ersatz(bin_, programm)
         os.environ["PATH"] = bin_ + os.pathsep + os.environ["PATH"]
         cls.d = dienst_laden(os.path.join(cls.tmp, "daten"),
                              "http://127.0.0.1:%d/dav/Musik" % cls.server.server_port)
         os.makedirs(cls.d.ARBEIT, exist_ok=True)
+
+    @staticmethod
+    def _ersatz(bin_, programm):
+        """Ersatz fuer spotdl/yt-dlp: legt zwei Dateien in den Ordner hinter
+        --output, wie die Programme sie benennen. "leer" in der Quelle: nichts."""
+        with open(os.path.join(bin_, programm), "w") as f:
+            f.write("#!/bin/sh\n"
+                    "case \"$*\" in *leer*) exit 1;; esac\n"
+                    "while [ $# -gt 0 ]; do [ \"$1\" = --output ] && ziel=$(dirname \"$2\"); shift; done\n"
+                    "echo a > \"$ziel/Span - Louenesee.mp3\"\n"
+                    "echo b > \"$ziel/Queen - Bohemian Rhapsody.mp3\"\n")
+        os.chmod(os.path.join(bin_, programm), 0o755)
 
     @classmethod
     def tearDownClass(cls):
@@ -93,6 +99,20 @@ class DienstTest(unittest.TestCase):
         self.assertEqual(ABGELEGT["Span - Louenesee.mp3"], b"a\n")
         # Arbeitsordner ist weg.
         self.assertFalse(os.path.exists(os.path.join(self.d.ARBEIT, a["id"])))
+
+    def test_youtube_mit_yt_dlp_spotify_mit_spotdl(self):
+        yt = self.d.befehl_fuer("https://www.youtube.com/watch?v=uoym8LBzsPs", "/a")
+        self.assertEqual(yt[0], "yt-dlp")
+        self.assertEqual(yt[-2:], ["--", "https://www.youtube.com/watch?v=uoym8LBzsPs"])
+        self.assertEqual(self.d.befehl_fuer("https://open.spotify.com/track/x", "/a")[0], "spotdl")
+        self.assertEqual(self.d.befehl_fuer("Span Louenesee", "/a")[0], "spotdl")
+        self.assertNotIn("--cookies", yt)
+        open(self.d.COOKIES, "w").close()
+        try:
+            self.assertIn("--cookies", self.d.befehl_fuer("https://youtu.be/x", "/a"))
+            self.assertIn("--cookie-file", self.d.befehl_fuer("Span", "/a"))
+        finally:
+            os.remove(self.d.COOKIES)
 
     def test_nichts_gefunden_wird_fehler(self):
         a = self.d.neuer_auftrag("leer nichts", "Erika")

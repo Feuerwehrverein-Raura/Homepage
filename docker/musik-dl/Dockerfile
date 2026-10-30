@@ -3,8 +3,11 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg curl unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# yt-dlp braucht fuer YouTube eine JavaScript-Laufzeit, von Haus aus deno.
+COPY --from=denoland/deno:bin-2.9.7 /deno /usr/local/bin/deno
 
 # spotDL fest; yt-dlp danach auf die neueste Fassung, weil YouTube oft etwas
 # aendert und nur ein aktuelles yt-dlp mithaelt.
