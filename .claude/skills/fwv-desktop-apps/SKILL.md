@@ -45,6 +45,15 @@ Desktop-Releases werden **nie** «Latest» (`--latest=false`):
   `SichererSpeicher(null, 'ch.fwvraura.<name>')`. Mit dem gemeinsamen
   Standardnamen liest eine App die Eintraege einer anderen, und macOS fragt
   fuer jeden der ~7 Eintraege einzeln nach dem Passwort (FWV Musik 1.0.2).
+- **Test-Builds getrennt (macOS):** `AppInfo.xcconfig` gibt Debug eigenen
+  Namen und Kennung (`PRODUCT_NAME[config=Debug] = FWV Musik Test`,
+  `…musik.test`), `dienste.dart` im Debug einen eigenen
+  Schluesselbund-Bereich. Sonst zeigt macOS zwei Apps, startet den ad-hoc
+  signierten Test-Build und fragt nach dem Passwort (30.10.2026: mein
+  `flutter build macos --debug` lag im Repo, Stefan startete ihn statt
+  1.2.1). Nach jedem lokalen macOS-Build aufraeumen:
+  `lsregister -u "<…>.app" && rm -rf build/macos`, pruefen mit
+  `lsregister -dump | grep -i "path:.*<Name>.*\.app"`.
 - **macOS-Kategorie:** `LSApplicationCategoryType` in
   `macos/Runner/Info.plist` setzen (Musik: `public.app-category.music`),
   sonst fehlt die App in der Programm-Uebersicht von macOS 26.

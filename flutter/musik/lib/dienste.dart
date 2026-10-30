@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:fwv_core/desktop.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
@@ -33,7 +34,11 @@ class Dienste {
         // Eigener Bereich im macOS-Schluesselbund (siehe SichererSpeicher):
         // sonst fragt macOS fuer jeden Eintrag der Mitglieder-App nach dem
         // Passwort.
-        speicher: SitzungsSpeicher(SichererSpeicher(null, 'ch.fwvraura.musik')),
+        // Test-Builds eigener Bereich: Sie sind anders signiert, und macOS
+        // fragte sonst bei jedem Eintrag der echten App nach dem Passwort.
+        speicher: SitzungsSpeicher(
+          SichererSpeicher(null, kDebugMode ? 'ch.fwvraura.musik.test' : 'ch.fwvraura.musik'),
+        ),
         http: http.Client(),
       ),
       authentik: LoopbackAnmeldung(

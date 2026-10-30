@@ -10,5 +10,11 @@ PRODUCT_NAME = FWV Musik
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = ch.fwvraura.musik
 
+// Test-Builds (flutter run / build --debug) heissen anders und haben eine
+// eigene Kennung: sonst zeigt macOS zwei "FWV Musik", nimmt womoeglich den
+// unsignierten Test-Build und fragt wieder nach dem Schluesselbund-Passwort.
+PRODUCT_NAME[config=Debug] = FWV Musik Test
+PRODUCT_BUNDLE_IDENTIFIER[config=Debug] = ch.fwvraura.musik.test
+
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Feuerwehrverein Raura
