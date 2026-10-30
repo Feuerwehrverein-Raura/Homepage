@@ -199,6 +199,23 @@ void main() {
     expect(a.datei(_queen.pfad), isNotNull);
   });
 
+  test('Alles speichern: ganze Sammlung zuletzt geladen, beim Abgleich neue Titel dazu', () async {
+    final a = neueAblage();
+    await a.allesSpeichern();
+    await a.interpretSpeichern('Span', [_span]);
+    await fertig(a);
+    expect(a.sammlung(GespeicherteSammlung.alleId)!.titel, hasLength(3));
+    expect(a.anzahlTitel, 3);
+    // Der erste Titel gehoerte schon der ganzen Sammlung; danach kam Span vor dem Rest.
+    expect(geholt.indexOf(_span.pfad), lessThan(geholt.indexOf(_queen2.pfad)));
+
+    const neu = MusikTitel(pfad: 'Baschi/Gib mer e Chance.mp3', interpret: 'Baschi');
+    zugang.alle = [...zugang.alle, neu];
+    await a.aktualisieren();
+    await fertig(a);
+    expect(a.datei(neu.pfad), isNotNull);
+  });
+
   test('Player: Gespeichertes von der Platte, ohne Netz nur Gespeichertes', () async {
     final a = neueAblage();
     await a.interpretSpeichern('Span', [_span]);

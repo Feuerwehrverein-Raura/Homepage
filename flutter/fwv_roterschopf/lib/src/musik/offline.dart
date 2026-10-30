@@ -21,9 +21,13 @@ class SpeichernKnopf extends StatelessWidget {
     required this.id,
     required this.name,
     required this.speichern,
+    this.rueckfrage,
   });
 
   final MusikAblage ablage;
+
+  /// Vorher nachfragen, mit diesem Text (die ganze Sammlung braucht Platz).
+  final String? rueckfrage;
 
   /// Id der Sammlung (GespeicherteSammlung.playlistId/interpretId).
   final String id;
@@ -42,6 +46,15 @@ class SpeichernKnopf extends StatelessWidget {
             tooltip: 'Auf diesem Computer speichern',
             icon: const Icon(Icons.download_for_offline_outlined),
             onPressed: () async {
+              if (rueckfrage case final text?) {
+                final ja = await nachfragen(
+                  context,
+                  titel: '„$name“ speichern?',
+                  text: text,
+                  ja: 'Speichern',
+                );
+                if (!ja) return;
+              }
               try {
                 await speichern();
                 if (context.mounted) meldung(context, '„$name“ wird gespeichert');
@@ -73,6 +86,17 @@ class SpeichernKnopf extends StatelessWidget {
     );
   }
 }
+
+/// Knopf "die ganze Sammlung speichern" - mit Rueckfrage.
+Widget alleSpeichernKnopf(MusikAblage ablage) => SpeichernKnopf(
+  ablage: ablage,
+  id: GespeicherteSammlung.alleId,
+  name: 'Alle Titel',
+  rueckfrage:
+      'Jeder Titel der Sammlung kommt auf diesen Computer. Das braucht viel Platz '
+      'und dauert eine Weile; Playlists und Interpreten werden zuerst geladen.',
+  speichern: ablage.allesSpeichern,
+);
 
 Future<void> entfernenNachfragen(
   BuildContext context,
@@ -301,6 +325,13 @@ class GespeichertSeite extends StatelessWidget {
                     ),
             ),
             if (ablage.laedtHerunter) const LinearProgressIndicator(),
+            if (ablage.sammlung(GespeicherteSammlung.alleId) == null)
+              ListTile(
+                leading: const Icon(Icons.library_music),
+                title: const Text('Alles speichern'),
+                subtitle: const Text('Die ganze Sammlung, für unterwegs ohne Netz'),
+                trailing: alleSpeichernKnopf(ablage),
+              ),
             const Divider(height: 1),
             if (liste.isEmpty)
               const Padding(
@@ -313,7 +344,13 @@ class GespeichertSeite extends StatelessWidget {
               ),
             for (final s in liste)
               ListTile(
-                leading: Icon(s.interpret ? Icons.person_outline : Icons.queue_music),
+                leading: Icon(
+                  s.alle
+                      ? Icons.library_music
+                      : s.interpret
+                      ? Icons.person_outline
+                      : Icons.queue_music,
+                ),
                 title: Text(s.name),
                 subtitle: Text(_stand(s)),
                 onTap: () => _abspielen(context, s),
@@ -342,7 +379,11 @@ class GespeichertSeite extends StatelessWidget {
   String _stand(GespeicherteSammlung s) {
     final da = ablage.vorhanden(s);
     final n = s.titel.length;
-    final art = s.interpret ? 'Interpret' : 'Playlist';
+    final art = s.alle
+        ? 'Ganze Sammlung'
+        : s.interpret
+        ? 'Interpret'
+        : 'Playlist';
     return da >= n
         ? '$art · ${n == 1 ? '1 Titel' : '$n Titel'}'
         : '$art · $da von $n Titeln geladen';
@@ -350,7 +391,8 @@ class GespeichertSeite extends StatelessWidget {
 
   Future<void> _abspielen(BuildContext context, GespeicherteSammlung s) async {
     try {
-      await player.spieleListe(s.name, s.titel);
+      // Die ganze Sammlung durcheinander, wie "Alle Titel" sonst auch.
+      await player.spieleListe(s.name, s.titel, zufall: s.alle);
     } on Object catch (e) {
       if (context.mounted) meldung(context, fehlerText(e));
     }

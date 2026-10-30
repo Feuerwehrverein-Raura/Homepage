@@ -32,6 +32,9 @@ die Mitglieder-App zeigt davon nichts.
 - Beim Start und mit «Mit dem Server abgleichen»: neue Titel laden,
   entfernte löschen. Eine auf dem Server gelöschte Playlist bleibt, bis
   man sie selbst entfernt.
+- **Alles speichern** (bei «Alle Titel» und im Reiter «Gespeichert»,
+  mit Rückfrage): die ganze Sammlung. Sie wird zuletzt geladen, Playlists
+  und Interpreten kommen zuerst.
 - Der Player spielt Gespeichertes von der Platte; ohne Netz nur das
   Gespeicherte.
 - **Abmelden löscht alles Gespeicherte** (Musik nur für Mitglieder).

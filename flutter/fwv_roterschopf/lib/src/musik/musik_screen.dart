@@ -229,10 +229,16 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
               title: const Text('Alle Titel'),
               subtitle: const Text('Die ganze Sammlung, zufällig'),
               onTap: _alleAbspielen,
-              trailing: IconButton(
-                tooltip: 'Alle Titel abspielen',
-                icon: const Icon(Icons.shuffle),
-                onPressed: _alleAbspielen,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Alle Titel abspielen',
+                    icon: const Icon(Icons.shuffle),
+                    onPressed: _alleAbspielen,
+                  ),
+                  if (widget.ablage case final ablage?) alleSpeichernKnopf(ablage),
+                ],
               ),
             ),
             if (liste.isEmpty)

@@ -59,6 +59,11 @@ class GespeicherteSammlung {
 
   static String playlistId(String id) => 'playlist:$id';
   static String interpretId(String name) => 'interpret:$name';
+
+  /// Die ganze Sammlung ("Alle Titel").
+  static const alleId = 'alle';
+
+  bool get alle => id == alleId;
 }
 
 class MusikAblage extends ChangeNotifier {
@@ -204,6 +209,23 @@ class MusikAblage extends ChangeNotifier {
     );
   }
 
+  /// Die ganze Sammlung speichern - zuletzt geladen, nach Playlists und
+  /// Interpreten.
+  Future<void> allesSpeichern() async {
+    await laden();
+    await _merken(
+      GespeicherteSammlung(
+        id: GespeicherteSammlung.alleId,
+        name: 'Alle Titel',
+        interpret: false,
+        titel: [
+          for (final t in await zugang.alleTitel())
+            if (t.vorhanden) t,
+        ],
+      ),
+    );
+  }
+
   Future<void> _merken(GespeicherteSammlung s) async {
     final i = _sammlungen.indexWhere((x) => x.id == s.id);
     if (i < 0) {
@@ -239,7 +261,21 @@ class MusikAblage extends ChangeNotifier {
     List<MusikTitel>? alle;
     for (final s in List.of(_sammlungen)) {
       try {
-        if (s.interpret) {
+        if (s.alle) {
+          alle ??= await zugang.alleTitel();
+          final neu = [
+            for (final t in alle)
+              if (t.vorhanden) t,
+          ];
+          if (neu.isNotEmpty) {
+            _sammlungen[_sammlungen.indexOf(s)] = GespeicherteSammlung(
+              id: s.id,
+              name: s.name,
+              interpret: false,
+              titel: neu,
+            );
+          }
+        } else if (s.interpret) {
           alle ??= await zugang.alleTitel();
           final neu = [
             for (final t in alle)
@@ -343,7 +379,8 @@ class MusikAblage extends ChangeNotifier {
   }
 
   String? _naechsterFehlender() {
-    for (final s in _sammlungen) {
+    // Die ganze Sammlung zuletzt: Playlists und Interpreten sind schneller da.
+    for (final s in [..._sammlungen.where((s) => !s.alle), ..._sammlungen.where((s) => s.alle)]) {
       for (final t in s.titel) {
         if (!_dateien.containsKey(t.pfad) && !_gescheitert.contains(t.pfad)) return t.pfad;
       }
