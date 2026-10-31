@@ -7891,6 +7891,15 @@ function alarmSchluessel(req, res, next) {
 app.get('/kiosk/alarm-sms', alarmSchluessel, async (req, res) => {
     try {
         await alarmTabelle();
+        // ?vorschau=1: nur ansehen - nichts wird als abgeholt markiert, der
+        // Gateway bekommt alles wie sonst.
+        if (req.query.vorschau === '1') {
+            const v = await pool.query(`
+                SELECT id, art, nummer, text, erstellt, abgeholt FROM kiosk_alarm_sms
+                 WHERE gesendet IS NULL AND fehler IS NULL AND erstellt > NOW() - INTERVAL '12 hours'
+                 ORDER BY id`);
+            return res.json({ vorschau: true, sms: v.rows });
+        }
         const r = await pool.query(`
             UPDATE kiosk_alarm_sms SET abgeholt = NOW()
              WHERE id IN (SELECT id FROM kiosk_alarm_sms
