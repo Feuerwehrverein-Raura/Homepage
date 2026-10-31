@@ -6669,9 +6669,10 @@ app.post('/kiosk/hoeren/groesse', authenticateToken, async (req, res) => {
 // nicht, wer bloss Schicht hat.
 const MUSIK_DL_URL = process.env.MUSIK_DL_URL || 'http://fwv-musik-dl:8080';
 
-function musikErgaenzenZugang(req, res, next) {
+/** Nur die Gruppen Roter Schopf, Vorstand, admin - ohne Schicht-Zugang. */
+function roterSchopfGruppe(req, res, next) {
     if (hatRoterSchopfZugang(req.user?.groups)) return next();
-    return res.status(403).json({ error: 'Songs ergaenzen nur Gruppe Roter Schopf, Vorstand und admin' });
+    return res.status(403).json({ error: 'Nur Gruppe Roter Schopf, Vorstand und admin' });
 }
 
 async function musikDl(req, res, methode, pfad, daten) {
@@ -6689,13 +6690,13 @@ async function musikDl(req, res, methode, pfad, daten) {
     }
 }
 
-app.get('/kiosk/ergaenzen/suche', authenticateToken, musikErgaenzenZugang, (req, res) =>
+app.get('/kiosk/ergaenzen/suche', authenticateToken, roterSchopfGruppe, (req, res) =>
     musikDl(req, res, 'GET', '/suche?q=' + encodeURIComponent(String(req.query.q || '').slice(0, 200))));
 
-app.get('/kiosk/ergaenzen', authenticateToken, musikErgaenzenZugang, (req, res) =>
+app.get('/kiosk/ergaenzen', authenticateToken, roterSchopfGruppe, (req, res) =>
     musikDl(req, res, 'GET', '/auftraege'));
 
-app.post('/kiosk/ergaenzen', authenticateToken, musikErgaenzenZugang, (req, res) =>
+app.post('/kiosk/ergaenzen', authenticateToken, roterSchopfGruppe, (req, res) =>
     musikDl(req, res, 'POST', '/auftraege', {
         quelle: req.body?.quelle,
         wer: req.user?.name || req.user?.preferred_username || req.user?.email || '?',
@@ -7756,7 +7757,32 @@ async function alarmTabelle() {
             gesendet TIMESTAMPTZ,
             fehler TEXT
         )`);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS kiosk_alarm_einstellung (
+            id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+            scharf BOOLEAN NOT NULL DEFAULT TRUE,
+            bis TIMESTAMPTZ,
+            von TEXT,
+            geaendert TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    await pool.query('INSERT INTO kiosk_alarm_einstellung (id) VALUES (1) ON CONFLICT DO NOTHING');
     alarmTabelleDa = true;
+}
+
+/**
+ * Scharf oder entschaerft (in der App umschaltbar). Entschaerft wird mit
+ * Dauer; ist sie um, gilt der Alarm von selbst wieder als scharf.
+ */
+async function alarmEinstellung() {
+    await alarmTabelle();
+    const r = await pool.query('SELECT scharf, bis, von, geaendert FROM kiosk_alarm_einstellung WHERE id = 1');
+    const e = r.rows[0];
+    if (!e.scharf && e.bis && new Date(e.bis) <= new Date()) {
+        await pool.query("UPDATE kiosk_alarm_einstellung SET scharf = TRUE, bis = NULL, von = 'automatisch', geaendert = NOW() WHERE id = 1");
+        logWarn('KUEHLER-ALARM', { art: 'wieder scharf', grund: 'Dauer abgelaufen', entschaerft_von: e.von });
+        return { scharf: true, bis: null, von: 'automatisch', geaendert: new Date() };
+    }
+    return e;
 }
 
 /** Wer den Alarm bekommt: Gruppen Vorstand und Roter Schopf (Authentik). */
@@ -7779,12 +7805,24 @@ async function kuehlerAlarmStarten() {
            AND NOT EXISTS (SELECT 1 FROM kiosk_alarm_sms e
                             WHERE e.schluessel = a.schluessel AND e.art = 'entwarnung' AND e.erstellt > a.erstellt)
          GROUP BY schluessel`);
-    const waechter = kuehlerAlarm({ gemeldet: new Map(offen.rows.map(r => [r.schluessel, Number(r.zeit)])) });
+    let waechter = kuehlerAlarm({ gemeldet: new Map(offen.rows.map(r => [r.schluessel, Number(r.zeit)])) });
+    let entschaerft = false;
     let laeuft = false;
     async function takt() {
         if (laeuft) return;
         laeuft = true;
         try {
+            // Entschaerft: nichts melden. Wieder scharf: neu zaehlen - was
+            // dann noch nicht stimmt, meldet sich nach der ueblichen Wartezeit.
+            const { scharf } = await alarmEinstellung();
+            if (!scharf) {
+                entschaerft = true;
+                return;
+            }
+            if (entschaerft) {
+                entschaerft = false;
+                waechter = kuehlerAlarm();
+            }
             const z = await roterSchopfDienst.zustand();
             const meldungen = waechter.pruefen(z.kuehlung);
             if (!meldungen.length) return;
@@ -7806,6 +7844,41 @@ async function kuehlerAlarmStarten() {
     setInterval(takt, 60 * 1000);
     console.log('Kuehler-Alarm scharf');
 }
+
+// Scharf stellen und entschaerfen: Gruppe Roter Schopf, Vorstand, admin
+// (wie Songs ergaenzen - nicht, wer bloss Schicht hat).
+app.get('/kiosk/kuehler-alarm', authenticateToken, roterSchopfGruppe, async (req, res) => {
+    try {
+        const e = await alarmEinstellung();
+        res.json({ ...e, aktiv: process.env.KUEHLER_ALARM === 'an' });
+    } catch (error) {
+        console.error('GET /kiosk/kuehler-alarm:', error.message);
+        res.status(500).json({ error: 'Alarm-Einstellung nicht lesbar' });
+    }
+});
+
+const ALARM_STUNDEN = [1, 4, 24];
+
+app.put('/kiosk/kuehler-alarm', authenticateToken, roterSchopfGruppe, async (req, res) => {
+    try {
+        await alarmTabelle();
+        const scharf = req.body?.scharf === true;
+        // Entschaerfen nur mit Dauer aus der Liste - oder ausdruecklich "bis von Hand" (null).
+        const stunden = req.body?.stunden === null ? null : Number(req.body?.stunden);
+        if (!scharf && stunden !== null && !ALARM_STUNDEN.includes(stunden)) {
+            return res.status(400).json({ error: `Dauer: ${ALARM_STUNDEN.join(', ')} Stunden oder bis von Hand` });
+        }
+        const von = req.user?.name || req.user?.preferred_username || req.user?.email || '?';
+        await pool.query(
+            `UPDATE kiosk_alarm_einstellung SET scharf = $1, bis = $2, von = $3, geaendert = NOW() WHERE id = 1`,
+            [scharf, scharf || stunden === null ? null : new Date(Date.now() + stunden * 3600e3), von]);
+        logWarn('KUEHLER-ALARM', { art: scharf ? 'scharf gestellt' : 'entschaerft', stunden: scharf ? null : stunden, von });
+        res.json({ ...(await alarmEinstellung()), aktiv: process.env.KUEHLER_ALARM === 'an' });
+    } catch (error) {
+        console.error('PUT /kiosk/kuehler-alarm:', error.message);
+        res.status(500).json({ error: 'Alarm-Einstellung nicht gespeichert' });
+    }
+});
 
 function alarmSchluessel(req, res, next) {
     const s = process.env.ALARM_SMS_KEY;

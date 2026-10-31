@@ -26,6 +26,27 @@ class _Zugang extends RoterSchopfZugang {
     if (kaputt) throw const ApiFehler('Zentrale nicht erreichbar', status: 502);
     geschaltet.add((kennung, an));
   }
+
+  var alarm = KuehlerAlarm.ausJson({
+    'scharf': true,
+    'von': 'Erika Muster',
+    'geaendert': '2026-10-31T12:00:00Z',
+  });
+  final alarmGesetzt = <(bool, int?)>[];
+
+  @override
+  Future<KuehlerAlarm> kuehlerAlarm() async => alarm;
+
+  @override
+  Future<KuehlerAlarm> kuehlerAlarmSetzen({required bool scharf, int? stunden}) async {
+    alarmGesetzt.add((scharf, stunden));
+    return alarm = KuehlerAlarm(
+      scharf: scharf,
+      bis: scharf || stunden == null ? null : DateTime.now().add(Duration(hours: stunden)),
+      von: 'Stefan Müller',
+      geaendert: DateTime.now(),
+    );
+  }
 }
 
 void main() {
@@ -60,12 +81,16 @@ void main() {
     expect(trv.fehler, ['not_calibrated']);
   });
 
-  Future<_Zugang> zeigen(WidgetTester tester) async {
+  Future<_Zugang> zeigen(WidgetTester tester, {bool alarm = false}) async {
     final zugang = _Zugang(vertrag);
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(home: RoterSchopfScreen(zugang: zugang)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RoterSchopfScreen(zugang: zugang, alarmSchalten: alarm),
+      ),
+    );
     await tester.pumpAndSettle();
     return zugang;
   }
@@ -150,5 +175,41 @@ void main() {
     expect(s.bis!.toUtc(), DateTime.utc(2026, 10, 15, 1));
     expect(SchopfFreigabe.ausJson(v['kein']).zugang, isFalse);
     expect(SchopfFreigabe.ausJson(null).zugang, isFalse);
+  });
+
+  testWidgets('SMS-Alarm: nur mit Berechtigung; entschaerfen mit Dauer, wieder scharf', (
+    tester,
+  ) async {
+    await zeigen(tester);
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('kuehler-alarm')), findsNothing);
+
+    final z = await zeigen(tester, alarm: true);
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    expect(find.text('SMS-Alarm scharf'), findsOneWidget);
+    expect(find.textContaining('Zuletzt: Erika Muster'), findsOneWidget);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(find.text('SMS-Alarm entschärfen'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('entschaerfen-4')));
+    await tester.pumpAndSettle();
+    expect(z.alarmGesetzt.last, (false, 4));
+    expect(find.textContaining('SMS-Alarm entschärft bis'), findsOneWidget);
+
+    // Abbrechen aendert nichts; wieder scharf geht ohne Rueckfrage.
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(z.alarmGesetzt.last, (true, null));
+    expect(find.text('SMS-Alarm scharf'), findsOneWidget);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('entschaerfen-0')));
+    await tester.pumpAndSettle();
+    expect(z.alarmGesetzt.last, (false, null));
+    expect(find.text('SMS-Alarm entschärft'), findsOneWidget);
   });
 }

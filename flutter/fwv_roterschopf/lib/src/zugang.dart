@@ -34,6 +34,13 @@ abstract class RoterSchopfZugang {
 
   /// Darf ich gerade in den Roten Schopf (Gruppe oder Schicht)?
   Future<SchopfFreigabe> freigabe();
+
+  /// SMS-Alarm der Tiefkuehler (Gruppe Roter Schopf, Vorstand, admin).
+  Future<KuehlerAlarm> kuehlerAlarm() => throw UnsupportedError('Kein SMS-Alarm');
+
+  /// Scharf stellen, oder entschaerfen fuer [stunden] (null: bis von Hand).
+  Future<KuehlerAlarm> kuehlerAlarmSetzen({required bool scharf, int? stunden}) =>
+      throw UnsupportedError('Kein SMS-Alarm');
 }
 
 class ApiRoterSchopfZugang extends RoterSchopfZugang {
@@ -57,4 +64,14 @@ class ApiRoterSchopfZugang extends RoterSchopfZugang {
   @override
   Future<SchopfFreigabe> freigabe() async =>
       SchopfFreigabe.ausJson(await api.get('kiosk/roter-schopf/zugang'));
+
+  @override
+  Future<KuehlerAlarm> kuehlerAlarm() async =>
+      KuehlerAlarm.ausJson(await api.get('kiosk/kuehler-alarm'));
+
+  @override
+  Future<KuehlerAlarm> kuehlerAlarmSetzen({required bool scharf, int? stunden}) async =>
+      KuehlerAlarm.ausJson(
+        await api.put('kiosk/kuehler-alarm', daten: {'scharf': scharf, 'stunden': stunden}),
+      );
 }

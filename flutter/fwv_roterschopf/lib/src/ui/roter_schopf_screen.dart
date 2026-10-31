@@ -35,6 +35,7 @@ class RoterSchopfScreen extends StatefulWidget {
     this.hinweis,
     this.musik,
     this.bildschirm,
+    this.alarmSchalten = false,
   });
 
   final RoterSchopfZugang zugang;
@@ -44,6 +45,10 @@ class RoterSchopfScreen extends StatefulWidget {
 
   /// Knopf oben rechts: Bildschirm des Laptops oeffnen.
   final VoidCallback? bildschirm;
+
+  /// SMS-Alarm der Tiefkuehler scharf stellen und entschaerfen (Gruppe
+  /// Roter Schopf, Vorstand, admin - nicht mit blossem Schicht-Zugang).
+  final bool alarmSchalten;
 
   /// Zeile oben, z.B. "Fuer deine Schicht Bar bis 01:00" (Zugang nur wegen
   /// der Schicht).
@@ -209,6 +214,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
         if (z.hauptmessung != null) ...[const _Kopf('Strom'), _StromKarte(z.hauptmessung!)],
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
+          if (widget.alarmSchalten) _AlarmKarte(zugang: widget.zugang),
           for (final k in z.kuehlung) _KuehlerKarte(k),
         ],
         if (z.thermostate.isNotEmpty) ...[
@@ -450,6 +456,132 @@ class _StromKarte extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// SMS-Alarm: scharf oder entschaerft. Entschaerfen immer mit Dauer, damit
+/// niemand das Wiedereinschalten vergisst (etwa nach dem Abtauen).
+class _AlarmKarte extends StatefulWidget {
+  const _AlarmKarte({required this.zugang});
+
+  final RoterSchopfZugang zugang;
+
+  @override
+  State<_AlarmKarte> createState() => _AlarmKarteState();
+}
+
+class _AlarmKarteState extends State<_AlarmKarte> {
+  KuehlerAlarm? _alarm;
+  bool _schaltet = false;
+  String? _fehler;
+
+  @override
+  void initState() {
+    super.initState();
+    _laden();
+  }
+
+  Future<void> _laden() async {
+    try {
+      final a = await widget.zugang.kuehlerAlarm();
+      if (mounted) setState(() => _alarm = a);
+    } on Object catch (e) {
+      if (mounted) setState(() => _fehler = fehlerText(e));
+    }
+  }
+
+  Future<void> _umschalten(bool scharf) async {
+    int? stunden;
+    if (!scharf) {
+      final wahl = await showDialog<int>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('SMS-Alarm entschärfen'),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                'Solange der Alarm entschärft ist, geht keine SMS an Vorstand und Roter Schopf.',
+              ),
+            ),
+            for (final (h, text) in const [
+              (1, 'Für 1 Stunde'),
+              (4, 'Für 4 Stunden'),
+              (24, 'Für 24 Stunden'),
+              (0, 'Bis ich ihn wieder scharf stelle'),
+            ])
+              SimpleDialogOption(
+                key: Key('entschaerfen-$h'),
+                onPressed: () => Navigator.of(context).pop(h),
+                child: Text(text),
+              ),
+          ],
+        ),
+      );
+      if (wahl == null) return;
+      stunden = wahl == 0 ? null : wahl;
+    }
+    setState(() => _schaltet = true);
+    try {
+      final a = await widget.zugang.kuehlerAlarmSetzen(scharf: scharf, stunden: stunden);
+      if (mounted) setState(() => _alarm = a);
+      if (mounted)
+        meldung(
+          context,
+          scharf ? 'Alarm wieder scharf gestellt' : 'Alarm entschärft – vorerst keine SMS',
+        );
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _schaltet = false);
+    }
+  }
+
+  static String _zeit(DateTime t) {
+    final heute = DateTime.now();
+    final uhr = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final gleicherTag = t.year == heute.year && t.month == heute.month && t.day == heute.day;
+    return gleicherTag ? uhr : '${t.day}.${t.month}. $uhr';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _alarm;
+    final farben = Theme.of(context).colorScheme;
+    if (a == null) {
+      return ListTile(
+        leading: const Icon(Icons.sms_outlined),
+        title: const Text('SMS-Alarm'),
+        subtitle: Text(_fehler ?? 'Wird geladen …'),
+      );
+    }
+    final titel = !a.aktiv
+        ? 'SMS-Alarm auf dem Server ausgeschaltet'
+        : a.scharf
+        ? 'SMS-Alarm scharf'
+        : a.bis == null
+        ? 'SMS-Alarm entschärft'
+        : 'SMS-Alarm entschärft bis ${_zeit(a.bis!)}';
+    return Card(
+      key: const Key('kuehler-alarm'),
+      color: a.scharf || !a.aktiv ? null : farben.errorContainer,
+      child: SwitchListTile(
+        secondary: Icon(
+          a.scharf ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+        ),
+        title: Text(titel),
+        subtitle: Text(
+          [
+            if (a.scharf)
+              'SMS an Vorstand und Roter Schopf, wenn ein Tiefkühler zu warm wird oder ausfällt',
+            if (!a.scharf && a.bis == null) 'Bis ihn jemand wieder scharf stellt',
+            if (a.von != null && a.geaendert != null) 'Zuletzt: ${a.von}, ${_zeit(a.geaendert!)}',
+          ].join(' · '),
+        ),
+        value: a.scharf,
+        onChanged: _schaltet || !a.aktiv ? null : _umschalten,
       ),
     );
   }

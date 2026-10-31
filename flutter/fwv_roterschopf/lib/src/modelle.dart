@@ -271,3 +271,32 @@ class SchopfFreigabe {
   /// Ende des Zugangs (Schichtende + 1 h); null ueber die Gruppe.
   final DateTime? bis;
 }
+
+/// SMS-Alarm der Tiefkuehler (api-members, src/kuehler-alarm.js): scharf
+/// oder fuer eine Weile entschaerft.
+class KuehlerAlarm {
+  const KuehlerAlarm({required this.scharf, this.bis, this.von, this.geaendert, this.aktiv = true});
+
+  factory KuehlerAlarm.ausJson(Object? roh) {
+    final j = roh is Map ? roh : const {};
+    DateTime? zeit(Object? v) => v == null ? null : DateTime.tryParse('$v')?.toLocal();
+    final von = '${j['von'] ?? ''}'.trim();
+    return KuehlerAlarm(
+      scharf: j['scharf'] != false,
+      bis: zeit(j['bis']),
+      von: von.isEmpty ? null : von,
+      geaendert: zeit(j['geaendert']),
+      aktiv: j['aktiv'] != false,
+    );
+  }
+
+  final bool scharf;
+
+  /// Entschaerft bis dahin; null = bis jemand wieder scharf stellt.
+  final DateTime? bis;
+  final String? von;
+  final DateTime? geaendert;
+
+  /// false: auf dem Server ganz abgeschaltet (KUEHLER_ALARM).
+  final bool aktiv;
+}

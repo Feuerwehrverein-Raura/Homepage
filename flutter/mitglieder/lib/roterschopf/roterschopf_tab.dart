@@ -25,6 +25,8 @@ class RoterSchopfTab extends StatelessWidget {
       // Alles zum Lokal an einem Ort: Musik am Laptop und sein Bildschirm.
       musik: dienste.musik,
       bildschirm: () => bildschirmOeffnen(context, dienste),
+      // SMS-Alarm der Tiefkuehler schalten: nur mit Gruppe, nicht per Schicht.
+      alarmSchalten: hatRoterSchopfZugang(dienste.sitzung.sitzung),
     ),
   );
 }
