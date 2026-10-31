@@ -7883,6 +7883,9 @@ app.put('/kiosk/kuehler-alarm', authenticateToken, roterSchopfGruppe, async (req
 function alarmSchluessel(req, res, next) {
     const s = process.env.ALARM_SMS_KEY;
     if (s && req.get('X-Alarm-Key') === s) return next();
+    // Zum Ansehen im Browser: Schluessel in der Adresse, aber nur fuer die
+    // Vorschau (die nichts abholt) - abholen geht nur mit Kopfzeile.
+    if (s && req.method === 'GET' && req.query.vorschau === '1' && req.query.key === s) return next();
     return res.status(401).json({ error: 'Kein Zugang' });
 }
 
