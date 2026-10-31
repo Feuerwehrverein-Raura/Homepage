@@ -7734,6 +7734,119 @@ async function periodicAuthentikSync() {
     }
 }
 
+// --- Tiefkuehler-Alarm per SMS (src/kuehler-alarm.js) ------------------------
+// Der Waechter legt SMS in kiosk_alarm_sms; der SMS-Gateway im PJC holt sie
+// jede Minute ab (GET /kiosk/alarm-sms, X-Alarm-Key) und meldet, ob sie
+// rausgingen. Scharf nur mit KUEHLER_ALARM=an.
+const { kuehlerAlarm, alarmBenutzer, alarmEmpfaenger } = require('./kuehler-alarm');
+
+let alarmTabelleDa = false;
+async function alarmTabelle() {
+    if (alarmTabelleDa) return;
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS kiosk_alarm_sms (
+            id SERIAL PRIMARY KEY,
+            schluessel TEXT NOT NULL,
+            art TEXT NOT NULL,
+            nummer TEXT NOT NULL,
+            name TEXT,
+            text TEXT NOT NULL,
+            erstellt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            abgeholt TIMESTAMPTZ,
+            gesendet TIMESTAMPTZ,
+            fehler TEXT
+        )`);
+    alarmTabelleDa = true;
+}
+
+/** Wer den Alarm bekommt: Gruppen Vorstand und Roter Schopf (Authentik). */
+async function kuehlerAlarmEmpfaenger() {
+    const pks = alarmBenutzer(await gruppenDienst.liste());
+    if (!pks.length) return [];
+    const r = await pool.query(
+        `SELECT vorname, nachname, mobile, telefon, status FROM members
+          WHERE authentik_user_id::text = ANY($1::text[])`, [pks.map(String)]);
+    return alarmEmpfaenger(r.rows);
+}
+
+async function kuehlerAlarmStarten() {
+    await alarmTabelle();
+    // Was vor dem Neustart gemeldet und nicht entwarnt wurde, gilt als gemeldet.
+    const offen = await pool.query(`
+        SELECT schluessel, EXTRACT(EPOCH FROM MAX(erstellt)) * 1000 AS zeit
+          FROM kiosk_alarm_sms a
+         WHERE art IN ('alarm', 'erinnerung') AND erstellt > NOW() - INTERVAL '1 day'
+           AND NOT EXISTS (SELECT 1 FROM kiosk_alarm_sms e
+                            WHERE e.schluessel = a.schluessel AND e.art = 'entwarnung' AND e.erstellt > a.erstellt)
+         GROUP BY schluessel`);
+    const waechter = kuehlerAlarm({ gemeldet: new Map(offen.rows.map(r => [r.schluessel, Number(r.zeit)])) });
+    let laeuft = false;
+    async function takt() {
+        if (laeuft) return;
+        laeuft = true;
+        try {
+            const z = await roterSchopfDienst.zustand();
+            const meldungen = waechter.pruefen(z.kuehlung);
+            if (!meldungen.length) return;
+            const empfaenger = await kuehlerAlarmEmpfaenger();
+            for (const m of meldungen) {
+                logWarn('KUEHLER-ALARM', { art: m.art, schluessel: m.schluessel, text: m.text, empfaenger: empfaenger.length });
+                for (const e of empfaenger) {
+                    await pool.query(
+                        'INSERT INTO kiosk_alarm_sms (schluessel, art, nummer, name, text) VALUES ($1, $2, $3, $4, $5)',
+                        [m.schluessel, m.art, e.nummer, e.name, m.text]);
+                }
+            }
+        } catch (error) {
+            console.error('Kuehler-Alarm:', error.message);
+        } finally {
+            laeuft = false;
+        }
+    }
+    setInterval(takt, 60 * 1000);
+    console.log('Kuehler-Alarm scharf');
+}
+
+function alarmSchluessel(req, res, next) {
+    const s = process.env.ALARM_SMS_KEY;
+    if (s && req.get('X-Alarm-Key') === s) return next();
+    return res.status(401).json({ error: 'Kein Zugang' });
+}
+
+// Der SMS-Gateway holt ab. Was abgeholt, aber nach 5 min nicht bestaetigt
+// ist, kommt nochmals; aelter als 12 h verschickt niemand mehr.
+app.get('/kiosk/alarm-sms', alarmSchluessel, async (req, res) => {
+    try {
+        await alarmTabelle();
+        const r = await pool.query(`
+            UPDATE kiosk_alarm_sms SET abgeholt = NOW()
+             WHERE id IN (SELECT id FROM kiosk_alarm_sms
+                           WHERE gesendet IS NULL AND fehler IS NULL
+                             AND erstellt > NOW() - INTERVAL '12 hours'
+                             AND (abgeholt IS NULL OR abgeholt < NOW() - INTERVAL '5 minutes')
+                           ORDER BY id LIMIT 20)
+            RETURNING id, nummer, text`);
+        res.json({ sms: r.rows });
+    } catch (error) {
+        console.error('GET /kiosk/alarm-sms:', error.message);
+        res.status(500).json({ error: 'Warteschlange nicht lesbar' });
+    }
+});
+
+app.post('/kiosk/alarm-sms/:id', alarmSchluessel, async (req, res) => {
+    try {
+        await alarmTabelle();
+        const ok = req.body?.ok === true;
+        await pool.query(
+            'UPDATE kiosk_alarm_sms SET gesendet = CASE WHEN $2 THEN NOW() END, fehler = CASE WHEN $2 THEN NULL ELSE $3 END WHERE id = $1',
+            [Number(req.params.id), ok, String(req.body?.fehler || 'abgelehnt').slice(0, 300)]);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('POST /kiosk/alarm-sms/:id:', error.message);
+        res.status(500).json({ error: 'Nicht gespeichert' });
+    }
+});
+
 // Start server
 // DEUTSCH: Server starten, periodische Synchronisationen und Passwort-Rotation einrichten
 app.listen(PORT, () => {
@@ -7741,6 +7854,10 @@ app.listen(PORT, () => {
 
     // Benutzernamen fuer Mitglieder ohne E-Mail (siehe benutzernamenSicherstellen)
     benutzernamenSicherstellen();
+
+    if (process.env.KUEHLER_ALARM === 'an') {
+        kuehlerAlarmStarten().catch(e => console.error('Kuehler-Alarm nicht gestartet:', e.message));
+    }
 
     // Run initial sync and rotation after 30 seconds (to allow container to fully start)
     setTimeout(() => {
