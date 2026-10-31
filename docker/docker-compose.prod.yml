@@ -73,6 +73,10 @@ services:
       KIOSK_MUSIK_PFAD: /app/musik     # DEUTSCH: Nur lesend — Vorhoeren, Streamen, Spiegel fuer den Laptop
       MUSIK_DL_URL: http://fwv-musik-dl:8080   # DEUTSCH: Songs ergaenzen (spotDL), nur intern
       MUSIK_DL_KEY: ${MUSIK_DL_KEY}
+      # DEUTSCH: Tiefkuehler-Alarm per SMS (src/kuehler-alarm.js); der SMS-Gateway
+      # im PJC holt die SMS mit ALARM_SMS_KEY ab. Scharf erst mit "an".
+      KUEHLER_ALARM: ${KUEHLER_ALARM:-aus}
+      ALARM_SMS_KEY: ${ALARM_SMS_KEY}
       BONDRUCKER_IP: ${BONDRUCKER_IP:-192.168.88.11}  # DEUTSCH: Epson TM-m30III im Roten Schopf, fuer den Anmeldebon
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       NEXTCLOUD_URL: https://nextcloud.fwv-raura.ch
