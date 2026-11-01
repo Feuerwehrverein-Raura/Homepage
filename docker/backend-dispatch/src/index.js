@@ -4084,7 +4084,9 @@ app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'ad
 
 // Rendert Brief-HTML zu einem PDF wie /dispatch/send-post (gleicher Rand,
 // Seitenzahlen); zonen=true legt die Pingen-Zonen ueber Seite 1.
-async function vorschauPdfRendern(html, pdf_margin, showZones) {
+// links: Fenster links (deutsche Empfaenger) - Zonen gespiegelt wie in
+// nachricht-layout.js (Adresse 22/60mm, Frankierbereich 20/40mm).
+async function vorschauPdfRendern(html, pdf_margin, showZones, links = false) {
     // Gleiche Rand-Logik wie /dispatch/send-post, damit die Vorschau 1:1 dem
     // echten Brief entspricht (z.B. Event-Einladung: 15mm Oberrand).
     const previewMargin = (pdf_margin && typeof pdf_margin === 'object')
@@ -4100,16 +4102,16 @@ async function vorschauPdfRendern(html, pdf_margin, showZones) {
     let finalHtml = html;
     if (showZones) {
         const zoneOverlay = `
-<div style="position: absolute; top: -${mTop}mm; left: 0; width: 210mm; height: ${297 - mBottom}mm; overflow: hidden; pointer-events: none; z-index: 9999;">
+<div style="position: absolute; top: -${mTop}mm; left: 0; width: 210mm; height: ${297 - mBottom - 1}mm; overflow: hidden; pointer-events: none; z-index: 9999;">
 <!-- Randsperrbereich 5mm rundum (Blatt-Koordinaten) -->
 <div style="position: absolute; top: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-bottom: 1px dashed rgba(239,68,68,0.6);"></div>
 <div style="position: absolute; top: 292mm; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
 <div style="position: absolute; top: 0; left: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
 <div style="position: absolute; top: 0; right: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
-<!-- Frankierbereich X=116, Y=40, W=89.5, H=47.5 -->
-<div style="position: absolute; top: 40mm; left: 116mm; width: 89.5mm; height: 47.5mm; background: rgba(251,146,60,0.15); border: 1px dashed rgba(251,146,60,0.6); font-size: 7pt; color: #9a3412; padding: 1mm;">Frankierbereich (116/40/89.5/47.5mm)</div>
-<!-- Adressbereich X=118, Y=60, W=85.5, H=25.5 -->
-<div style="position: absolute; top: 60mm; left: 118mm; width: 85.5mm; height: 25.5mm; background: rgba(220,38,38,0.15); border: 1.5px solid rgba(220,38,38,0.8); font-size: 7pt; color: #7f1d1d; padding: 1mm;">Adressbereich (118/60/85.5/25.5mm)</div>
+<!-- Frankierbereich (rechts X=116 / links X=20), Y=40, W=89.5, H=47.5 -->
+<div style="position: absolute; top: 40mm; left: ${links ? 20 : 116}mm; width: 89.5mm; height: 47.5mm; background: rgba(251,146,60,0.15); border: 1px dashed rgba(251,146,60,0.6); font-size: 7pt; color: #9a3412; padding: 1mm;">Frankierbereich (${links ? 20 : 116}/40/89.5/47.5mm)</div>
+<!-- Adressbereich (rechts X=118 / links X=22), Y=60, W=85.5, H=25.5 -->
+<div style="position: absolute; top: 60mm; left: ${links ? 22 : 118}mm; width: 85.5mm; height: 25.5mm; background: rgba(220,38,38,0.15); border: 1.5px solid rgba(220,38,38,0.8); font-size: 7pt; color: #7f1d1d; padding: 1mm;">Adressbereich (${links ? 22 : 118}/60/85.5/25.5mm)</div>
 </div>`;
         finalHtml = html.replace('</body>', zoneOverlay + '</body>');
     }

@@ -80,7 +80,7 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
                 subject: L.platzhalterErsetzen(subject, mitglied).trim() || 'Brief'
             };
             if (vorschau === true) {
-                const pdf = await vorschauPdf(html, L.BRIEF_RAND, zonen === true);
+                const pdf = await vorschauPdf(html, L.BRIEF_RAND, zonen === true, L.istDeutscherEmpfaenger(mitglied));
                 antwort.pdf_base64 = Buffer.from(pdf).toString('base64');
             }
             res.json(antwort);
