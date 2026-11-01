@@ -84,5 +84,33 @@ void main() {
     ];
     expect(felder, contains('Einladung: Chilbi 2026'));
     expect(felder.where((t) => t.contains('Anmeldeschluss: 01.10.2026')), hasLength(1));
+    // Ohne PDF am Anlass kein Hinweis.
+    expect(find.byKey(const Key('versand-anhang')), findsNothing);
+  });
+
+  test('Entwurf nennt den Anlass und sein PDF', () {
+    final e = einladungsEntwurf(_anlass({'pdf_filename': 'Jass-Einladung 2026.pdf'}));
+    expect(e.anlassId, 'e1');
+    expect(e.anhang, 'Jass-Einladung 2026.pdf');
+    expect(einladungsEntwurf(_anlass()).anhang, isNull);
+  });
+
+  testWidgets('Verfassen zeigt, dass das PDF mitkommt', (tester) async {
+    final b = FalschesBackend(
+      (a) => switch (a.url.path) {
+        '/members' => <Object>[],
+        '/templates' => <Object>[],
+        _ => (404, {'error': 'unbekannt'}),
+      },
+    );
+    await zeigen(
+      tester,
+      VerfassenAnsicht(
+        dienste: b.dienste,
+        entwurf: einladungsEntwurf(_anlass({'pdf_filename': 'Jass-Einladung 2026.pdf'})),
+      ),
+    );
+    expect(find.byKey(const Key('versand-anhang')), findsOneWidget);
+    expect(find.textContaining('«Jass-Einladung 2026.pdf»'), findsOneWidget);
   });
 }

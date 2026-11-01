@@ -61,7 +61,10 @@ test('Brief: Kopf, Fenster, Betreff, Text mit Platzhaltern, escaped', () => {
     assert.match(html, /<div>Eri&lt;ka&gt; Muster<\/div>/);
     assert.doesNotMatch(html, /<script>/);
     const de = L.briefHtml({ betreff: '', text: 'x', mitglied: { ...ERIKA, plz: '79618' }, absender: '' });
-    assert.match(de, /top:40mm;left:20mm;/);
+    // DE links ausserhalb Pingens Frankierbereich: Adresse ab 60mm, Logo kleiner.
+    assert.match(de, /top:45mm;left:22mm;width:85.5mm;max-height:25.5mm;/);
+    assert.match(de, /width:30mm;height:auto/);
+    assert.match(html, /width:35mm;height:auto/);
 });
 
 test('E-Mail: Layout mit Betreff und Text', () => {

@@ -7,8 +7,11 @@
 
 import 'package:fwv_core/fwv_core.dart';
 
-/// Betreff und Text, mit denen "Verfassen" startet.
-typedef NachrichtEntwurf = ({String betreff, String text});
+/// Betreff und Text, mit denen "Verfassen" startet. Bei einer Einladung
+/// dazu der Anlass: der Versand schickt dann sein PDF (Flyer, Programm) mit,
+/// als Anhang der E-Mail und als weitere Seiten des Briefs ([anhang] ist
+/// sein Dateiname, null ohne PDF).
+typedef NachrichtEntwurf = ({String betreff, String text, String? anlassId, String? anhang});
 
 /// Seite des Anlasses auf der Website (wie der QR in vorstand.html).
 Uri anlassSeite(Anlass a) =>
@@ -40,5 +43,5 @@ NachrichtEntwurf einladungsEntwurf(Anlass a) {
         ? 'Ohne Helferinnen und Helfer geht es nicht – herzlichen Dank fürs Mitmachen.'
         : 'Wir freuen uns über zahlreiches Erscheinen.',
   ].join('\n\n');
-  return (betreff: 'Einladung: ${a.titel}', text: text);
+  return (betreff: 'Einladung: ${a.titel}', text: text, anlassId: a.id, anhang: a.pdfDateiname);
 }

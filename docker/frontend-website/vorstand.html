@@ -8445,6 +8445,15 @@
 
                 showToast('Versand läuft...', 'info');
 
+                // Von Hand beigelegte Dateien gehen mit (vorher immer attachments: []).
+                // Das PDF des gewaehlten Anlasses (Flyer) legt das Backend selbst
+                // dazu, sobald event_id mitkommt - bei der E-Mail als Anhang, beim
+                // Brief als weitere Seiten (backend-dispatch/src/anlass-pdf.js).
+                const anhaenge = await Promise.all(dispatchAttachments.map(async f => ({
+                    filename: f.name, content: await fileToBase64(f), contentType: f.type || 'application/octet-stream'
+                })));
+                const anlassId = getSelectedDispatchEvent()?.id || null;
+
                 // E-Mail-Versand: HTML im offiziellen Layout einwickeln (Kopf + Body + Schluss)
                 // Placeholders {{vorname}} etc. werden vom Backend pro Empfaenger ersetzt
                 if (emailRecipients.length > 0) {
@@ -8487,7 +8496,8 @@
                                     : (evt.start_date ? formatEventDate(evt.start_date) : ''),
                                 event_location: evt.location || ''
                             } : {},
-                            attachments: []
+                            attachments: anhaenge,
+                            event_id: anlassId
                         })
                     });
 
@@ -8537,7 +8547,10 @@
                                     member_id: member.id,
                                     subject: postSubject,
                                     // Event-Einladung: 15mm Oberrand, damit Folgeseiten nicht in Pingens Sperrzone laufen
-                                    pdf_margin: evtForPost ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
+                                    pdf_margin: evtForPost ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined,
+                                    // Flyer des Anlasses und beigelegte PDFs als weitere Seiten
+                                    event_id: anlassId,
+                                    anhaenge
                                 })
                             });
                             if (response.ok) postSuccess++;

@@ -157,6 +157,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
       betreff: _betreff.text,
       text: _text.text,
       staging: mitPost && _staging,
+      anlassId: widget.entwurf?.anlassId,
       fortschritt: (f, g) {
         if (mounted) setState(() => _fortschritt = (f, g));
       },
@@ -372,6 +373,13 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             helperMaxLines: 3,
           ),
         ),
+        if (widget.entwurf?.anhang case final anhang?) ...[
+          const SizedBox(height: 8),
+          Hinweis(
+            key: const Key('versand-anhang'),
+            text: 'Kommt mit: «$anhang» – als Anhang der E-Mail und als weitere Seiten des Briefs.',
+          ),
+        ],
         const SizedBox(height: 8),
         Text('Platzhalter einfügen', style: t.textTheme.labelMedium),
         const SizedBox(height: 4),

@@ -111,12 +111,14 @@ class VersandDienst {
 
   /// Schickt nach [plan]: erst die E-Mails (paketweise), dann die Briefe
   /// einzeln (Brief bauen, dann send-post). Fehler einzelner Empfaenger
-  /// stehen im Ergebnis; ohne Verbindung bricht der Versand ab.
+  /// stehen im Ergebnis; ohne Verbindung bricht der Versand ab. Mit
+  /// [anlassId] haengt das Backend das PDF des Anlasses an (anlass-pdf.js).
   Future<VersandErgebnis> senden(
     Versandplan plan, {
     required String betreff,
     required String text,
     required bool staging,
+    String? anlassId,
     Fortschritt? fortschritt,
   }) async {
     final ergebnis = VersandErgebnis(staging: staging);
@@ -134,6 +136,7 @@ class VersandDienst {
             'subject': betreff.trim(),
             'body': text,
             'layout': 'standard',
+            'event_id': ?anlassId,
             // Versandart E-Mail: auch an Mitglieder, die Post wuenschen.
             if (plan.art == Versandart.email) 'praeferenz_ignorieren': true,
           },
@@ -170,6 +173,7 @@ class VersandDienst {
             'subject': brief.betreff,
             'staging': staging,
             'pdf_margin': ?brief.rand,
+            'event_id': ?anlassId,
           },
         );
         ergebnis.briefe++;

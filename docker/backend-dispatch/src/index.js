@@ -17,6 +17,7 @@ const { generate } = require('@pdfme/generator');
 const { text, image, barcodes } = require('@pdfme/schemas');
 const crypto = require('crypto');
 const nachrichtLayout = require('./nachricht-layout');
+const { anlassPdf, mitAnlassPdf, seitenAnhaengen } = require('./anlass-pdf');
 const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen } = require('./nachricht-routen');
 
 // ============================================
@@ -837,6 +838,9 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
         }
         console.log('[EMAIL BULK] Processing', filteredMembers.length, 'members (requested:', requestedIds.size + ')');
 
+        // Einladung zu einem Anlass (event_id): sein PDF kommt mit (anlass-pdf.js).
+        const anhaenge = mitAnlassPdf(req.body.attachments, await anlassPdf(pool, req.body.event_id));
+
         const results = [];
         let skipped = 0;
         for (const member of filteredMembers) {
@@ -879,7 +883,8 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                             absender
                         })
                         : req.body.html,
-                    attachments: req.body.attachments
+                    attachments: anhaenge,
+                    event_id: req.body.event_id || null
                 }, {
                     headers: { Authorization: req.headers.authorization || '' }
                 });
@@ -3873,7 +3878,7 @@ app.post('/invoices/generate-qr', authenticateAny, requireRole('vorstand', 'admi
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
 app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { html, recipient, member_id, subject, staging = false, pdf_margin } = req.body;
+        const { html, recipient, member_id, subject, staging = false, pdf_margin, event_id, anhaenge } = req.body;
 
         if (!html || !recipient) {
             return res.status(400).json({ error: 'html und recipient erforderlich' });
@@ -3904,6 +3909,8 @@ app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'
             footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
         });
         await browser.close();
+        // Einladung zu einem Anlass: sein PDF (und beigelegte PDFs) als weitere Seiten.
+        const briefPdf = await seitenAnhaengen(pdfBuffer, mitAnlassPdf(anhaenge, await anlassPdf(pool, event_id)));
 
         // Pingen-Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
@@ -3921,7 +3928,7 @@ app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'
         const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
 
         // PDF hochladen
-        await axios.put(fileUrl, pdfBuffer, { headers: { 'Content-Type': 'application/pdf' } });
+        await axios.put(fileUrl, briefPdf, { headers: { 'Content-Type': 'application/pdf' } });
 
         // Brief bei Pingen erstellen - Adresse ist bereits im HTML/PDF, daher nur address_position setzen
         const letterRes = await axios.post(

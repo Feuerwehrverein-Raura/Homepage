@@ -108,11 +108,23 @@ const SCHLUSS = `Mit freundlichen Grüssen<br><br>
  * Brief im offiziellen Layout (Basis: einheitliche Vorlage aus
  * dispatch-letter.ts). Kopf absolut positioniert, Text im Fluss; zusammen mit
  * BRIEF_RAND landet das Adressfenster bei 60mm/118mm (CH) bzw. links (DE).
+ *
+ * DE (Fenster links, address_position left): Pingens Zonen gespiegelt -
+ * Adressbereich 22/60mm (85.5 x 25.5mm), Frankierbereich 20/40mm
+ * (89.5 x 47.5mm), darin darf ausser der Adresse nichts stehen. Vorher stand
+ * die Adresse bei 55mm und das Logo reichte bis 41mm: Pingen lehnte ab
+ * ("protected_stamp_area", Preisjassen 01.11.2026). Darum hier Adresse ab
+ * 60mm mit engeren Zeilen (5 Zeilen mit "Deutschland" in 25.5mm) und das
+ * Logo 30mm breit (endet bei 37.6mm).
  */
 function briefHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
     const titel = platzhalterErsetzen(betreff, mitglied);
     const inhalt = textZuHtml(platzhalterErsetzen(text, mitglied));
-    const adresseCss = istDeutscherEmpfaenger(mitglied) ? 'top:40mm;left:20mm;' : 'top:45mm;left:118mm;';
+    const de = istDeutscherEmpfaenger(mitglied);
+    const adresseCss = de
+        ? 'top:45mm;left:22mm;width:85.5mm;max-height:25.5mm;overflow:hidden;line-height:1.15;'
+        : 'top:45mm;left:118mm;width:85mm;';
+    const logoBreite = de ? '30mm' : '35mm';
     const adresse = adressZeilen(mitglied).map(z => `<div>${escapeHtml(z)}</div>`).join('\n        ');
     const kopf = titel
         ? `<div style="font-weight:bold;font-size:13pt;">${escapeHtml(titel)}</div><hr style="border:none;border-top:1px solid #000;margin:4mm 0 6mm 0;">`
@@ -126,15 +138,15 @@ function briefHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
 </style></head>
 <body>
 <div style="position:relative;height:85mm;">
-    <div style="position:absolute;top:0;left:25mm;width:35mm;">
-        <img src="${LOGO}" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
+    <div style="position:absolute;top:0;left:25mm;width:${logoBreite};">
+        <img src="${LOGO}" alt="FWV Raura" style="width:${logoBreite};height:auto;display:block;">
     </div>
     <div style="position:absolute;top:0;left:118mm;">
         <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
         <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
     </div>
     <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${escapeHtml(absender)}</div>
-    <div style="position:absolute;${adresseCss}width:85mm;">
+    <div style="position:absolute;${adresseCss}">
         ${adresse}
     </div>
     <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${schweizerDatum(datum)}</div>
