@@ -83,12 +83,12 @@ async function seed(pool) {
     // Anlass 1: Erika ist Haupt-Organisatorin (Mitglied)
     await q(`INSERT INTO events (id, slug, title, category, start_date, status, organizer_id, organizer_name,
                                  registration_required)
-             VALUES ($1, 'chilbi', 'Chilbi', 'Sonstiges', '2026-10-24 18:00', 'planned', $2, 'Erika Muster', true)`,
+             VALUES ($1, 'chilbi', 'Chilbi', 'Sonstiges', '2099-10-24 18:00', 'planned', $2, 'Erika Muster', true)`,
     [E(1), ERIKA]);
     // Anlass 2: externer Haupt-Organisator mit dem bisherigen Login (SHA-256)
     await q(`INSERT INTO events (id, slug, title, category, start_date, status, organizer_name, organizer_email,
                                  event_email, event_password_hash, registration_required)
-             VALUES ($1, 'grill', 'Grillfest', 'Sonstiges', '2026-10-25 18:00', 'planned', 'Gaby Grill',
+             VALUES ($1, 'grill', 'Grillfest', 'Sonstiges', '2099-10-25 18:00', 'planned', 'Gaby Grill',
                      'gaby@example.ch', 'grill@fwv-raura.ch', $2, true)`,
     [E(2), crypto.createHash('sha256').update(HAUPT_PASSWORT).digest('hex')]);
 }
@@ -192,7 +192,7 @@ test('Mitorganisatoren gegen den echten Server', { skip: !DB && 'TEST_DATABASE_U
         assert.equal(await bearbeiten('hans'), 200);
         assert.equal(await bearbeiten('otto'), 403);
         const schicht = await anfrage('POST', `/events/${E(1)}/shifts-as-organizer`, 'hans',
-            { name: 'Bar', date: '2026-10-24', start_time: '18:00', end_time: '20:00', needed: 2 });
+            { name: 'Bar', date: '2099-10-24', start_time: '18:00', end_time: '20:00', needed: 2 });
         assert.equal(schicht.status, 201, JSON.stringify(schicht.json));
         const notiz = await anfrage('POST', `/events/${E(1)}/organizer-notes`, 'hans', { content: 'Bier bestellen' });
         assert.equal(notiz.status, 201);

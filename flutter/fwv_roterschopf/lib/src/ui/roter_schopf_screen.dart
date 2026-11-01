@@ -527,11 +527,12 @@ class _AlarmKarteState extends State<_AlarmKarte> {
     try {
       final a = await widget.zugang.kuehlerAlarmSetzen(scharf: scharf, stunden: stunden);
       if (mounted) setState(() => _alarm = a);
-      if (mounted)
+      if (mounted) {
         meldung(
           context,
           scharf ? 'Alarm wieder scharf gestellt' : 'Alarm entschärft – vorerst keine SMS',
         );
+      }
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
     } finally {
