@@ -2224,11 +2224,12 @@ Feuerwehrverein Raura - Kassensystem
     `.trim();
 
     // Send via main API email endpoint
-    const emailApiUrl = process.env.EMAIL_API_URL || 'https://www.fwv-raura.ch/api/email/send';
+    const emailApiUrl = process.env.EMAIL_API_URL || 'http://fwv-api-dispatch:3000/email/send';
 
     const emailResponse = await fetch(emailApiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // dispatch /email/send verlangt Vorstand oder den API-Schluessel.
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.DISPATCH_API_KEY || '' },
       body: JSON.stringify({
         to: userEmail,
         subject: `Tagesbericht Kasse - ${displayDate}`,

@@ -1998,6 +1998,18 @@ async function sendNotificationEmail(memberId, templateName, variables = {}, pus
 
 // Send farewell message to departing member based on delivery preferences
 // DEUTSCH: Sendet eine Verabschiedungs-Nachricht an austretende Mitglieder (per E-Mail und/oder Brief via Pingen)
+/** Text des Abschiedsbriefs aus der E-Mail-Vorlage "Verabschiedung Mitglied":
+ * Platzhalter eingesetzt, ohne die Grussformel (die setzt das Brief-Layout). */
+function abschiedsBrief(vorlage, m, { eintrittsdatum, aktuarName }) {
+    let text = (vorlage && vorlage.body) || 'Mit diesem Schreiben möchten wir uns herzlich für deine Mitgliedschaft beim Feuerwehrverein Raura Kaiseraugst bedanken.\n\nWir wünschen dir für deine Zukunft alles Gute.';
+    text = text.split(/\n\s*Mit kameradschaftlichen Gr(ü|ue)ssen/)[0].trim();
+    const werte = { anrede: m.anrede || '', vorname: m.vorname || '', nachname: m.nachname || '',
+        eintrittsdatum, aktuar_name: aktuarName };
+    for (const [k, v] of Object.entries(werte)) text = text.replace(new RegExp(`{{${k}}}`, 'g'), v);
+    return { betreff: (vorlage && vorlage.subject) || 'Alles Gute und auf Wiedersehen',
+        text: text.replace(/[ \t]+\n/g, '\n').replace(/^Liebe\/r\s+/, 'Liebe/r ') };
+}
+
 async function sendFarewellMessage(memberData) {
     try {
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
@@ -2059,81 +2071,27 @@ async function sendFarewellMessage(memberData) {
             }
         }
 
-        // Send farewell LETTER if preference is set
+        // Send farewell LETTER if preference is set. Ueber den Server-Brief von
+        // api-dispatch (/dispatch/brief + /dispatch/send-post: Vereinslayout,
+        // Fenster CH rechts / DE links). Vorher: eine Briefvorlage, die es auf
+        // dem Server nie gab, und ein Aufruf von /pingen/send mit falschen
+        // Feldern - Mitglieder mit Post-Wunsch bekamen nichts.
         if (memberData.zustellung_post && memberData.strasse && memberData.plz && memberData.ort) {
             try {
-                // Get letter template
-                const letterTemplate = await pool.query(
-                    "SELECT * FROM dispatch_templates WHERE name = 'Verabschiedung Mitglied Brief' AND type = 'post'"
+                const vorlage = await pool.query(
+                    "SELECT subject, body FROM dispatch_templates WHERE name = 'Verabschiedung Mitglied' AND type = 'email'"
                 );
-
-                if (letterTemplate.rows.length > 0) {
-                    const template = letterTemplate.rows[0];
-                    const datum = new Date().toLocaleDateString('de-CH', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                    });
-
-                    // Get logo as base64 (same as invoice generation)
-                    let logoBase64 = '';
-                    try {
-                        const logoPath = '/app/logo.png';
-                        if (fs.existsSync(logoPath)) {
-                            logoBase64 = fs.readFileSync(logoPath).toString('base64');
-                        }
-                    } catch (logoErr) {
-                        console.warn('Could not load logo for farewell letter');
-                    }
-
-                    // Replace variables in template
-                    let html = template.body;
-                    const variables = {
-                        anrede: memberData.anrede || '',
-                        vorname: memberData.vorname || '',
-                        nachname: memberData.nachname || '',
-                        anrede_formal: anredeFormal,
-                        eintrittsdatum: eintrittsdatum,
-                        aktuar_name: aktuarName,
-                        aktuar_adresse: aktuar.strasse || '',
-                        aktuar_plz: aktuar.plz || '',
-                        aktuar_ort: aktuar.ort || '',
-                        datum: datum,
-                        empfaenger_anrede: memberData.anrede || '',
-                        empfaenger_vorname: memberData.vorname || '',
-                        empfaenger_nachname: memberData.nachname || '',
-                        empfaenger_strasse: memberData.strasse || '',
-                        empfaenger_plz: memberData.plz || '',
-                        empfaenger_ort: memberData.ort || '',
-                        logo_base64: logoBase64
-                    };
-
-                    for (const [key, value] of Object.entries(variables)) {
-                        html = html.replace(new RegExp(`{{${key}}}`, 'g'), value || '');
-                    }
-
-                    // Build recipient address for Pingen
-                    const recipientAddress = [
-                        `${memberData.anrede || ''} ${memberData.vorname} ${memberData.nachname}`.trim(),
-                        memberData.strasse,
-                        memberData.adresszusatz,
-                        `${memberData.plz} ${memberData.ort}`
-                    ].filter(Boolean).join('\n');
-
-                    // Send via Pingen
-                    await axios.post(`${DISPATCH_API}/pingen/send`, {
-                        html: html,
-                        recipientAddress: recipientAddress,
-                        recipientName: `${memberData.vorname} ${memberData.nachname}`,
-                        recipientCountry: 'CH'
-                    });
-
-                    console.log(`Farewell letter sent to ${memberData.vorname} ${memberData.nachname}`);
-                } else {
-                    console.warn('Farewell letter template not found');
-                }
+                const brief = abschiedsBrief(vorlage.rows[0], memberData, { eintrittsdatum, aktuarName });
+                const b = (await axios.post(`${DISPATCH_API}/dispatch/brief`, {
+                    member_id: memberData.id, subject: brief.betreff, body: brief.text
+                }, { timeout: 30000 })).data;
+                await axios.post(`${DISPATCH_API}/dispatch/send-post`, {
+                    html: b.html, recipient: b.recipient, member_id: memberData.id,
+                    subject: b.subject, pdf_margin: b.pdf_margin
+                }, { timeout: 60000 });
+                console.log(`Farewell letter sent to ${memberData.vorname} ${memberData.nachname}`);
             } catch (letterError) {
-                console.error('Failed to send farewell letter:', letterError.message);
+                console.error('Failed to send farewell letter:', letterError.response?.data?.error || letterError.message);
             }
         }
 
@@ -4873,11 +4831,12 @@ app.post('/internal/vorstand-meldung', (req, res) => {
 
 // DEUTSCH: Interner Endpoint fuer andere Backends (api-events, api-dispatch),
 // um Push-Notifications an ein Mitglied zu senden. Authentifiziert per
-// INTERNAL_API_KEY (Header X-Internal-Key oder ?key=). Body:
+// INTERNAL_API_KEY (nur Header X-Internal-Key - in der Adresse landete er in
+// Logs). Body:
 // { memberId, notificationType, title, body, data? }
 app.post('/internal/push-to-member', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;
-    const provided = req.headers['x-internal-key'] || req.query.key;
+    const provided = req.headers['x-internal-key'];
     if (!apiKey || provided !== apiKey) {
         return res.status(403).json({ error: 'Forbidden' });
     }
@@ -4900,7 +4859,7 @@ app.post('/internal/push-to-member', async (req, res) => {
  */
 app.post('/internal/push-broadcast', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;
-    const provided = req.headers['x-internal-key'] || req.query.key;
+    const provided = req.headers['x-internal-key'];
     if (!apiKey || provided !== apiKey) return res.status(403).json({ error: 'Forbidden' });
 
     const { notificationType, title, body, data } = req.body || {};
@@ -4959,7 +4918,7 @@ app.post('/internal/push-broadcast', async (req, res) => {
 // DEUTSCH: Lookup memberId per E-Mail — fuer Backends, die nur die Mailadresse haben.
 app.get('/internal/member-id-by-email', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;
-    const provided = req.headers['x-internal-key'] || req.query.key;
+    const provided = req.headers['x-internal-key'];
     if (!apiKey || provided !== apiKey) {
         return res.status(403).json({ error: 'Forbidden' });
     }

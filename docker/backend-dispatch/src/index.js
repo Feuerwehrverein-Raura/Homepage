@@ -163,35 +163,30 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
-// DEUTSCH: Sendet eine Kostenbenachrichtigung an den Kassier nach jedem Pingen-Briefversand
-// Pingen Preise (Stand 2024): Economy ~CHF 1.00, Priority ~CHF 1.50 (inkl. Porto)
-async function sendPingenCostNotification(recipientName, letterId, isStaging = false) {
+// DEUTSCH: Kostenmeldung an den Kassier fuer jeden Pingen-Brief - ueber die
+// Sammelmail (sammelmail.js, taeglich 18:00), damit er bei vielen Briefen eine
+// Mail bekommt statt einer pro Brief. Vorher nur bei /pingen/send und sofort;
+// send-post (Hauptweg), send-manual und Arbeitsplan meldeten gar nichts.
+async function sendPingenCostNotification(recipientName, letterId, isStaging = false, betreff = '') {
     try {
-        // Get Kassier email from database
         const kassierResult = await pool.query(
-            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' LIMIT 1"
+            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' AND email IS NOT NULL LIMIT 1"
         );
-
         if (kassierResult.rows.length === 0) {
             logWarn('Kassier not found for Pingen cost notification');
             return;
         }
-
         const kassier = kassierResult.rows[0];
-        const estimatedCost = 'ca. CHF 1.00'; // Economy Versand
         const environment = isStaging ? ' (STAGING/TEST)' : '';
-
-        await transporter.sendMail({
-            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+        const worum = betreff ? `\nBetreff: ${betreff}` : '';
+        await vormerken(pool, {
             to: kassier.email,
-            subject: `Pingen Briefversand${environment}: ${recipientName}`,
-            text: `Hallo ${kassier.vorname},\n\nEin Brief wurde über Pingen versendet:\n\nEmpfänger: ${recipientName}\nBrief-ID: ${letterId}\nGeschätzte Kosten: ${estimatedCost}\n\nDie genauen Kosten findest du im Pingen Dashboard.\n\nFeuerwehrverein Raura`,
-            html: `<p>Hallo ${kassier.vorname},</p><p>Ein Brief wurde über Pingen versendet:</p><ul><li><strong>Empfänger:</strong> ${recipientName}</li><li><strong>Brief-ID:</strong> ${letterId}</li><li><strong>Geschätzte Kosten:</strong> ${estimatedCost}</li></ul><p>Die genauen Kosten findest du im <a href="https://app.pingen.com">Pingen Dashboard</a>.</p><p>Feuerwehrverein Raura</p>`
+            subject: `Pingen-Brief${environment}: ${recipientName}`,
+            text: `Hallo ${kassier.vorname},\n\nEin Brief wurde über Pingen versendet:\n\nEmpfänger: ${recipientName}${worum}\nBrief-ID: ${letterId}\n\nDie genauen Kosten findest du im Pingen Dashboard (https://app.pingen.com).`
         });
-
-        logInfo('Pingen cost notification sent to Kassier', { recipient: recipientName, letterId });
+        logInfo('Pingen cost notification queued for Kassier', { recipient: recipientName, letterId });
     } catch (error) {
-        logError('Failed to send Pingen cost notification', { error: error.message });
+        logError('Failed to queue Pingen cost notification', { error: error.message });
     }
 }
 
@@ -2918,6 +2913,7 @@ app.post('/pingen/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'a
             event_id
         ]);
 
+        if (!staging) sendPingenCostNotification(`${member.vorname} ${member.nachname}`, letterId, false, eventTitle).catch(() => {});
         res.json({
             success: true,
             letterId,
@@ -3353,6 +3349,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
         letterId,
         eventId
     ]);
+    if (!staging) sendPingenCostNotification(`${member.vorname} ${member.nachname}`, letterId, false).catch(() => {});
 
     return { letterId };
 }
@@ -3961,6 +3958,7 @@ app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'
         await briefProtokollieren(pool, {
             memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
         });
+        if (!staging) sendPingenCostNotification(recipient.name, letterRes.data.data?.id, false, subject).catch(() => {});
         res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {
@@ -4058,6 +4056,7 @@ app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'ad
         await briefProtokollieren(pool, {
             memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
         });
+        if (!staging) sendPingenCostNotification(recipient.name, letterRes.data.data?.id, false, subject).catch(() => {});
         res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {

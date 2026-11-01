@@ -8497,7 +8497,11 @@
                                 event_location: evt.location || ''
                             } : {},
                             attachments: anhaenge,
-                            event_id: anlassId
+                            event_id: anlassId,
+                            // Versandart E-Mail: auch an Mitglieder mit Post-Wunsch (die
+                            // Auswahl oben hat schon gefiltert). Ohne das liess der Server
+                            // sie still weg, obwohl die Rueckfrage sie mitzaehlte.
+                            praeferenz_ignorieren: deliveryMethod === 'email'
                         })
                     });
 
@@ -9267,7 +9271,9 @@
                             body: '',
                             html: html,
                             attachments: [],
-                            exclude_honored: true
+                            exclude_honored: true,
+                            // Ausdruecklich per E-Mail an dieses Mitglied - auch mit Post-Wunsch.
+                            praeferenz_ignorieren: true
                         })
                     });
                     if (response.ok) emailSuccess++; else emailFailed++;
@@ -9997,7 +10003,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                             body: '',
                             html: html,
                             attachments: [],
-                            exclude_honored: true
+                            exclude_honored: true,
+                            // Ausdruecklich per E-Mail an dieses Mitglied - auch mit Post-Wunsch.
+                            praeferenz_ignorieren: true
                         })
                     });
                     if (!response.ok) throw new Error('E-Mail-Versand fehlgeschlagen');

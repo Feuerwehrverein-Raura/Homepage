@@ -4222,9 +4222,11 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
 // `shiftInfo` darf ein Objekt ({bereich?,name,date,time}) ODER ein fertiges
 // Label (String) sein. Wirft { status, error } bei Validierungsfehlern.
 async function suggestAlternativeForRegistration(regId, payload, actor) {
-    const { newShiftId, shiftInfo, comment, email } = payload || {};
-    if (!newShiftId || !email) {
-        throw { status: 400, error: 'newShiftId and email are required' };
+    // Die Adresse kommt aus der Anmeldung, nicht vom Client: sonst liesse sich
+    // die Mail (Absender Verein) an jede beliebige Adresse schicken.
+    const { newShiftId, shiftInfo, comment } = payload || {};
+    if (!newShiftId) {
+        throw { status: 400, error: 'newShiftId is required' };
     }
 
     const regResult = await pool.query('SELECT * FROM registrations WHERE id = $1', [regId]);
@@ -4232,6 +4234,14 @@ async function suggestAlternativeForRegistration(regId, payload, actor) {
         throw { status: 404, error: 'Registration not found' };
     }
     const reg = regResult.rows[0];
+    let email = reg.guest_email || null;
+    if (reg.member_id) {
+        const m = await pool.query('SELECT email, versand_email FROM members WHERE id = $1', [reg.member_id]);
+        email = m.rows[0]?.versand_email || m.rows[0]?.email || email;
+    }
+    if (!email) {
+        throw { status: 400, error: 'Die Anmeldung hat keine E-Mail-Adresse' };
+    }
 
     const eventResult = await pool.query('SELECT title, image_url FROM events WHERE id = $1', [reg.event_id]);
     const eventTitle = eventResult.rows[0]?.title || 'Event';
@@ -6437,7 +6447,16 @@ async function schichtStundeVorherTick(jetzt = new Date()) {
     }
 }
 
-app.post('/reminders/send-daily', async (req, res) => {
+// Nur der Cronjob (docker/cron/shift-reminders.sh, im Container ueber
+// localhost) oder mit API-Schluessel. Ueber Traefik war die Route offen -
+// jeder konnte die Vortags-Erinnerungen ausloesen.
+function nurLokalOderSchluessel(req, res, next) {
+    const von = req.socket?.remoteAddress || '';
+    if (['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(von)) return next();
+    return requireApiKey(req, res, next);
+}
+
+app.post('/reminders/send-daily', nurLokalOderSchluessel, async (req, res) => {
     try {
         // Calculate tomorrow's date
         const tomorrow = new Date();

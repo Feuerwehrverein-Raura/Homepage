@@ -42,7 +42,11 @@ services:
       SUMUP_API_KEY: ${SUMUP_API_KEY:-}
       SUMUP_MERCHANT_CODE: ${SUMUP_MERCHANT_CODE:-}
       # Email
-      EMAIL_API_URL: https://www.fwv-raura.ch/api/email/send
+      # Tagesbericht der Kasse (POST /api/stats/send-report) ueber api-dispatch
+      # im Docker-Netz, mit dessen API_KEY. Vorher: www.fwv-raura.ch/api/email/send
+      # gibt es nicht, und ohne Schluessel lehnte dispatch ab.
+      EMAIL_API_URL: ${EMAIL_API_URL:-http://fwv-api-dispatch:3000/email/send}
+      DISPATCH_API_KEY: ${DISPATCH_API_KEY:-}
       # Printers (Epson TM-T20III via Ethernet)
       PRINTER_BAR_IP: ${PRINTER_BAR_IP:-}
       PRINTER_BAR_PORT: ${PRINTER_BAR_PORT:-9100}

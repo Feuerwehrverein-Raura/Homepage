@@ -546,11 +546,14 @@ async function runFeeReminders() {
         pushed++;
         if (r.email && r.zustellung_email) {
             try {
+                // Mit x-api-key: ohne ihn lehnte dispatch mit 401 ab, und die
+                // Mail ging nie raus (nur der Push).
                 await axios.post(`${DISPATCH_API}/email/send`, {
                     to: r.email,
+                    member_id: r.member_id,
                     subject: title,
                     body: `Hallo ${r.vorname || ''},\n\n${body}\n\nFreundliche Gruesse\nFeuerwehrverein Raura`
-                });
+                }, { headers: { 'x-api-key': process.env.API_KEY }, timeout: 20000 });
                 emailed++;
             } catch (e) { console.error('Beitrags-Erinnerung E-Mail fehlgeschlagen:', e.message); }
         }
@@ -789,7 +792,10 @@ app.post('/membership-fees/payments/:id/send', authenticateAny, requireRole('vor
                 body: '',
                 html,
                 attachments: [],
-                exclude_honored: true
+                exclude_honored: true,
+                // Ausdruecklich Kanal E-Mail - sonst liess dispatch Mitglieder mit
+                // Post-Wunsch still weg und meldete trotzdem Erfolg.
+                praeferenz_ignorieren: true
             }, { headers: dispatchHeaders, timeout: 20000 });
         } else {
             const html = await buildBeitragLetterForPayment({ member, payment, settings, kassier });
