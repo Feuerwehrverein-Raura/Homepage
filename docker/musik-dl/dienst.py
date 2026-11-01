@@ -18,6 +18,17 @@ YouTube sperrt Rechenzentrums-Adressen ("Sign in to confirm you're not a
 bot"). Liegt /daten/youtube-cookies.txt (Netscape-Format, von einem eigenen
 Google-Konto), bekommen beide Programme sie mit.
 
+Helfer (MUSIK_DL_HELFER, z.B. "pjc"): YouTube sperrt den Vereinsserver,
+den Anschluss des Premium Jazz Club nicht. Dann laedt hier nichts, der
+Downloader des PJC holt die Auftraege ueber api-members ab (nur abgehend,
+wie der SMS-Alarm), laedt dort und schickt jede MP3 zurueck:
+
+  POST /fern/abholen          naechster wartender Auftrag (oder keiner)
+  PUT  /fern/<id>/datei?name= eine MP3 ("Interpret - Titel.mp3")
+  POST /fern/<id>/fertig      {fehler} - fertig oder gescheitert
+
+Was abgeholt, aber nach LEIHFRIST_S nicht fertig ist, kommt wieder dran.
+
 Ein Auftrag laedt in einen eigenen Arbeitsordner und legt jede
 fertige Datei per WebDAV in den Nextcloud-Gruppenordner "Musik" (Konto
 musik-bot). Was dort schon liegt, wird nicht ueberschrieben. Von dort holt
@@ -58,6 +69,10 @@ YOUTUBE_SEITEN = ("youtube.com", "www.youtube.com", "m.youtube.com", "music.yout
 # eine langsame Quelle soll die Warteschlange nicht fuer immer belegen.
 HOECHSTENS_S = 6 * 3600
 BEHALTEN = 100  # so viele Auftraege bleiben in der Liste
+
+HELFER = os.environ.get("MUSIK_DL_HELFER", "")
+LEIHFRIST_S = 3 * 3600
+HOECHSTENS_BYTES = 80 * 1024 * 1024  # eine MP3 vom Helfer
 
 ERLAUBTE_SEITEN = YOUTUBE_SEITEN + ("open.spotify.com",)
 
@@ -124,6 +139,8 @@ def neuer_auftrag(quelle, wer):
         "schon_da": 0,
         "erstellt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "fertig": None,
+        "helfer": None,
+        "abgeholt": None,
     }
     with _sperre:
         _auftraege.append(a)
@@ -265,6 +282,70 @@ def arbeiter():
             _setzen(a, stand="fehler", meldung=str(e)[:300])
 
 
+# --------------------------------------------------------------------------
+# Helfer (Downloader des PJC)
+# --------------------------------------------------------------------------
+
+def abholen(jetzt=None):
+    """Aeltester wartender Auftrag, sonst einer, dessen Leihfrist um ist."""
+    jetzt = time.time() if jetzt is None else jetzt
+    with _sperre:
+        for a in _auftraege:
+            liegen = a["stand"] == "laedt" and jetzt - (a.get("abgeholt") or 0) > LEIHFRIST_S
+            if a["stand"] == "wartet" or liegen:
+                a.update(stand="laedt", helfer=HELFER, abgeholt=jetzt, meldung=None,
+                         dateien=[], neu=0, schon_da=0)
+                _sichern()
+                return {"id": a["id"], "quelle": a["quelle"]}
+    return None
+
+
+def dateiname_pruefen(name):
+    n = str(name or "")
+    if (not n.lower().endswith(".mp3") or n.startswith(".") or len(n) > 200
+            or os.path.basename(n) != n or "\\" in n or any(ord(z) < 32 for z in n)):
+        raise ValueError("Ungueltiger Dateiname.")
+    return n
+
+
+def _geliehen(id_):
+    a = _auftrag(id_)
+    if a is None or a["stand"] != "laedt" or not a.get("helfer"):
+        raise LookupError("Kein abgeholter Auftrag.")
+    return a
+
+
+def datei_annehmen(id_, name, daten):
+    a = _geliehen(id_)
+    name = dateiname_pruefen(name)
+    ordner = os.path.join(ARBEIT, a["id"])
+    os.makedirs(ordner, exist_ok=True)
+    pfad = os.path.join(ordner, name)
+    try:
+        with open(pfad, "wb") as f:
+            f.write(daten)
+        neu = ablegen(pfad)
+    finally:
+        shutil.rmtree(ordner, ignore_errors=True)
+    with _sperre:
+        if name not in a["dateien"]:
+            a["dateien"] = sorted(a["dateien"] + [name])
+        a["neu" if neu else "schon_da"] += 1
+        _sichern()
+    melde("Auftrag %s: %s vom Helfer (%s)" % (a["id"], name, "neu" if neu else "schon da"))
+    return neu
+
+
+def abschliessen(id_, fehler=None):
+    a = _geliehen(id_)
+    if a["dateien"]:
+        _setzen(a, stand="fertig", fertig=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    else:
+        _setzen(a, stand="fehler", meldung=str(fehler or "Nichts gefunden oder Laden gescheitert.")[:300])
+    melde("Auftrag %s beim Helfer: %s" % (a["id"], a["stand"]))
+    return a
+
+
 def youtube_suchen(begriff, anzahl=12):
     b = str(begriff or "").strip()[:200]
     if not b:
@@ -332,18 +413,48 @@ class Anfrage(BaseHTTPRequestHandler):
             return self._antwort(200, {"auftraege": liste})
         self._antwort(404, {"error": "Unbekannt"})
 
+    def _json(self):
+        laenge = int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(min(laenge, 10000)) or b"{}")
+
     def do_POST(self):
         if not self._erlaubt():
             return
-        if self.path != "/auftraege":
-            return self._antwort(404, {"error": "Unbekannt"})
+        teile = self.path.strip("/").split("/")
         try:
-            laenge = int(self.headers.get("Content-Length") or 0)
-            koerper = json.loads(self.rfile.read(min(laenge, 10000)) or b"{}")
-            a = neuer_auftrag(koerper.get("quelle"), koerper.get("wer"))
+            if teile == ["auftraege"]:
+                koerper = self._json()
+                return self._antwort(200, neuer_auftrag(koerper.get("quelle"), koerper.get("wer")))
+            if teile == ["fern", "abholen"]:
+                return self._antwort(200, {"auftrag": abholen() if HELFER else None})
+            if len(teile) == 3 and teile[0] == "fern" and teile[2] == "fertig":
+                return self._antwort(200, abschliessen(teile[1], self._json().get("fehler")))
+        except LookupError as e:
+            return self._antwort(404, {"error": str(e)})
         except ValueError as e:
             return self._antwort(400, {"error": str(e)})
-        self._antwort(200, a)
+        self._antwort(404, {"error": "Unbekannt"})
+
+    def do_PUT(self):
+        if not self._erlaubt():
+            return
+        teile = urllib.parse.urlsplit(self.path)
+        stuecke = teile.path.strip("/").split("/")
+        if len(stuecke) != 3 or stuecke[0] != "fern" or stuecke[2] != "datei":
+            return self._antwort(404, {"error": "Unbekannt"})
+        laenge = int(self.headers.get("Content-Length") or 0)
+        if not 0 < laenge <= HOECHSTENS_BYTES:
+            return self._antwort(413, {"error": "Datei fehlt oder ist zu gross."})
+        name = urllib.parse.parse_qs(teile.query).get("name", [""])[0]
+        try:
+            neu = datei_annehmen(stuecke[1], name, self.rfile.read(laenge))
+        except LookupError as e:
+            return self._antwort(404, {"error": str(e)})
+        except ValueError as e:
+            return self._antwort(400, {"error": str(e)})
+        except Exception as e:
+            return self._antwort(502, {"error": str(e)[:300]})
+        self._antwort(200, {"neu": neu})
 
     def log_message(self, *_):
         pass  # Jede Anfrage ins Log waere nur Rauschen; Auftraege melden selbst.
@@ -354,6 +465,9 @@ if __name__ == "__main__":
         raise SystemExit("MUSIK_DL_KEY fehlt")
     os.makedirs(ARBEIT, exist_ok=True)
     _laden()
-    threading.Thread(target=arbeiter, daemon=True).start()
-    melde("musik-dl bereit")
+    if HELFER:
+        melde("musik-dl bereit, geladen wird beim Helfer %s" % HELFER)
+    else:
+        threading.Thread(target=arbeiter, daemon=True).start()
+        melde("musik-dl bereit")
     ThreadingHTTPServer(("0.0.0.0", 8080), Anfrage).serve_forever()

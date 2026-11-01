@@ -73,6 +73,7 @@ services:
       KIOSK_MUSIK_PFAD: /app/musik     # DEUTSCH: Nur lesend — Vorhoeren, Streamen, Spiegel fuer den Laptop
       MUSIK_DL_URL: http://fwv-musik-dl:8080   # DEUTSCH: Songs ergaenzen (spotDL), nur intern
       MUSIK_DL_KEY: ${MUSIK_DL_KEY}
+      MUSIK_HELFER_KEY: ${MUSIK_HELFER_KEY}   # DEUTSCH: Downloader im PJC holt Auftraege ab
       # DEUTSCH: Tiefkuehler-Alarm per SMS (src/kuehler-alarm.js); der SMS-Gateway
       # im PJC holt die SMS mit ALARM_SMS_KEY ab. Scharf erst mit "an".
       KUEHLER_ALARM: ${KUEHLER_ALARM:-aus}
@@ -452,6 +453,9 @@ services:
       MUSIK_DAV_URL: https://nextcloud.fwv-raura.ch/remote.php/dav/files/musik-bot/Musik
       MUSIK_DAV_USER: ${MUSIK_DAV_USER}
       MUSIK_DAV_TOKEN: ${MUSIK_DAV_TOKEN}
+      # DEUTSCH: YouTube sperrt diesen Server; "pjc" = der Downloader im
+      # Premium Jazz Club laedt (holt ueber api-members ab). Leer = selbst laden.
+      MUSIK_DL_HELFER: ${MUSIK_DL_HELFER:-}
       TZ: Europe/Zurich
     volumes:
       - ./data/musik-dl:/daten   # DEUTSCH: Warteschlange; Besitzer uid 1000

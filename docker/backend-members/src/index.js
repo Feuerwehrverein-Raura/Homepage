@@ -6702,6 +6702,40 @@ app.post('/kiosk/ergaenzen', authenticateToken, roterSchopfGruppe, (req, res) =>
         wer: req.user?.name || req.user?.preferred_username || req.user?.email || '?',
     }));
 
+// YouTube sperrt den Vereinsserver. Mit MUSIK_DL_HELFER laedt der Downloader
+// des Premium Jazz Club (Repo pjc-docker, matrix-yt-dl/fwv-musik.js): er holt
+// hier ab, laedt dort und schickt jede MP3 zurueck. Nur abgehend vom PJC,
+// Schluessel MUSIK_HELFER_KEY.
+function musikHelferSchluessel(req, res, next) {
+    const s = process.env.MUSIK_HELFER_KEY;
+    if (s && req.get('X-Musik-Helfer-Key') === s) return next();
+    return res.status(401).json({ error: 'Kein Zugang' });
+}
+
+app.post('/kiosk/musik-helfer/abholen', musikHelferSchluessel, (req, res) =>
+    musikDl(req, res, 'POST', '/fern/abholen'));
+
+app.post('/kiosk/musik-helfer/:id/fertig', musikHelferSchluessel, (req, res) =>
+    musikDl(req, res, 'POST', `/fern/${encodeURIComponent(req.params.id)}/fertig`,
+        { fehler: req.body?.fehler ? String(req.body.fehler).slice(0, 300) : null }));
+
+app.put('/kiosk/musik-helfer/:id/datei', musikHelferSchluessel,
+    express.raw({ type: () => true, limit: '80mb' }), async (req, res) => {
+        try {
+            const antwort = await fetch(`${MUSIK_DL_URL}/fern/${encodeURIComponent(req.params.id)}/datei?name=`
+                + encodeURIComponent(String(req.query.name || '')), {
+                method: 'PUT',
+                headers: { 'X-Intern-Key': process.env.MUSIK_DL_KEY || '', 'Content-Type': 'audio/mpeg' },
+                body: Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
+                signal: AbortSignal.timeout(300000),
+            });
+            res.status(antwort.status).json(await antwort.json());
+        } catch (error) {
+            console.error('musik-helfer datei:', error.message);
+            res.status(502).json({ error: 'Der Dienst zum Ergaenzen antwortet nicht' });
+        }
+    });
+
 // Der Laptop spiegelt die Sammlung (kiosk-abgleich): erst die Liste, dann
 // jede fehlende oder geaenderte Datei einzeln.
 app.get('/kiosk/sammlung', kioskSchluessel, async (req, res) => {

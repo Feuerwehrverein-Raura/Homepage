@@ -119,6 +119,48 @@ class DienstTest(unittest.TestCase):
         self.d.bearbeiten(a)
         self.assertEqual(a["stand"], "fehler")
 
+    def test_helfer_holt_ab_schickt_dateien_und_meldet_fertig(self):
+        ABGELEGT.clear()
+        self.d.HELFER = "pjc"
+        try:
+            del self.d._auftraege[:]
+            a = self.d.neuer_auftrag("https://youtu.be/uoym8LBzsPs", "Erika")
+            b = self.d.neuer_auftrag("leer", "Erika")
+            self.assertEqual(self.d.abholen(), {"id": a["id"], "quelle": a["quelle"]})
+            self.assertEqual(self.d.abholen()["id"], b["id"])
+            self.assertIsNone(self.d.abholen())
+            self.assertTrue(self.d.datei_annehmen(a["id"], "Span - Louenesee.mp3", b"x"))
+            self.assertFalse(self.d.datei_annehmen(a["id"], "Span - Louenesee.mp3", b"y"))
+            self.assertEqual(ABGELEGT["Span - Louenesee.mp3"], b"x")
+            self.assertEqual(self.d.abschliessen(a["id"])["stand"], "fertig")
+            self.assertEqual((a["neu"], a["schon_da"]), (1, 1))
+            # Ohne Datei gescheitert, mit der Meldung des Helfers.
+            self.assertEqual(self.d.abschliessen(b["id"], "YouTube sperrt")["meldung"], "YouTube sperrt")
+            # Erledigte nimmt er nicht mehr an.
+            with self.assertRaises(LookupError):
+                self.d.datei_annehmen(a["id"], "Neu.mp3", b"z")
+        finally:
+            self.d.HELFER = ""
+
+    def test_helfer_liegengelassenes_kommt_wieder(self):
+        self.d.HELFER = "pjc"
+        try:
+            del self.d._auftraege[:]
+            a = self.d.neuer_auftrag("Span Louenesee", "Erika")
+            jetzt = 1_000_000
+            self.assertEqual(self.d.abholen(jetzt)["id"], a["id"])
+            self.assertIsNone(self.d.abholen(jetzt + 60))
+            self.assertEqual(self.d.abholen(jetzt + self.d.LEIHFRIST_S + 1)["id"], a["id"])
+        finally:
+            self.d.HELFER = ""
+
+    def test_dateiname_vom_helfer(self):
+        p = self.d.dateiname_pruefen
+        self.assertEqual(p("Span - Louenesee.mp3"), "Span - Louenesee.mp3")
+        for schlecht in ("../x.mp3", "a/b.mp3", ".x.mp3", "x.sh", "", "a\nb.mp3", "a\\b.mp3"):
+            with self.assertRaises(ValueError, msg=schlecht):
+                p(schlecht)
+
 
 if __name__ == "__main__":
     unittest.main()
