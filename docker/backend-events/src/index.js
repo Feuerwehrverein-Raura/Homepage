@@ -320,31 +320,6 @@ function logInfo(message, data = {}) { log('INFO', message, data); }
 function logWarn(message, data = {}) { log('WARN', message, data); }
 function logError(message, data = {}) { log('ERROR', message, data); }
 
-// DEUTSCH: AES-256-GCM Ver-/Entschluesselung fuer Event-Passwoerter, damit sie bei
-// einem Organisator-Wechsel wiederverwendet und in der Benachrichtigung mitgesendet
-// werden koennen. Nutzt JWT_SECRET als Schluesselableitungs-Quelle.
-const ENC_KEY = crypto.createHash('sha256').update(process.env.JWT_SECRET || 'fwv-fallback-key').digest();
-function encryptPassword(plain) {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv);
-    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return Buffer.concat([iv, tag, enc]).toString('base64');
-}
-function decryptPassword(stored) {
-    try {
-        const buf = Buffer.from(stored, 'base64');
-        const iv = buf.subarray(0, 12);
-        const tag = buf.subarray(12, 28);
-        const enc = buf.subarray(28);
-        const decipher = crypto.createDecipheriv('aes-256-gcm', ENC_KEY, iv);
-        decipher.setAuthTag(tag);
-        return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
-    } catch (e) {
-        return null;
-    }
-}
-
 // DEUTSCH: Ermittelt die echte Client-IP (berücksichtigt Cloudflare, Proxy-Header)
 function getClientIp(req) {
     if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
@@ -1595,17 +1570,19 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         if (create_access && organizer_email && !isVorstandMember && !organizer_id) {
             // Event-spezifische E-Mail generieren
             eventEmail = `${slug}@fwv-raura.ch`;
-            // Zufaelliges Passwort generieren (16 Zeichen, base64url)
-            eventPassword = crypto.randomBytes(12).toString('base64url').slice(0, 16);
-            // Passwort hashen (einfaches SHA256 - fuer Produktionsumgebung bcrypt empfohlen)
-            eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
+            // Zufallspasswort, das niemand kennt (scrypt mit Salz): der
+            // Organisator legt sein Passwort ueber den Link in der Mail selbst
+            // fest (passwortLinkSenden).
+            eventPassword = mitorganisatoren.neuesPasswort();
+            eventPasswordHash = mitorganisatoren.passwortHashen(eventPassword);
             // Ablaufdatum: 3 Monate nach Event-Ende
             const endDateObj = end_date ? new Date(end_date) : new Date(start_date);
             eventAccessExpires = new Date(endDateObj);
             eventAccessExpires.setMonth(eventAccessExpires.getMonth() + 3);
         }
 
-        const eventPasswordEncrypted = eventPassword ? encryptPassword(eventPassword) : null;
+        // Kein verschluesselt abgelegtes Passwort mehr - es kennt nur der Organisator.
+        const eventPasswordEncrypted = null;
 
         const result = await pool.query(`
             INSERT INTO events (
@@ -1656,19 +1633,14 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             }
         }
 
-        // E-Mail mit Zugangsdaten an Organisator senden (create_access Modus)
+        // E-Mail mit Login und Link "Passwort festlegen" (create_access Modus)
         if (create_access && organizer_email && eventPassword) {
             try {
-                // Text gemeinsam mit den externen Mitorganisatoren (src/mitorganisatoren.js)
-                await axios.post(`${DISPATCH_API}/email/send`, {
-                    to: organizer_email,
-                    ...mitorganisatoren.zugangsdatenMail({
-                        name: organizer_name, titel: title, loginEmail: eventEmail,
-                        passwort: eventPassword, gueltigBis: eventAccessExpires
-                    }),
-                    event_id: newEvent.id
+                await passwortLinkSenden({
+                    eventId: newEvent.id, organizerId: null, an: organizer_email, name: organizer_name,
+                    titel: title, loginEmail: eventEmail, gueltigBis: eventAccessExpires
                 });
-                console.log(`Event-Zugangsdaten gesendet an ${organizer_email}`);
+                console.log(`Event-Zugang (Link) gesendet an ${organizer_email}`);
             } catch (emailErr) {
                 console.error('Fehler beim Senden der Zugangsdaten:', emailErr.message);
             }
@@ -1723,7 +1695,6 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         const oldEvent = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
         const oldOrgEmail = oldEvent.rows[0]?.organizer_email;
         const oldStatus = oldEvent.rows[0]?.status;
-        const oldEncryptedPw = oldEvent.rows[0]?.event_password_encrypted;
 
         const result = await pool.query(`
             UPDATE events SET ${setClause}, updated_at = NOW()
@@ -1776,37 +1747,26 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             ];
             const isVorstand = vorstandEmails.some(ve => newOrgEmail.toLowerCase() === ve.toLowerCase());
 
-            // Fuer Nicht-Vorstand UND Nicht-verknuepftes-Mitglied: Event-Zugang erstellen
-            // oder bei Organisator-Wechsel das bestehende Passwort wiederverwenden.
-            // Verknuepfte Mitglieder brauchen keinen Token — sie nutzen die App.
-            let eventPassword = null;
+            // Fuer Nicht-Vorstand UND Nicht-verknuepftes-Mitglied: Event-Zugang
+            // anlegen, falls es noch keinen gibt, und einen Link "Passwort
+            // festlegen" schicken - kein Passwort mehr in der Mail.
+            // Verknuepfte Mitglieder brauchen keinen Zugang - sie nutzen die App.
+            let passwortLink = null;
             if (!isVorstand && !isLinkedMember) {
-                // Versuche das bestehende verschluesselte Passwort wiederzuverwenden
-                if (oldEncryptedPw) {
-                    eventPassword = decryptPassword(oldEncryptedPw);
-                }
-                if (!eventPassword) {
-                    // Kein altes Passwort vorhanden (oder Entschluesselung fehlgeschlagen):
-                    // neues generieren und verschluesselt + gehasht ablegen
-                    eventPassword = crypto.randomBytes(12).toString('base64url').slice(0, 16);
-                    const eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
-                    const encrypted = encryptPassword(eventPassword);
+                if (!updatedEvent.event_email || !updatedEvent.event_password_hash) {
                     const eventEmail = updatedEvent.event_email || `${updatedEvent.slug}@fwv-raura.ch`;
                     const endDate = updatedEvent.end_date ? new Date(updatedEvent.end_date) : new Date(updatedEvent.start_date);
                     const accessExpires = new Date(endDate);
                     accessExpires.setMonth(accessExpires.getMonth() + 3);
-
                     await pool.query(
-                        'UPDATE events SET event_email = $1, event_password_hash = $2, event_password_encrypted = $3, event_access_expires = $4 WHERE id = $5',
-                        [eventEmail, eventPasswordHash, encrypted, accessExpires, id]
+                        'UPDATE events SET event_email = $1, event_password_hash = $2, event_password_encrypted = NULL, event_access_expires = $3 WHERE id = $4',
+                        [eventEmail, mitorganisatoren.passwortHashen(mitorganisatoren.neuesPasswort()), accessExpires, id]
                     );
                     updatedEvent.event_email = eventEmail;
                     updatedEvent.event_access_expires = accessExpires;
-                    const action = oldOrgEmail ? 'Organisator-Wechsel: neues Passwort generiert (kein altes verfuegbar)' : 'Event-Zugang erstellt';
-                    console.log(`${action}: ${eventEmail}`);
-                } else {
-                    console.log(`Organisator-Wechsel: bestehendes Passwort wiederverwendet fuer ${updatedEvent.event_email}`);
+                    console.log(`Event-Zugang erstellt: ${eventEmail}`);
                 }
+                passwortLink = await passwortLinkErstellen(id, null);
             }
 
             try {
@@ -1823,10 +1783,8 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                     const dashboardUrl = 'https://fwv-raura.ch/event-dashboard.html';
                     emailBody = `Hallo ${updatedEvent.organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${updatedEvent.title}" eingetragen.\n\nDatum: ${updatedEvent.start_date ? new Date(updatedEvent.start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${updatedEvent.location || 'wird noch mitgeteilt'}`;
 
-                    if (eventPassword) {
-                        emailBody += `\n\nDeine Zugangsdaten fuer das Event-Dashboard:\n\nURL: ${dashboardUrl}\nE-Mail: ${updatedEvent.event_email}\nPasswort: ${eventPassword}\n\nDieser Zugang ist gueltig bis ${new Date(updatedEvent.event_access_expires || Date.now()).toLocaleDateString('de-CH')}.`;
-                    } else if (updatedEvent.event_email) {
-                        emailBody += `\n\nDein Event-Dashboard:\n${dashboardUrl}\nE-Mail: ${updatedEvent.event_email}\n(Bitte wende dich an den Aktuar fuer das Passwort)`;
+                    if (passwortLink) {
+                        emailBody += `\n\nDein Login fuer das Event-Dashboard (${dashboardUrl}):\nE-Mail: ${updatedEvent.event_email}\n\nBitte lege dein Passwort selbst fest - der Link gilt ${mitorganisatoren.LINK_TAGE} Tage:\n${passwortLink}\n\nAbgelaufen? Im Event-Dashboard unter "Passwort vergessen?" bekommst du einen neuen Link.\n\nDieser Zugang ist gueltig bis ${new Date(updatedEvent.event_access_expires || Date.now()).toLocaleDateString('de-CH')}.`;
                     }
 
                     emailBody += `\n\nIm Dashboard kannst du:\n- Alle Anmeldungen einsehen\n- Anmeldungen genehmigen oder ablehnen\n- Den Ueberblick ueber die Teilnehmerzahl behalten\n\nDu wirst automatisch per E-Mail benachrichtigt, wenn sich jemand anmeldet.`;
@@ -1873,6 +1831,113 @@ app.delete('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), asy
 // ============================================
 
 // DEUTSCH: Login fuer Event-Organisatoren mit event-spezifischer E-Mail und Passwort, gibt JWT zurück
+// --- Passwort selbst festlegen (externe Organisatoren) ----------------------
+// Statt eines Passworts im Klartext bekommt der Organisator einen Link, mit
+// dem er sein Passwort selbst festlegt (event-dashboard.html?passwort=...).
+
+/** Neuer Link fuer den Haupt-Organisator (organizerId null) oder einen
+ * externen Mitorganisator; gibt die Adresse zurueck. */
+async function passwortLinkErstellen(eventId, organizerId) {
+    const { token, hash } = mitorganisatoren.linkToken();
+    await pool.query(
+        `INSERT INTO organisator_passwort_links (token_hash, event_id, organizer_id, gueltig_bis)
+         VALUES ($1, $2, $3, NOW() + make_interval(days => $4))`,
+        [hash, eventId, organizerId, mitorganisatoren.LINK_TAGE]);
+    return mitorganisatoren.linkAdresse(token);
+}
+
+async function passwortLinkSenden({ eventId, organizerId, an, name, titel, loginEmail, gueltigBis, rolle }) {
+    const link = await passwortLinkErstellen(eventId, organizerId);
+    await axios.post(`${DISPATCH_API}/email/send`, {
+        to: an,
+        ...mitorganisatoren.passwortLinkMail({ name, titel, loginEmail, link, gueltigBis, rolle }),
+        event_id: eventId
+    });
+}
+
+// Link einloesen: Passwort festlegen. Oeffentlich, der Token ist der Ausweis.
+app.post('/events/passwort-setzen', async (req, res) => {
+    try {
+        const { token, passwort } = req.body || {};
+        if (typeof token !== 'string' || token.length < 20) {
+            return res.status(400).json({ error: 'Ungueltiger Link' });
+        }
+        if (!mitorganisatoren.passwortGenuegt(passwort)) {
+            return res.status(400).json({ error: 'Das Passwort braucht mindestens 10 Zeichen' });
+        }
+        const r = await pool.query(
+            `UPDATE organisator_passwort_links SET benutzt_at = NOW()
+              WHERE token_hash = $1 AND benutzt_at IS NULL AND gueltig_bis > NOW()
+              RETURNING event_id, organizer_id`,
+            [mitorganisatoren.tokenHash(token)]);
+        if (r.rows.length === 0) {
+            return res.status(400).json({ error: 'Der Link ist abgelaufen oder wurde schon benutzt. Unter "Passwort vergessen?" bekommen Sie einen neuen.' });
+        }
+        const { event_id, organizer_id } = r.rows[0];
+        const hash = mitorganisatoren.passwortHashen(passwort);
+        let login;
+        if (organizer_id) {
+            login = (await pool.query(
+                'UPDATE event_organizers SET password_hash = $1 WHERE id = $2 RETURNING email', [hash, organizer_id])).rows[0]?.email;
+        } else {
+            login = (await pool.query(
+                'UPDATE events SET event_password_hash = $1, event_password_encrypted = NULL WHERE id = $2 RETURNING event_email',
+                [hash, event_id])).rows[0]?.event_email;
+        }
+        if (!login) return res.status(400).json({ error: 'Der Zugang existiert nicht mehr' });
+        // Andere offene Links fuer denselben Zugang verfallen.
+        await pool.query(
+            `UPDATE organisator_passwort_links SET benutzt_at = NOW()
+              WHERE event_id = $1 AND organizer_id IS NOT DISTINCT FROM $2 AND benutzt_at IS NULL`,
+            [event_id, organizer_id]);
+        res.json({ success: true, email: login });
+    } catch (error) {
+        console.error('POST /events/passwort-setzen:', error.message);
+        res.status(500).json({ error: 'Passwort nicht gespeichert' });
+    }
+});
+
+// "Passwort vergessen?": neuer Link an die hinterlegte Adresse. Antwortet
+// immer gleich, damit sich nicht pruefen laesst, welche Logins es gibt.
+const passwortLinkVersuche = new Map(); // IP -> Zeitpunkte der letzten Stunde
+app.post('/events/passwort-vergessen', async (req, res) => {
+    const antwort = { success: true, message: 'Falls es diesen Zugang gibt, ist ein Link unterwegs.' };
+    try {
+        const ip = getClientIp(req) || 'unbekannt';
+        const jetzt = Date.now();
+        const versuche = (passwortLinkVersuche.get(ip) || []).filter(t => jetzt - t < 3600e3);
+        if (versuche.length >= 5) return res.status(429).json({ error: 'Zu viele Versuche - bitte spaeter nochmals' });
+        versuche.push(jetzt);
+        passwortLinkVersuche.set(ip, versuche);
+
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!mitorganisatoren.emailGueltig(email)) return res.json(antwort);
+        // Haupt-Organisator: Login ist die Anlass-Adresse, der Link geht an
+        // die hinterlegte Adresse des Organisators.
+        const haupt = await pool.query(
+            `SELECT id, title, organizer_name, organizer_email, event_email, event_access_expires FROM events
+              WHERE LOWER(event_email) = $1 AND organizer_email IS NOT NULL
+                AND (event_access_expires IS NULL OR event_access_expires > NOW())`, [email]);
+        for (const e of haupt.rows) {
+            await passwortLinkSenden({ eventId: e.id, organizerId: null, an: e.organizer_email, name: e.organizer_name,
+                titel: e.title, loginEmail: e.event_email, gueltigBis: e.event_access_expires || new Date() });
+        }
+        const mit = await pool.query(
+            `SELECT o.id, o.name, o.email, o.access_expires, e.id AS event_id, e.title FROM event_organizers o
+               JOIN events e ON e.id = o.event_id
+              WHERE o.member_id IS NULL AND LOWER(o.email) = $1
+                AND (o.access_expires IS NULL OR o.access_expires > NOW())`, [email]);
+        for (const o of mit.rows) {
+            await passwortLinkSenden({ eventId: o.event_id, organizerId: o.id, an: o.email, name: o.name,
+                titel: o.title, loginEmail: o.email, gueltigBis: o.access_expires || new Date(), rolle: 'Mitorganisator' });
+        }
+        res.json(antwort);
+    } catch (error) {
+        console.error('POST /events/passwort-vergessen:', error.message);
+        res.json(antwort);
+    }
+});
+
 app.post('/events/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -1891,7 +1956,7 @@ app.post('/events/login', async (req, res) => {
         // eigenes Passwort, src/mitorganisatoren.js). Nur wenn der Login des
         // Haupt-Organisators nicht passt — dessen Pruefung bleibt unveraendert.
         const hauptPasswortOk = result.rows.length > 0 &&
-            crypto.createHash('sha256').update(password).digest('hex') === result.rows[0].event_password_hash;
+            mitorganisatoren.hauptPasswortPruefen(password, result.rows[0].event_password_hash);
         if (!hauptPasswortOk) {
             const mit = await mitorganisatorLogin(email, password);
             if (mit) return res.status(mit.status).json(mit.json);
@@ -1911,15 +1976,14 @@ app.post('/events/login', async (req, res) => {
         // Nach dem Anlass (oder wenn er abgesagt ist) gilt der Zugang nicht
         // mehr — erst nach der Passwort-Pruefung melden, damit die Antwort
         // nicht verraet, ob es die Adresse gibt.
-        const passwortOk = crypto.createHash('sha256').update(password).digest('hex') === event.event_password_hash;
+        const passwortOk = mitorganisatoren.hauptPasswortPruefen(password, event.event_password_hash);
         const gesperrt = passwortOk ? organisatorAnsicht.organisatorLoginGesperrt(event) : null;
         if (gesperrt) {
             return res.status(403).json({ error: gesperrt, code: 'anlass_vorbei' });
         }
 
         // Passwort pruefen
-        const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
-        if (passwordHash !== event.event_password_hash) {
+        if (!passwortOk) {
             return res.status(401).json({ error: 'Ungueltige Zugangsdaten' });
         }
 
@@ -3695,13 +3759,9 @@ app.post('/events/:id/organizers', authenticateAny, async (req, res) => {
         if (ins.rows.length === 0) return res.status(409).json({ error: 'Diese E-Mail ist bereits Mitorganisator' });
         let mailGesendet = true;
         try {
-            await axios.post(`${DISPATCH_API}/email/send`, {
-                to: email,
-                ...mitorganisatoren.zugangsdatenMail({
-                    name, titel: event.title, loginEmail: email.toLowerCase(), passwort,
-                    gueltigBis: bis, rolle: 'Mitorganisator'
-                }),
-                event_id: event.id
+            await passwortLinkSenden({
+                eventId: event.id, organizerId: ins.rows[0].id, an: email, name, titel: event.title,
+                loginEmail: email.toLowerCase(), gueltigBis: bis, rolle: 'Mitorganisator'
             });
         } catch (e) {
             mailGesendet = false;

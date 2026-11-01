@@ -51,15 +51,28 @@ test('Ansicht eines Eintrags: Mitglied mit Namen aus members, extern mit Ablauf'
     assert.ok(!('password_hash' in extern), 'Hash nie in der Antwort');
 });
 
-test('Zugangsdaten-Mail: gleicher Text wie beim externen Haupt-Organisator', () => {
-    const mail = m.zugangsdatenMail({ name: 'Eva', titel: 'Chilbi', loginEmail: 'eva@x.ch', passwort: 'pw',
-        gueltigBis: new Date('2027-01-24T12:00:00Z'), rolle: 'Mitorganisator' });
-    assert.equal(mail.subject, 'Ihre Zugangsdaten fuer Chilbi');
+test('Zugangs-Mail: Login und Link zum Passwort-Festlegen, kein Passwort', () => {
+    const mail = m.passwortLinkMail({ name: 'Eva', titel: 'Chilbi', loginEmail: 'eva@x.ch',
+        link: 'https://www.fwv-raura.ch/event-dashboard.html?passwort=abc', gueltigBis: new Date(2027, 0, 24), rolle: 'Mitorganisator' });
+    assert.equal(mail.subject, 'Ihr Zugang fuer Chilbi');
     assert.match(mail.body, /^Guten Tag Eva,\n\nSie wurden als Mitorganisator fuer das Event "Chilbi" eingetragen\./);
-    assert.match(mail.body, /URL: https:\/\/fwv-raura\.ch\/event-dashboard\.html\nE-Mail: eva@x\.ch\nPasswort: pw\n/);
+    assert.match(mail.body, /E-Mail: eva@x\.ch\n/);
+    assert.match(mail.body, /event-dashboard\.html\?passwort=abc/);
     assert.match(mail.body, /gueltig bis 24\.1\.2027\./);
-    assert.match(m.zugangsdatenMail({ titel: 'X', loginEmail: 'a', passwort: 'b', gueltigBis: new Date() }).body,
-        /^Guten Tag Organisator,\n\nSie wurden als Organisator fuer/);
+    assert.doesNotMatch(mail.body, /Passwort: /);
+});
+
+test('Haupt-Organisator: scrypt neu, altes SHA-256 weiter gueltig; Link-Token nur als Hash', () => {
+    assert.equal(m.hauptPasswortPruefen('alt-passwort', crypto.createHash('sha256').update('alt-passwort').digest('hex')), true);
+    assert.equal(m.hauptPasswortPruefen('falsch', crypto.createHash('sha256').update('alt-passwort').digest('hex')), false);
+    assert.equal(m.hauptPasswortPruefen('neu-passwort', m.passwortHashen('neu-passwort')), true);
+    assert.equal(m.hauptPasswortPruefen('neu-passwort', 'kaputt'), false);
+    assert.equal(m.passwortGenuegt('kurz'), false);
+    assert.equal(m.passwortGenuegt('lang-genug-1'), true);
+    const { token, hash } = m.linkToken();
+    assert.equal(hash, m.tokenHash(token));
+    assert.notEqual(hash, token);
+    assert.match(m.linkAdresse(token), /^https:\/\/www\.fwv-raura\.ch\/event-dashboard\.html\?passwort=/);
 });
 
 const DB = process.env.TEST_DATABASE_URL;
@@ -154,6 +167,7 @@ test('Mitorganisatoren gegen den echten Server', { skip: !DB && 'TEST_DATABASE_U
     const bearbeiten = async wer => (await anfrage('PUT', `/events/${E(1)}/as-organizer`, wer,
         { description: `von ${wer}` })).status;
     const an = adresse => mails.filter(x => (x.to || '').toLowerCase() === adresse.toLowerCase());
+    const linkToken = text => decodeURIComponent(text.match(/\?passwort=([^\s]+)/)[1]);
     let hansEintrag, externEintrag, externPasswort;
 
     await t.test('vorher: nur Haupt-Organisatorin und Vorstand', async () => {
@@ -242,7 +256,14 @@ test('Mitorganisatoren gegen den echten Server', { skip: !DB && 'TEST_DATABASE_U
         assert.equal(mail.length, 1);
         assert.match(mail[0].body, /Sie wurden als Mitorganisator fuer das Event "Chilbi" eingetragen/);
         assert.match(mail[0].body, /E-Mail: eva\.extern@example\.ch/);
-        externPasswort = mail[0].body.match(/Passwort: (\S+)/)[1];
+        assert.doesNotMatch(mail[0].body, /Passwort: /, 'kein Passwort im Klartext');
+        externPasswort = 'eva-eigenes-passwort';
+        const setzen = await anfrage('POST', '/events/passwort-setzen', null,
+            { token: linkToken(mail[0].body), passwort: externPasswort });
+        assert.equal(setzen.status, 200, JSON.stringify(setzen.json));
+        assert.equal(setzen.json.email, 'eva.extern@example.ch');
+        assert.equal((await anfrage('POST', '/events/passwort-setzen', null,
+            { token: linkToken(mail[0].body), passwort: 'nochmal-anders' })).status, 400, 'Link nur einmal');
         const db = (await pool.query('SELECT password_hash FROM event_organizers WHERE id = $1', [externEintrag.id])).rows[0];
         assert.match(db.password_hash, /^scrypt\$/);
         assert.ok(!db.password_hash.includes(externPasswort));
@@ -317,9 +338,31 @@ test('Mitorganisatoren gegen den echten Server', { skip: !DB && 'TEST_DATABASE_U
         assert.deepEqual((await anfrage('GET', '/events/organized-by-me', 'hans')).json, []);
     });
 
+    await t.test('Passwort vergessen: neuer Link, gleiche Antwort fuer unbekannte Adressen', async () => {
+        mails.length = 0;
+        const r = await anfrage('POST', '/events/passwort-vergessen', null, { email: 'unbekannt@example.ch' });
+        assert.equal(r.status, 200);
+        assert.equal(mails.length, 0);
+        const r2 = await anfrage('POST', '/events/passwort-vergessen', null, { email: 'grill@fwv-raura.ch' });
+        assert.equal(r2.status, 200);
+        assert.deepEqual(r2.json, r.json, 'Antwort verraet nichts');
+        const neu = mails.filter(x => /passwort=/.test(x.body || ''));
+        assert.equal(neu.length, 1, 'Link an die Adresse des Haupt-Organisators');
+        assert.equal((await anfrage('POST', '/events/passwort-setzen', null,
+            { token: linkToken(neu[0].body), passwort: 'kurz' })).status, 400, 'zu kurz');
+        assert.equal((await anfrage('POST', '/events/passwort-setzen', null,
+            { token: linkToken(neu[0].body), passwort: 'grill-neues-passwort' })).status, 200);
+        assert.equal((await anfrage('POST', '/events/login', null,
+            { email: 'grill@fwv-raura.ch', password: 'grill-neues-passwort' })).status, 200);
+        assert.equal((await anfrage('POST', '/events/login', null,
+            { email: 'grill@fwv-raura.ch', password: HAUPT_PASSWORT })).status, 401, 'altes Passwort ungueltig');
+    });
+
     await t.test('abgelaufener Zugang: Login abgewiesen', async () => {
         const r = await anfrage('POST', `/events/${E(1)}/organizers`, 'vorstand', { name: 'Alt', email: 'alt@example.ch' });
-        const pw = an('alt@example.ch').at(-1).body.match(/Passwort: (\S+)/)[1];
+        const pw = 'alt-eigenes-passwort';
+        assert.equal((await anfrage('POST', '/events/passwort-setzen', null,
+            { token: linkToken(an('alt@example.ch').at(-1).body), passwort: pw })).status, 200);
         await pool.query(`UPDATE event_organizers SET access_expires = NOW() - INTERVAL '1 day' WHERE id = $1`, [r.json.id]);
         const login = await anfrage('POST', '/events/login', null, { email: 'alt@example.ch', password: pw });
         assert.equal(login.status, 401);

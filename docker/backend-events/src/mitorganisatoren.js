@@ -39,7 +39,20 @@ const SCHEMA_SQL = [
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_event_organizers_email
         ON event_organizers(event_id, LOWER(email)) WHERE member_id IS NULL`,
     `CREATE INDEX IF NOT EXISTS idx_event_organizers_member ON event_organizers(member_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_event_organizers_email ON event_organizers(LOWER(email))`
+    `CREATE INDEX IF NOT EXISTS idx_event_organizers_email ON event_organizers(LOWER(email))`,
+    // Links "Passwort festlegen" (passwortLinkMail): statt ein Passwort per
+    // Mail zu schicken, legt der Organisator es selbst fest. organizer_id NULL
+    // = Haupt-Organisator (events.event_password_hash). Gespeichert ist nur
+    // der SHA-256 des Tokens.
+    `CREATE TABLE IF NOT EXISTS organisator_passwort_links (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        token_hash TEXT NOT NULL UNIQUE,
+        event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        organizer_id UUID REFERENCES event_organizers(id) ON DELETE CASCADE,
+        gueltig_bis TIMESTAMP NOT NULL,
+        benutzt_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+    )`
 ];
 
 // Passwort der externen Mitorganisatoren: scrypt mit eigenem Salz (nicht wie
@@ -58,6 +71,35 @@ function passwortPruefen(passwort, gespeichert) {
     if (soll.length !== 32) return false;
     const ist = crypto.scryptSync(passwort, Buffer.from(salzHex, 'hex'), 32);
     return crypto.timingSafeEqual(ist, soll);
+}
+
+// Passwort des Haupt-Organisators (events.event_password_hash): neu wie bei
+// den Mitorganisatoren scrypt mit Salz, aeltere Zugaenge noch ungesalzenes
+// SHA-256 (64 Hex-Zeichen) - beides wird angenommen.
+function hauptPasswortPruefen(passwort, gespeichert) {
+    if (typeof passwort !== 'string' || typeof gespeichert !== 'string') return false;
+    if (gespeichert.startsWith('scrypt$')) return passwortPruefen(passwort, gespeichert);
+    if (!/^[0-9a-f]{64}$/.test(gespeichert)) return false;
+    const ist = crypto.createHash('sha256').update(passwort).digest();
+    return crypto.timingSafeEqual(ist, Buffer.from(gespeichert, 'hex'));
+}
+
+// Selbst gewaehltes Passwort: mindestens 10 Zeichen.
+function passwortGenuegt(passwort) {
+    return typeof passwort === 'string' && passwort.length >= 10 && passwort.length <= 200;
+}
+
+// Link "Passwort festlegen": 14 Tage gueltig, einmal benutzbar.
+const LINK_TAGE = 14;
+function linkToken() {
+    const token = crypto.randomBytes(32).toString('base64url');
+    return { token, hash: tokenHash(token) };
+}
+function tokenHash(token) {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+function linkAdresse(token) {
+    return `https://www.fwv-raura.ch/event-dashboard.html?passwort=${encodeURIComponent(token)}`;
 }
 
 // Zufaelliges Passwort (16 Zeichen, wie beim Haupt-Organisator).
@@ -79,24 +121,27 @@ function emailGueltig(email) {
     return typeof email === 'string' && EMAIL_MUSTER.test(email.trim());
 }
 
-// Mail mit den Zugangsdaten fuers Event-Dashboard. Gleicher Text fuer den
-// externen Haupt-Organisator (POST /events, create_access) und externe
+// Mail mit dem Zugang zum Event-Dashboard: Login-Adresse und ein Link, mit
+// dem die Person ihr Passwort selbst festlegt - kein Passwort im Klartext.
+// Gleicher Text fuer den externen Haupt-Organisator und externe
 // Mitorganisatoren (rolle 'Mitorganisator').
-function zugangsdatenMail({ name, titel, loginEmail, passwort, gueltigBis, rolle = 'Organisator' }) {
+function passwortLinkMail({ name, titel, loginEmail, link, gueltigBis, rolle = 'Organisator' }) {
     return {
-        subject: `Ihre Zugangsdaten fuer ${titel}`,
+        subject: `Ihr Zugang fuer ${titel}`,
         body: `
 Guten Tag ${name || rolle},
 
 Sie wurden als ${rolle} fuer das Event "${titel}" eingetragen.
 
-Hier sind Ihre Zugangsdaten fuer das Event-Dashboard:
-
-URL: https://fwv-raura.ch/event-dashboard.html
+Ihr Login fuer das Event-Dashboard (https://www.fwv-raura.ch/event-dashboard.html):
 E-Mail: ${loginEmail}
-Passwort: ${passwort}
 
-Dieser Zugang ist gueltig bis ${new Date(gueltigBis).toLocaleDateString('de-CH')}.
+Bitte legen Sie Ihr Passwort selbst fest - der Link gilt ${LINK_TAGE} Tage:
+${link}
+
+Abgelaufen? Im Event-Dashboard unter "Passwort vergessen?" bekommen Sie einen neuen Link.
+
+Der Zugang ist gueltig bis ${new Date(gueltigBis).toLocaleDateString('de-CH')}.
 
 Bei Fragen wenden Sie sich bitte an den Vorstand.
 
@@ -157,6 +202,7 @@ function empfaengerListe(haupt, weitere = [], ohne = []) {
 }
 
 module.exports = {
-    SCHEMA_SQL, passwortHashen, passwortPruefen, neuesPasswort, zugangBis, emailGueltig,
-    zugangsdatenMail, mitgliedMail, eintragAnsicht, empfaengerListe
+    SCHEMA_SQL, passwortHashen, passwortPruefen, hauptPasswortPruefen, passwortGenuegt, neuesPasswort,
+    zugangBis, emailGueltig, LINK_TAGE, linkToken, tokenHash, linkAdresse,
+    passwortLinkMail, mitgliedMail, eintragAnsicht, empfaengerListe
 };
