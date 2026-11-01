@@ -18,7 +18,8 @@ const { text, image, barcodes } = require('@pdfme/schemas');
 const crypto = require('crypto');
 const nachrichtLayout = require('./nachricht-layout');
 const { anlassPdf, mitAnlassPdf, seitenAnhaengen } = require('./anlass-pdf');
-const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen } = require('./nachricht-routen');
+const einladungLayout = require('./einladung-layout');
+const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen, einladungInhalt } = require('./nachricht-routen');
 
 // ============================================
 // CONTACT FORM RATE LIMITING (in-memory)
@@ -814,15 +815,24 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
         // Layout aus dem Text (nachricht-layout.js), statt html vom Client.
         // praeferenz_ignorieren: true -> auch an Mitglieder ohne
         // E-Mail-Zustellung (Versandart "E-Mail"); sonst wie bisher nur mit.
-        const standardLayout = req.body.layout === 'standard';
+        // layout: 'einladung' + event_id -> Einladungs-Layout (einladung-layout.js),
+        // body ist dann die Einleitung.
+        const einladung = req.body.layout === 'einladung' && req.body.event_id;
+        const standardLayout = req.body.layout === 'standard' || !!einladung;
         const praeferenzIgnorieren = req.body.praeferenz_ignorieren === true;
         const absender = standardLayout ? await absenderLaden(pool) : null;
+        const einladungsDaten = einladung ? await einladungLayout.einladungDaten(pool, req.body.event_id) : null;
+        if (einladung && !einladungsDaten) return res.status(404).json({ error: 'Anlass nicht gefunden' });
+        // Interne Aufrufe (Mitglieder laden, /email/send) mit dem Ausweis des
+        // Aufrufers UND dem API-Schluessel: kam der Aufruf selbst mit Schluessel
+        // (api-accounting, Beitragsversand), fehlte sonst jede Anmeldung.
+        const internKopf = { Authorization: req.headers.authorization || '', 'x-api-key': process.env.API_KEY || '' };
 
         // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
         const membersResp = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
             params: { ids: member_ids.join(',') },
-            headers: { Authorization: req.headers.authorization || '' }
+            headers: internKopf
         });
         // SICHERHEIT: Zusaetzlich client-seitig nach den angefragten IDs filtern, falls das Members-API
         // den ids-Parameter (noch) nicht unterstuetzt. Sonst wuerde an ALLE Mitglieder gesendet!
@@ -875,13 +885,16 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                             betreff: req.body.subject,
                             text: req.body.body,
                             mitglied: member,
-                            absender
+                            absender,
+                            inhaltHtml: einladung
+                                ? await einladungInhalt(pool, req.body.event_id, req.body.body, member, async () => einladungsDaten)
+                                : null
                         })
                         : req.body.html,
                     attachments: anhaenge,
                     event_id: req.body.event_id || null
                 }, {
-                    headers: { Authorization: req.headers.authorization || '' }
+                    headers: internKopf
                 });
 
                 results.push({ member_id: member.id, success: true });
@@ -3956,7 +3969,7 @@ app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'
 
         logInfo('Letter sent via Pingen (HTML)', { member_id, name: recipient.name, subject });
         await briefProtokollieren(pool, {
-            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
+            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging, eventId: event_id
         });
         if (!staging) sendPingenCostNotification(recipient.name, letterRes.data.data?.id, false, subject).catch(() => {});
         res.json({ success: true, letter_id: letterRes.data.data?.id });

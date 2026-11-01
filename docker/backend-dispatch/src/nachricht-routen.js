@@ -11,6 +11,7 @@
 // Tests ohne Datenbank und Puppeteer laufen (test/nachricht.test.js).
 
 const L = require('./nachricht-layout');
+const E = require('./einladung-layout');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -27,11 +28,23 @@ async function absenderLaden(pool) {
     return L.absenderZeile(await aktuarLaden(pool));
 }
 
+/** Einladung fuer ein Mitglied: Einleitung (Platzhalter von Mitglied und
+ *  Anlass ersetzt) im Einladungs-Layout. [laden] = E.einladungDaten, in Tests
+ *  ersetzbar. Wirft, wenn der Anlass fehlt. */
+async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten) {
+    const daten = await laden(pool, eventId);
+    if (!daten) throw Object.assign(new Error('Anlass nicht gefunden'), { status: 404 });
+    const intro = E.anlassPlatzhalter(L.platzhalterErsetzen(text, mitglied), daten.anlass);
+    return E.einladungHtml({ ...daten, introHtml: L.textZuHtml(intro) });
+}
+
 /** Handler fuer POST /dispatch/brief. [vorschauPdf](html, rand, zonen) -> Buffer. */
-function briefErstellen({ pool, vorschauPdf }) {
+function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }) {
     return async (req, res) => {
         try {
-            const { subject, body, member_id, vorschau = false, zonen = false } = req.body || {};
+            // vorlage 'einladung' + event_id: Inhalt im Einladungs-Layout
+            // (einladung-layout.js), body ist dann die Einleitung.
+            const { subject, body, member_id, vorschau = false, zonen = false, vorlage, event_id } = req.body || {};
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
             }
@@ -48,7 +61,10 @@ function briefErstellen({ pool, vorschauPdf }) {
                 betreff: subject,
                 text: body,
                 mitglied,
-                absender: await absenderLaden(pool)
+                absender: await absenderLaden(pool),
+                inhaltHtml: vorlage === 'einladung'
+                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten)
+                    : null
             });
             const antwort = {
                 html,
@@ -62,7 +78,7 @@ function briefErstellen({ pool, vorschauPdf }) {
             }
             res.json(antwort);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: error.message });
         }
     };
 }
@@ -70,11 +86,11 @@ function briefErstellen({ pool, vorschauPdf }) {
 /** Brief im Versandprotokoll festhalten (send-post, send-pdf-post schrieben
  *  bisher nichts - Verlauf und Pingen-Liste blieben leer). Staging-Briefe
  *  sind im Betreff markiert. Fehler hier brechen den Versand nicht ab. */
-async function briefProtokollieren(pool, { memberId, recipient, subject, letterId, staging }) {
+async function briefProtokollieren(pool, { memberId, recipient, subject, letterId, staging, eventId }) {
     try {
         await pool.query(
-            `INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, sent_at)
-             VALUES ('pingen', $1, $2, $3, 'sent', $4, NOW())`,
+            `INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id, sent_at)
+             VALUES ('pingen', $1, $2, $3, 'sent', $4, $5, NOW())`,
             [
                 memberId && UUID.test(String(memberId)) ? memberId : null,
                 JSON.stringify({
@@ -84,7 +100,8 @@ async function briefProtokollieren(pool, { memberId, recipient, subject, letterI
                     city: recipient?.city
                 }),
                 `${staging ? '[Staging] ' : ''}${subject || 'Brief'}`.slice(0, 300),
-                letterId || null
+                letterId || null,
+                eventId && UUID.test(String(eventId)) ? eventId : null
             ]
         );
     } catch (error) {
@@ -103,4 +120,5 @@ function variablenEinsetzen(text, variablen, alsHtml = false) {
     });
 }
 
-module.exports = { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen };
+module.exports = {
+    einladungInhalt, briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen };

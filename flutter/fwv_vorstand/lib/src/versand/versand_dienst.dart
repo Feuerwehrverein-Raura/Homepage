@@ -89,20 +89,28 @@ class VersandDienst {
     required String mitgliedId,
     required String betreff,
     required String text,
+    String? anlassId,
   }) async {
-    final brief = await _brief(mitgliedId, betreff, text, vorschau: true);
+    final brief = await _brief(mitgliedId, betreff, text, vorschau: true, anlassId: anlassId);
     final pdf = brief.pdf;
     if (pdf == null) throw const ApiFehler('Der Server hat keine Vorschau geliefert.');
     return pdf;
   }
 
-  Future<Brief> _brief(String id, String betreff, String text, {bool vorschau = false}) async {
+  Future<Brief> _brief(
+    String id,
+    String betreff,
+    String text, {
+    bool vorschau = false,
+    String? anlassId,
+  }) async {
     final j = await api.post(
       'dispatch/brief',
       daten: {
         'member_id': id,
         'subject': betreff.trim(),
         'body': text,
+        if (anlassId != null) ...{'vorlage': 'einladung', 'event_id': anlassId},
         if (vorschau) ...{'vorschau': true, 'zonen': true},
       },
     );
@@ -112,7 +120,9 @@ class VersandDienst {
   /// Schickt nach [plan]: erst die E-Mails (paketweise), dann die Briefe
   /// einzeln (Brief bauen, dann send-post). Fehler einzelner Empfaenger
   /// stehen im Ergebnis; ohne Verbindung bricht der Versand ab. Mit
-  /// [anlassId] haengt das Backend das PDF des Anlasses an (anlass-pdf.js).
+  /// [anlassId] ist es eine Einladung: das Backend setzt sie ins
+  /// Einladungs-Layout (einladung-layout.js, [text] ist die Einleitung) und
+  /// haengt das PDF des Anlasses an (anlass-pdf.js).
   Future<VersandErgebnis> senden(
     Versandplan plan, {
     required String betreff,
@@ -135,7 +145,7 @@ class VersandDienst {
             'member_ids': [for (final m in paket) m.id],
             'subject': betreff.trim(),
             'body': text,
-            'layout': 'standard',
+            'layout': anlassId == null ? 'standard' : 'einladung',
             'event_id': ?anlassId,
             // Versandart E-Mail: auch an Mitglieder, die Post wuenschen.
             if (plan.art == Versandart.email) 'praeferenz_ignorieren': true,
@@ -163,7 +173,7 @@ class VersandDienst {
     for (final m in plan.post) {
       if (ergebnis.abgebrochen) break;
       try {
-        final brief = await _brief(m.id, betreff, text);
+        final brief = await _brief(m.id, betreff, text, anlassId: anlassId);
         await api.post(
           'dispatch/send-post',
           daten: {

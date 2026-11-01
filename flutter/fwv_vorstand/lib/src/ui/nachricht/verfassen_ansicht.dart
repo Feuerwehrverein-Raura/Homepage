@@ -131,7 +131,12 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     await pdfTeilen(
       context,
       widget.dienste.umgebung,
-      () => _dienst.briefVorschau(mitgliedId: probe.id, betreff: _betreff.text, text: _text.text),
+      () => _dienst.briefVorschau(
+        mitgliedId: probe.id,
+        betreff: _betreff.text,
+        text: _text.text,
+        anlassId: widget.entwurf?.anlassId,
+      ),
       pdfName('Vorschau', mitgliedName(probe)),
     );
     if (mounted) setState(() => _vorschauLaedt = false);
@@ -373,10 +378,22 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             helperMaxLines: 3,
           ),
         ),
+        if (widget.entwurf?.anlassId != null) ...[
+          const SizedBox(height: 8),
+          const Hinweis(
+            key: Key('versand-einladung'),
+            art: HinweisArt.neutral,
+            text:
+                'Einladungs-Layout: Daten des Anlasses, Beschreibung, Unterschriften und QR-Code '
+                'kommen automatisch dazu – hier nur die Einleitung schreiben. Wie es aussieht, '
+                'zeigt die Brief-Vorschau.',
+          ),
+        ],
         if (widget.entwurf?.anhang case final anhang?) ...[
           const SizedBox(height: 8),
           Hinweis(
             key: const Key('versand-anhang'),
+            art: HinweisArt.neutral,
             text: 'Kommt mit: «$anhang» – als Anhang der E-Mail und als weitere Seiten des Briefs.',
           ),
         ],

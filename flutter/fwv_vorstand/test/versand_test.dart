@@ -349,12 +349,18 @@ void main() {
       );
       expect(d.posts('/email/bulk').map((m) => m['event_id']).toSet(), {'e1'});
       expect(d.posts('/dispatch/send-post').map((m) => m['event_id']).toSet(), {'e1'});
+      expect(d.posts('/email/bulk').map((m) => m['layout']).toSet(), {'einladung'});
+      expect(d.posts('/dispatch/brief').map((m) => (m['vorlage'], m['event_id'])).toSet(), {
+        ('einladung', 'e1'),
+      });
     });
 
     test('Ohne Anlass kein event_id', () async {
       final plan = versandPlanen(mitglieder(), Versandart.auto);
       await d.backend.dienste.versand.senden(plan, betreff: 'a', text: 'b', staging: false);
       expect(d.posts('/email/bulk').any((m) => m.containsKey('event_id')), isFalse);
+      expect(d.posts('/email/bulk').map((m) => m['layout']).toSet(), {'standard'});
+      expect(d.posts('/dispatch/brief').any((m) => m.containsKey('vorlage')), isFalse);
       expect(d.posts('/dispatch/send-post').any((m) => m.containsKey('event_id')), isFalse);
     });
 

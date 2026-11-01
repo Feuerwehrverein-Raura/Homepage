@@ -23,35 +23,12 @@ Anlass _anlass([Map<String, Object?> mehr = const {}]) => Anlass.ausJson({
 
 void main() {
   group('einladungsEntwurf', () {
-    test('Betreff, Daten, Beschreibung und Link', () {
+    test('Betreff und Einleitung, Rest setzt das Einladungs-Layout', () {
       final e = einladungsEntwurf(_anlass());
       expect(e.betreff, 'Einladung: Chilbi 2026');
-      expect(e.text, contains('zum Anlass «Chilbi 2026» einladen'));
-      expect(e.text, contains('Grill und Bar.'));
-      expect(
-        e.text,
-        contains(
-          'Was: Chilbi 2026\nWo: Roter Schopf\nWann: Sa 17.10.2026, 10:00–02:00\n'
-          'Anmeldung: Zwingend\nAnmeldeschluss: 01.10.2026\nKosten: gratis',
-        ),
-      );
-      expect(e.text, contains('https://www.fwv-raura.ch/events.html?event=chilbi-2026'));
-      expect(e.text, endsWith('Wir freuen uns über zahlreiches Erscheinen.'));
+      expect(e.text, 'Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.');
+      expect(e.anlassId, 'e1');
       expect(unbekanntePlatzhalter(e.text), isEmpty);
-    });
-
-    test('Datum offen, ohne Ort/Kosten/Schluss, freiwillig', () {
-      final e = einladungsEntwurf(
-        Anlass.ausJson({
-          'id': 'e2',
-          'title': 'Ausflug',
-          'app': {'datum_offen': true},
-        }),
-      );
-      expect(e.text, contains('Was: Ausflug\nWann: Datum noch offen\nAnmeldung: Freiwillig'));
-      expect(e.text, isNot(contains('Wo:')));
-      expect(e.text, isNot(contains('Kosten:')));
-      expect(e.text, contains('events.html?event=e2'));
     });
 
     test('Mit Schichten wird es ein Helferaufruf', () {
@@ -63,7 +40,6 @@ void main() {
         }),
       );
       expect(e.text, contains('suchen wir Helferinnen und Helfer'));
-      expect(e.text, endsWith('herzlichen Dank fürs Mitmachen.'));
     });
   });
 
@@ -83,7 +59,8 @@ void main() {
       for (final f in tester.widgetList<EditableText>(find.byType(EditableText))) f.controller.text,
     ];
     expect(felder, contains('Einladung: Chilbi 2026'));
-    expect(felder.where((t) => t.contains('Anmeldeschluss: 01.10.2026')), hasLength(1));
+    expect(felder, contains('Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.'));
+    expect(find.byKey(const Key('versand-einladung')), findsOneWidget);
     // Ohne PDF am Anlass kein Hinweis.
     expect(find.byKey(const Key('versand-anhang')), findsNothing);
   });

@@ -117,8 +117,10 @@ const SCHLUSS = `Mit freundlichen Grüssen<br><br>
  * 60mm mit engeren Zeilen (5 Zeilen mit "Deutschland" in 25.5mm) und das
  * Logo 30mm breit (endet bei 37.6mm).
  */
-function briefHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
-    const titel = platzhalterErsetzen(betreff, mitglied);
+function briefHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null }) {
+    // inhaltHtml: fertiger Inhalt mit eigenem Titel und Gruss (Einladung,
+    // einladung-layout.js) - dann ohne Betreffzeile und ohne SCHLUSS.
+    const titel = inhaltHtml ? '' : platzhalterErsetzen(betreff, mitglied);
     const inhalt = textZuHtml(platzhalterErsetzen(text, mitglied));
     const de = istDeutscherEmpfaenger(mitglied);
     const adresseCss = de
@@ -151,17 +153,18 @@ function briefHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
     </div>
     <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${schweizerDatum(datum)}</div>
 </div>
-<div class="letter-body" style="padding:0 25mm 5mm 25mm;">${kopf}<div>${inhalt}</div>
-    <div class="letter-closing" style="margin-top:10mm;">
+<div class="letter-body" style="padding:0 25mm 5mm 25mm;">${kopf}<div>${inhaltHtml || inhalt}</div>
+    ${inhaltHtml ? '' : `<div class="letter-closing" style="margin-top:10mm;">
         ${SCHLUSS}
-    </div>
+    </div>`}
 </div>
 </body></html>`;
 }
 
 /** E-Mail im offiziellen Layout (generateDispatchEmailHTML, vorstand.html). */
-function emailHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
-    const titel = platzhalterErsetzen(betreff, mitglied);
+function emailHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null }) {
+    // inhaltHtml wie bei briefHtml: fertige Einladung mit eigenem Gruss.
+    const titel = inhaltHtml ? '' : platzhalterErsetzen(betreff, mitglied);
     const inhalt = textZuHtml(platzhalterErsetzen(text, mitglied));
     const kopf = titel
         ? `<div style="font-weight:bold;font-size:13pt;">${escapeHtml(titel)}</div><hr style="border:none;border-top:1px solid #000;margin:8px 0 15px 0;">`
@@ -182,10 +185,10 @@ function emailHtml({ betreff, text, mitglied, absender, datum = new Date() }) {
     <div style="font-size:8pt;color:#333;margin-bottom:15px;">${escapeHtml(absender)}</div>
     <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${schweizerDatum(datum)}</div>
     ${kopf}
-    <div>${inhalt}</div>
-    <div style="margin-top:25px;">
+    <div>${inhaltHtml || inhalt}</div>
+    ${inhaltHtml ? '' : `<div style="margin-top:25px;">
         ${SCHLUSS}
-    </div>
+    </div>`}
 </div>
 </body></html>`;
 }
