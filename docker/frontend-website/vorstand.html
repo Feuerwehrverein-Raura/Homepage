@@ -7688,79 +7688,52 @@
         }
 
         // Zeigt die E-Mail-Vorschau im offiziellen Layout (gleicher Kopf wie Brief, email-freundlich)
-        function showEmailPreview() {
-            const subject = document.getElementById('dispatch-subject').value;
-            const content = getDispatchContent();
-            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${escapeHtml(l) || '&nbsp;'}</p>`).join('');
-
-            const sampleMember = members[0] || {
-                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
-                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst',
-                email: 'max@example.com'
-            };
-
-            // Event-Einladung: anderes Layout verwenden
-            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-            // Platzhalter haengen an der Event-Auswahl, nicht am Layout. Sonst zeigt
-            // die Vorschau {{event_title}}, waehrend der Versand ihn laengst ersetzt —
-            // eine Vorschau, die etwas anderes zeigt als das Ergebnis, ist wertlos.
-            const eventFuerPlatzhalter = getSelectedDispatchEvent();
-            const emailHtml = event
-                ? generateEventInvitationEmailHTML(event, bodyHtml, sampleMember)
-                : generateDispatchEmailHTML(bodyHtml, subject, sampleMember);
+        async function showEmailPreview() {
             const previewDiv = document.getElementById('dispatch-preview');
-
-            // Header ueber der Vorschau + generiertes Email-HTML (DOCTYPE/body gestrippt)
-            previewDiv.innerHTML = `
+            const probe = vorschauMitglied(false);
+            if (!probe) {
+                previewDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">Kein Mitglied mit E-Mail für die Vorschau.</div>';
+                return;
+            }
+            previewDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">Vorschau wird erstellt...</div>';
+            try {
+                // Genau die Mail, die /email/bulk fuer dieses Mitglied baut.
+                const inhalt = versandInhalt();
+                const response = await fetch(`${API_BASE}/dispatch/email-vorschau`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...inhalt, member_id: probe.id })
+                });
+                const v = await response.json();
+                if (!response.ok) throw new Error(v.error || `HTTP ${response.status}`);
+                previewDiv.innerHTML = `
                 <div style="background:#f3f4f6;padding:15px;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none;">
-                    <div style="font-size:11px;color:#6b7280;">An: ${escapeHtml(sampleMember.email)}</div>
-                    <div style="font-weight:600;color:#111827;">${escapeHtml(replacePlaceholders(replaceEventPlaceholders(subject, eventFuerPlatzhalter), sampleMember)) || '(kein Betreff)'}</div>
+                    <div style="font-size:11px;color:#6b7280;">An: ${escapeHtml(v.to || '')}</div>
+                    <div style="font-weight:600;color:#111827;">${escapeHtml(v.subject) || '(kein Betreff)'}</div>
                 </div>
                 <div style="border:1px solid #e5e7eb;border-radius:0 0 6px 6px;background:white;overflow:hidden;">
-                    ${emailHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '')}
+                    ${v.html.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '')}
                 </div>
-                ${dispatchAttachments.length > 0 ? `
+                ${(dispatchAttachments.length > 0 || getSelectedDispatchEvent()?.pdf_filename) ? `
                     <div style="padding:8px 15px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 6px 6px;font-size:11px;color:#6b7280;">
-                        Anhänge: ${dispatchAttachments.map(f => `📎 ${escapeHtml(f.name)}`).join(', ')}
+                        Anhänge: ${[...dispatchAttachments.map(f => f.name), getSelectedDispatchEvent()?.pdf_filename].filter(Boolean).map(n => `📎 ${escapeHtml(n)}`).join(', ')}
                     </div>
-                ` : ''}
-            `;
+                ` : ''}`;
+            } catch (error) {
+                previewDiv.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Fehler bei der Vorschau: ${escapeHtml(error.message)}</div>`;
+            }
         }
 
         // Rendert die Brief-Vorschau als PDF direkt in den angegebenen Container
         async function showLetterPreviewInto(container) {
-            const subject = document.getElementById('dispatch-subject').value;
-            const content = getDispatchContent();
-            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${escapeHtml(l) || '&nbsp;'}</p>`).join('');
-
-            const sampleMember = members[0] || {
-                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
-                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
-            };
-
-            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-            const letterHtml = event
-                ? generateEventInvitationLetterHTML(event, bodyHtml, sampleMember)
-                : generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
-
+            const probe = vorschauMitglied(true);
+            if (!probe) {
+                container.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">Kein Mitglied mit Postadresse für die Vorschau.</div>';
+                return;
+            }
             container.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">PDF wird generiert...</div>';
-
             try {
-                const response = await fetch(`${API_BASE}/dispatch/preview-pdf?zones=1`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    // Gleicher Rand wie beim echten Versand (Event-Einladung: 15mm oben)
-                    body: JSON.stringify({
-                        html: letterHtml,
-                        pdf_margin: event ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
-                    })
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const blob = await response.blob();
-                const pdfUrl = URL.createObjectURL(blob);
+                const pdfUrl = await briefVorschauUrl(probe);
                 container.innerHTML = `<iframe src="${pdfUrl}" style="width: 100%; height: 75vh; border: none; background: #e5e7eb;" title="Brief-Vorschau"></iframe>`;
             } catch (error) {
                 container.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Fehler bei PDF-Vorschau: ${escapeHtml(error.message)}</div>`;
@@ -7769,45 +7742,48 @@
 
         // Zeigt die Brief-Vorschau als echtes PDF (via Backend-Preview-Endpoint)
         async function showLetterPreview() {
+            await showLetterPreviewInto(document.getElementById('dispatch-preview'));
+        }
+
+        // --- Versand ueber den Server (api-dispatch) -------------------------
+        // Layout, Adressfenster CH rechts / DE links, Einladung (Tabelle,
+        // Unterschriften, QR) und Flyer des Anlasses baut der Server
+        // (nachricht-layout.js, einladung-layout.js) - fuer Website und App
+        // gleich. Hier nur noch der Inhalt aus dem Formular.
+        function versandInhalt() {
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
-            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${escapeHtml(l) || '&nbsp;'}</p>`).join('');
-
-            const sampleMember = members[0] || {
-                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
-                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
+            const evt = getSelectedDispatchEvent();
+            const einladung = !!(evt && currentTemplate?.layout === 'event-invitation');
+            return {
+                subject: evt ? replaceEventPlaceholders(subject, evt) : subject,
+                body: evt ? replaceEventPlaceholders(content.text || '', evt) : (content.text || ''),
+                body_html: content.html ? (evt ? replaceEventPlaceholders(content.html, evt, true) : content.html) : null,
+                layout: einladung ? 'einladung' : 'standard',
+                vorlage: einladung ? 'einladung' : undefined,
+                event_id: evt ? evt.id : null
             };
+        }
 
-            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-            const letterHtml = event
-                ? generateEventInvitationLetterHTML(event, bodyHtml, sampleMember)
-                : generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
-            const previewDiv = document.getElementById('dispatch-preview');
+        // Mitglied fuer die Vorschau: zuerst einer der gewaehlten Empfaenger,
+        // sonst irgendeins mit Adresse (Brief) bzw. E-Mail.
+        function vorschauMitglied(brief) {
+            const passt = m => brief ? (m.strasse && m.plz && m.ort) : (m.email || m.versand_email);
+            let empfaenger = [];
+            try { empfaenger = getFilteredRecipients(); } catch (_) { /* Formular noch nicht bereit */ }
+            return empfaenger.find(passt) || members.find(passt) || null;
+        }
 
-            previewDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">PDF wird generiert...</div>';
-
-            try {
-                const response = await fetch(`${API_BASE}/dispatch/preview-pdf?zones=1`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    // Gleicher Rand wie beim echten Versand (Event-Einladung: 15mm oben)
-                    body: JSON.stringify({
-                        html: letterHtml,
-                        pdf_margin: event ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
-                    })
-                });
-
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const blob = await response.blob();
-                const pdfUrl = URL.createObjectURL(blob);
-                previewDiv.innerHTML = `
-                    <iframe src="${pdfUrl}" style="width: 100%; height: 75vh; border: none; background: #e5e7eb;" title="Brief-Vorschau"></iframe>`;
-            } catch (error) {
-                previewDiv.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Fehler bei PDF-Vorschau: ${escapeHtml(error.message)}</div>`;
-            }
+        async function briefVorschauUrl(mitglied) {
+            const response = await fetch(`${API_BASE}/dispatch/brief`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...versandInhalt(), member_id: mitglied.id, vorschau: true, zonen: true })
+            });
+            const b = await response.json();
+            if (!response.ok) throw new Error(b.error || `HTTP ${response.status}`);
+            const bytes = Uint8Array.from(atob(b.pdf_base64), c => c.charCodeAt(0));
+            return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
         }
 
         // Ersetzt Platzhalter im Text mit den tatsächlichen Mitgliederdaten.
@@ -8051,12 +8027,11 @@
             const upcoming = events.filter(e => e.status !== 'cancelled' && (!e.end_date || new Date(e.end_date) >= now))
                 .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
 
-            // Schichten nachladen, sobald ein anderer Anlass gewaehlt wird —
-            // davon haengt ab, ob die Einladung zum Helferaufruf wird.
+            // Anderer Anlass: Grundtext je Anlassart und Vorschau neu (die
+            // Schichten setzt der Server in die Einladung, einladung-layout.js).
             if (!select.dataset.schichtHandler) {
                 select.dataset.schichtHandler = '1';
                 select.addEventListener('change', async () => {
-                    await ladeDispatchSchichten(select.value);
                     setzeGrundtextFuer(getSelectedDispatchEvent());
                     if (typeof showEmailPreview === 'function' &&
                         document.getElementById('dispatch-preview')?.innerHTML) {
@@ -8076,31 +8051,8 @@
             });
         }
 
-        // Schichten des gewaehlten Anlasses. Wird beim Umschalten des Dropdowns
-        // gefuellt, damit buildEventInvitationBody() ohne Warten darauf zugreifen
-        // kann — die Funktion baut HTML und ist bewusst synchron.
-        let dispatchSchichten = [];
 
-        async function ladeDispatchSchichten(eventId) {
-            dispatchSchichten = [];
-            if (!eventId) return;
-            try {
-                const antwort = await fetch(`${API_BASE}/shifts?event_id=${encodeURIComponent(eventId)}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                if (antwort.ok) dispatchSchichten = await antwort.json();
-            } catch (e) { /* ohne Schichten bleibt es bei der schlichten Einladung */ }
-        }
 
-        // Baut den Helferaufruf: eine Zeile je Tag, darin die Bereiche mit
-        // Zeitfenstern und Bedarf. Ohne Schichten kommt nichts zurueck — dann
-        // bleibt es bei der gewoehnlichen Einladung.
-        // Kategorien, bei denen es um Helfer geht und nicht um Teilnahme.
-        // Gleiche Einteilung wie auf der Website (getRegistrationBadge dort):
-        // Ein Dorffest sucht Helfer, ein Ausflug oder eine GV sammelt
-        // Anmeldungen. Die Kategorie entscheidet, nicht der Zufall, ob schon
-        // jemand Schichten angelegt hat.
-        const HELFER_KATEGORIEN = ['Dorffest'];
 
         // Grundtext je Anlassart. Bisher las sich jede Einladung gleich —
         // "Hiermit moechte der Vorstand euch zum Event X einladen", ob es nun
@@ -8152,52 +8104,6 @@
             if (unveraendert) setDispatchContent(text, null);
         }
 
-        function baueSchichtBlock(event) {
-            if (!event || !HELFER_KATEGORIEN.includes(event.category || '')) return '';
-            if (!dispatchSchichten || dispatchSchichten.length === 0) return '';
-
-            const nachTag = {};
-            dispatchSchichten.forEach(sch => {
-                const tag = (sch.date || '').substring(0, 10);
-                (nachTag[tag] = nachTag[tag] || []).push(sch);
-            });
-
-            const zeit = t => (t || '').substring(0, 5);
-            const wochentag = d => {
-                const namen = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-                const dat = new Date(d + 'T12:00:00');
-                return isNaN(dat) ? '' : namen[dat.getDay()];
-            };
-
-            const zeilen = Object.keys(nachTag).sort().map(tag => {
-                const eintraege = nachTag[tag]
-                    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
-                    .map(sch => {
-                        const bereich = sch.bereich || sch.name || '';
-                        const spanne = sch.start_time ? `${zeit(sch.start_time)}–${zeit(sch.end_time)}` : '';
-                        return `${escapeHtml(bereich)} ${spanne} (${escapeHtml(sch.needed || 1)})`;
-                    }).join(' &middot; ');
-                const datum = tag.split('-').reverse().join('.');
-                return `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;white-space:nowrap;">${wochentag(tag)}, ${datum}</td><td>${eintraege}</td></tr>`;
-            }).join('');
-
-            // Zwei verschiedene Zahlen, die gern verwechselt werden: wie viele
-            // Schichten ausgeschrieben sind, und wie viele Helferinnen und
-            // Helfer sie zusammen brauchen.
-            const anzahlSchichten = dispatchSchichten.length;
-            const gesamt = dispatchSchichten.reduce((n, sch) => n + (sch.needed || 1), 0);
-
-            return `
-                <div style="margin:3mm 0 1mm 0;font-weight:bold;">Wir suchen Helferinnen und Helfer</div>
-                <div style="margin:0 0 2mm 0;">Ausgeschrieben sind
-                    <strong>${anzahlSchichten} verschiedene Schichten</strong> mit zusammen
-                    <strong>${gesamt} Helferschichten</strong>, die besetzt werden wollen.
-                    Trag dich für die Schichten ein, die dir passen —
-                    über den QR-Code unten oder auf <strong>www.fwv-raura.ch</strong> beim Anlass.
-                    Zwei Schichten am Stück sind uns lieber als zwei einzelne über den Tag verteilt.</div>
-                <table style="border-collapse:collapse;margin:0 0 3mm 0;">${zeilen}</table>
-                <div style="margin:0 0 3mm 0;font-size:9pt;color:#555;">Die Zahl in Klammern ist der Bedarf pro Schicht.</div>`;
-        }
 
         // Gibt das aktuell im Dropdown ausgewaehlte Event zurueck (oder null)
         function getSelectedDispatchEvent() {
@@ -8452,29 +8358,11 @@
                 const anhaenge = await Promise.all(dispatchAttachments.map(async f => ({
                     filename: f.name, content: await fileToBase64(f), contentType: f.type || 'application/octet-stream'
                 })));
-                const anlassId = getSelectedDispatchEvent()?.id || null;
+                // Inhalt fuer den Server (Layout, Einladung, Flyer baut api-dispatch).
+                const inhalt = versandInhalt();
 
-                // E-Mail-Versand: HTML im offiziellen Layout einwickeln (Kopf + Body + Schluss)
-                // Placeholders {{vorname}} etc. werden vom Backend pro Empfaenger ersetzt
+                // E-Mail-Versand: Layout und Platzhalter pro Mitglied im Server.
                 if (emailRecipients.length > 0) {
-                    const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${escapeHtml(l) || '&nbsp;'}</p>`).join('');
-                    // Event-Einladung: spezielles Layout; sonst Standard-Layout
-                    // Layout nur beim Spezial-Template; Platzhalter dagegen immer,
-                    // sobald ein Anlass gewaehlt ist. Sonst bleibt {{event_title}}
-                    // stehen, wenn jemand die gleichnamige Vorlage aus der
-                    // Datenbank erwischt statt der fest eingebauten.
-                    const evtLayout = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-                    const evt = getSelectedDispatchEvent();
-                    const wrappedHtml = evtLayout
-                        ? generateEventInvitationEmailHTML(evtLayout, sourceHtml, null)
-                        : generateDispatchEmailHTML(sourceHtml, subject, null);
-
-                    // Event-Platzhalter ({{event_title}} etc.) im Betreff und Text-Fallback aufloesen.
-                    // Das Body-HTML macht das bereits in buildEventInvitationBody; Mitglieder-
-                    // Platzhalter ({{vorname}} ...) ersetzt das Backend pro Empfaenger.
-                    const emailSubject = evt ? replaceEventPlaceholders(subject, evt) : subject;
-                    const emailBodyText = evt ? replaceEventPlaceholders(content.text || '', evt) : content.text;
-
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
                         headers: {
@@ -8483,21 +8371,12 @@
                         },
                         body: JSON.stringify({
                             member_ids: emailRecipients.map(m => m.id),
-                            template_id: templateId || null,
-                            subject: emailSubject,
-                            body: emailBodyText,
-                            html: wrappedHtml,
-                            // Auffangnetz: Ersetzt das Backend die Platzhalter selbst,
-                            // ist es gleichgueltig, welche Vorlage gewaehlt wurde.
-                            variables: evt ? {
-                                event_title: evt.title || '',
-                                event_date: evt.datum_offen
-                                    ? 'Datum noch offen'
-                                    : (evt.start_date ? formatEventDate(evt.start_date) : ''),
-                                event_location: evt.location || ''
-                            } : {},
+                            subject: inhalt.subject,
+                            body: inhalt.body,
+                            body_html: inhalt.body_html,
+                            layout: inhalt.layout,
+                            event_id: inhalt.event_id,
                             attachments: anhaenge,
-                            event_id: anlassId,
                             // Versandart E-Mail: auch an Mitglieder mit Post-Wunsch (die
                             // Auswahl oben hat schon gefiltert). Ohne das liess der Server
                             // sie still weg, obwohl die Rueckfrage sie mitzaehlte.
@@ -8514,31 +8393,19 @@
                     }
                 }
 
-                // Post-Versand: pro Mitglied Brief im offiziellen Layout (Kopf wie Mitgliedsbeitrag)
-                // an /dispatch/send-post (Adresse schon im HTML, daher kein Deckblatt noetig)
+                // Post-Versand: pro Mitglied den Brief im Server bauen (Adressfenster
+                // CH rechts / DE links, Einladungs-Layout) und an Pingen schicken.
                 if (postRecipients.length > 0) {
-                    const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${escapeHtml(l) || '&nbsp;'}</p>`).join('');
-
-                    // Event-Einladung: spezielles Layout; sonst Standard-Layout
-                    const evtForPost = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-
                     for (let i = 0; i < postRecipients.length; i++) {
                         const member = postRecipients[i];
-                        // Ganzer Brief im offiziellen Layout (inkl. Kopf, Adresse im Fensterkuvert, Betreff, Body, Schluss)
-                        const letterHtml = evtForPost
-                            ? generateEventInvitationLetterHTML(evtForPost, sourceHtml, member)
-                            : generateDispatchLetterHTML(sourceHtml, subject, member);
-
-                        const recipient = {
-                            name: `${member.vorname} ${member.nachname}`,
-                            street: member.strasse,
-                            zip: member.plz,
-                            city: member.ort,
-                            country: 'CH'
-                        };
-
                         try {
-                            const postSubject = evtForPost ? `Einladung_${evtForPost.title}` : (subject || 'Brief');
+                            const b = await fetch(`${API_BASE}/dispatch/brief`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ...inhalt, member_id: member.id })
+                            });
+                            const brief = await b.json();
+                            if (!b.ok) throw new Error(brief.error || `HTTP ${b.status}`);
                             const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                                 method: 'POST',
                                 headers: {
@@ -8546,14 +8413,13 @@
                                     'Content-Type': 'application/json'
                                 },
                                 body: JSON.stringify({
-                                    html: letterHtml,
-                                    recipient,
+                                    html: brief.html,
+                                    recipient: brief.recipient,
                                     member_id: member.id,
-                                    subject: postSubject,
-                                    // Event-Einladung: 15mm Oberrand, damit Folgeseiten nicht in Pingens Sperrzone laufen
-                                    pdf_margin: evtForPost ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined,
+                                    subject: brief.subject,
+                                    pdf_margin: brief.pdf_margin,
                                     // Flyer des Anlasses und beigelegte PDFs als weitere Seiten
-                                    event_id: anlassId,
+                                    event_id: inhalt.event_id,
                                     anhaenge
                                 })
                             });
@@ -8997,16 +8863,6 @@
             return `${a.kurzName}, ${a.strasse}, ${a.plz} ${a.ort}`;
         }
 
-        // Praesident-Helper (fuer Event-Einladungen)
-        function getPraesident() {
-            const p = members.find(m => m.funktion && /pr[aä]sident/i.test(m.funktion));
-            if (!p) return null;
-            return {
-                vorname: p.vorname || '',
-                nachname: p.nachname || '',
-                name: `${p.vorname || ''} ${p.nachname || ''}`.trim()
-            };
-        }
 
         // Wechselt zwischen Auto / Post / E-Mail Modus
         function switchDeliveryMode(mode) {
@@ -9364,57 +9220,6 @@
             updateBeitragDerived();
         }
 
-        // Generiert den kompletten Brief als HTML (fuer E-Mail oder Post)
-        // includeAddress=true: Empfaenger-Adressblock im Schweizer Adressfenster (fuer Post-Versand via Pingen)
-        // includeAddress=false: ohne Adressblock (fuer E-Mail-Versand)
-        // Generiert eine allgemeine E-Mail (fuer Nachrichten-Tab E-Mail-Versand)
-        // Layout: Gleicher Kopf wie Dispatch-Letter, aber email-freundlich (Tabelle, max 660px)
-        // Kein Adressfenster (bei E-Mail unnoetig), kein QR-Slip.
-        function generateDispatchEmailHTML(bodyHtml, subject, member) {
-            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            // Platzhalter im Body ersetzen falls Mitglied uebergeben
-            let body = bodyHtml || '';
-            if (member) body = replacePlaceholders(body, member, true);
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
-<div style="max-width:660px;margin:0 auto;padding:20px;background:white;">
-
-    <!-- Briefkopf: Logo links, Titel rechts -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:15px;">
-        <tr>
-            <td width="120" valign="top">
-                <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" width="110" style="display:block;">
-            </td>
-            <td valign="top" style="padding-left:15px;">
-                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
-                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
-            </td>
-        </tr>
-    </table>
-
-    <!-- Absenderzeile (Aktuar) -->
-    <div style="font-size:8pt;color:#333;margin-bottom:15px;">${escapeHtml(getAktuarAbsenderLine())}</div>
-
-    <!-- Datum rechtsbuendig -->
-    <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${datum}</div>
-
-    ${subject ? `<div style="font-weight:bold;font-size:13pt;">${escapeHtml(subject)}</div><hr style="border:none;border-top:1px solid #000;margin:8px 0 15px 0;">` : ''}
-
-    <!-- Body -->
-    <div>${body}</div>
-
-    <!-- Abschluss -->
-    <div style="margin-top:25px;">
-        Mit freundlichen Grüssen<br><br>
-        <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-        <em>Der Vorstand</em>
-    </div>
-
-</div>
-</body></html>`;
-        }
 
         // Generiert einen allgemeinen Brief (fuer Nachrichten-Tab Post-Versand)
         // Baut die Empfaenger-Adresszeilen fuer Fensterkuvert-Briefe (Pingen).
@@ -9442,72 +9247,6 @@
             return letterAddressLines(member).map(l => `<div>${escapeHtml(l)}</div>`).join('\n        ');
         }
 
-        // Layout: Kopf wie Mitgliedsbeitrag (Logo+Titel+Absender+Empfaenger+Datum), ohne QR.
-        // Inline-Styles damit Vorschau und PDF-Generierung konsistent sind.
-        function generateDispatchLetterHTML(bodyHtml, subject, member) {
-            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
-            const strasse = member?.strasse || '{{strasse}}';
-            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
-
-            // Platzhalter im Body ersetzen falls Mitglied uebergeben
-            let body = bodyHtml || '';
-            if (member) body = replacePlaceholders(body, member, true);
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>
-/* Puppeteer: margin 0 top/sides, 20mm bottom (fuer Footer-Seitenzahlen) */
-* { box-sizing: border-box; }
-body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-/* Seite-1-Header: volle 210mm Breite, absolut positionierte Elemente */
-/* Schweizer Standard: Adressfenster X=118mm, Y=60mm */
-.first-page-header {
-    position: relative; width: 210mm; height: 110mm;
-    page-break-inside: avoid; page-break-after: avoid;
-}
-/* Pingen-Vorgaben:
- * Randsperrbereich: 5mm rundum
- * Frankierbereich: X=116-205.5mm, Y=40-87.5mm (reserviert, KEINE Absenderzeile hier)
- * Adressbereich: X=118-203.5mm, Y=60-85.5mm (NUR Empfängeradresse)
- * Logo oben links (ausserhalb Frankierbereich X<116mm) */
-.first-page-header .logo { position: absolute; top: 15mm; left: 20mm; width: 35mm; }
-.first-page-header .logo img { width: 35mm; height: auto; display: block; }
-/* Titel links oberhalb Frankierbereich (X<116mm und Y<40mm) */
-.first-page-header .title { position: absolute; top: 15mm; left: 60mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
-/* Absenderzeile: Y<40mm, links vom Frankierbereich (X<116mm) */
-.first-page-header .sender { position: absolute; top: 35mm; left: 20mm; width: 90mm; font-size: 7pt; color: #555; border-bottom: 0.3pt solid #999; padding-bottom: 0.5mm; }
-/* Empfängeradresse: EXAKT im Adressbereich X=118, Y=60, W=85.5, H=25.5 */
-.first-page-header .recipient { position: absolute; top: 60mm; left: 118mm; width: 85.5mm; max-height: 25.5mm; overflow: hidden; }
-/* Datum: unterhalb Frankierbereich (Y>87.5mm), rechts */
-.first-page-header .date { position: absolute; top: 92mm; right: 20mm; text-align: right; }
-/* Brieftext: 25mm links/rechts, 20mm Top-Margin auf Folgeseiten via @page */
-.letter-body { padding: 0 25mm; }
-.letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
-.letter-body p { margin: 0.5em 0; orphans: 3; widows: 3; }
-.letter-closing { margin-top: 10mm; page-break-inside: avoid; }
-@page :not(:first) { margin-top: 20mm; }
-</style></head>
-<body>
-<div class="first-page-header">
-    <div class="logo"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura"></div>
-    <div class="title">Feuerwehrverein Raura<br>Kaiseraugst</div>
-    <div class="sender">${escapeHtml(getAktuarAbsenderLine())}</div>
-    <div class="recipient">
-        ${letterAddressBlockHtml(member)}
-    </div>
-    <div class="date">Kaiseraugst, ${datum}</div>
-</div>
-<div class="letter-body">
-    ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${escapeHtml(subject)}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ''}
-    <div>${body}</div>
-    <div class="letter-closing">
-        Mit freundlichen Grüssen<br><br>
-        <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-        <em>Der Vorstand</em>
-    </div>
-</div>
-</body></html>`;
-        }
 
         // Deckblatt fuer PDF-Brief Modus: Logo, Adressfenster, Betreff, Hinweis auf Beilage
         function generatePdfCoverHTML(subject, member) {
@@ -9614,155 +9353,8 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 .replace(/\{\{organizer_phone\}\}/g, () => w(orgPhone));
         }
 
-        // Generiert den Event-Einladungs-Block (Tabelle Was/Wo/Wann..., Unterschriften, QR)
-        // Wird im Body sowohl von Letter- als auch Email-Version verwendet
-        function buildEventInvitationBody(event, introHtml) {
-            if (!event) return introHtml || '';
 
-            // Event-Platzhalter im Intro-Text ersetzen
-            introHtml = replaceEventPlaceholders(introHtml, event, true);
-            // Bei offenem Termin steht in der Wann-Zeile der Hinweis statt
-            // eines Datums, das nur der Sortierung dient.
-            const startDate = event.datum_offen
-                ? 'Datum noch offen'
-                : formatEventDate(event.start_date);
-            const endDate = event.end_date ? formatEventDate(event.end_date) : '';
-            const deadline = event.registration_deadline ? formatEventDate(event.registration_deadline) : '';
-            const subtitle = event.subtitle || startDate;
 
-            const eventUrl = `https://www.fwv-raura.ch/events.html?event=${encodeURIComponent(event.slug || event.id)}`;
-
-            // QR-Code fuer Event-Link generieren (als data: URL)
-            let qrImg = '';
-            try {
-                const qr = qrcode(0, 'M');
-                qr.addData(eventUrl);
-                qr.make();
-                qrImg = qr.createDataURL(4, 0);
-            } catch (e) {}
-
-            const praesident = getPraesident();
-            const aktuar = getAktuar();
-
-            // Tabellen-Zeilen (nur wenn Wert vorhanden)
-            const rows = [
-                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;width:38mm;">Was:</td><td>${escapeHtml(event.title)}</td></tr>`,
-                event.location ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Wo:</td><td>${escapeHtml(event.location)}</td></tr>` : '',
-                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Wann:</td><td style="font-weight:bold;">${startDate}${endDate ? ' – ' + endDate : ''}</td></tr>`,
-                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Anmeldung:</td><td>${event.registration_required ? 'Zwingend' : 'Freiwillig'}</td></tr>`,
-                deadline ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;color:#c00;">Anmeldeschluss:</td><td style="color:#c00;font-weight:bold;">${deadline}</td></tr>` : '',
-                event.cost ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Kosten:</td><td>${escapeHtml(event.cost)}</td></tr>` : ''
-            ].filter(Boolean).join('');
-
-            // Event-Beschreibung als Absatz einfuegen (mit Zeilenumbruechen)
-            const descriptionHtml = event.description
-                ? `<div style="margin:0 0 3mm 0;white-space:pre-wrap;">${escapeHtml(event.description)}</div>`
-                : '';
-
-            // Hat der Anlass Schichten, wird aus der Einladung ein Helferaufruf.
-            const schichtHtml = baueSchichtBlock(event);
-
-            return `
-                <div style="font-size:13pt;font-weight:bold;text-decoration:underline;margin-bottom:1mm;">${escapeHtml(event.title)}</div>
-                <div style="font-size:10pt;margin-bottom:3mm;">${escapeHtml(subtitle)}</div>
-                <hr style="border:none;border-top:1px solid #000;margin:0 0 3mm 0;">
-                ${introHtml ? `<div style="margin-bottom:3mm;">${introHtml}</div>` : ''}
-                ${descriptionHtml}
-                <p style="margin:0 0 2mm 0;">Die wichtigsten Daten nochmals zusammengefasst:</p>
-                <table style="margin:0 0 3mm 0;border-collapse:collapse;">${rows}</table>
-                ${schichtHtml}
-                <p style="margin:0;">${schichtHtml
-                    ? 'Ohne Helferinnen und Helfer geht es nicht — herzlichen Dank fürs Mitmachen.'
-                    : 'Wir freuen uns über zahlreiches Erscheinen.'}</p>
-                <p style="margin:0 0 3mm 0;">Im Namen des Vorstandes.</p>
-                <p style="margin:0 0 6mm 0;">Mit freundlichen Grüssen</p>
-                <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;">
-                    <tr>
-                        <td style="vertical-align:top;width:50%;">
-                            <div>${escapeHtml(praesident?.name || 'Präsident FWV Raura')}</div>
-                            <div>Präsident</div>
-                        </td>
-                        <td style="vertical-align:top;width:30%;">
-                            <div>${escapeHtml(aktuar?.name || 'Aktuar FWV Raura')}</div>
-                            <div>Aktuar</div>
-                        </td>
-                        <td style="vertical-align:top;width:20%;text-align:right;">
-                            ${qrImg ? `<img src="${qrImg}" alt="QR-Code Event" style="width:25mm;height:25mm;">` : ''}
-                        </td>
-                    </tr>
-                </table>`;
-        }
-
-        // Generiert eine Event-Einladung als A4-Brief (fuer Post via Pingen)
-        function generateEventInvitationLetterHTML(event, introHtml, member) {
-            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
-            const strasse = member?.strasse || '{{strasse}}';
-            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
-
-            let intro = introHtml || '';
-            if (member) intro = replacePlaceholders(intro, member, true);
-
-            const bodyContent = buildEventInvitationBody(event, intro);
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>
-  @page { size: A4; }
-  body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-</style></head>
-<body>
-<!-- Kopfbereich (Seite 1): absolut positioniert. Puppeteer rendert diesen Brief mit 15mm
-     Oberrand (pdf_margin), damit auch FOLGESEITEN nicht in Pingens Sperrzone laufen.
-     Deshalb sind die Kopf-Koordinaten um 15mm nach oben verschoben -> das Adressfenster
-     landet exakt bei 60mm/118mm ab Blattrand (Pingen-Rechts-Zone). -->
-<div style="position:relative;height:85mm;">
-    <div style="position:absolute;top:0;left:25mm;width:35mm;">
-        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
-    </div>
-    <div style="position:absolute;top:0;left:118mm;">
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
-    </div>
-    <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${escapeHtml(getAktuarAbsenderLine())}</div>
-    <div style="position:absolute;top:45mm;left:118mm;width:85mm;">
-        ${letterAddressBlockHtml(member)}
-    </div>
-    <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
-</div>
-<!-- Body im normalen Textfluss: bricht bei langem Inhalt sauber um; respektiert oben 15mm
-     und unten 20mm (Puppeteer-Raender) -> laeuft nicht mehr in die nicht-bedruckbare Zone. -->
-<div style="padding:0 25mm 5mm 25mm;">${bodyContent}</div>
-</body></html>`;
-        }
-
-        // Generiert eine Event-Einladung als E-Mail (responsive Layout)
-        function generateEventInvitationEmailHTML(event, introHtml, member) {
-            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            let intro = introHtml || '';
-            if (member) intro = replacePlaceholders(intro, member, true);
-            const bodyContent = buildEventInvitationBody(event, intro);
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
-<div style="max-width:660px;margin:0 auto;padding:20px;background:white;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:15px;">
-        <tr>
-            <td width="120" valign="top">
-                <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" width="110" style="display:block;">
-            </td>
-            <td valign="top" style="padding-left:15px;">
-                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
-                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
-            </td>
-        </tr>
-    </table>
-    <div style="font-size:8pt;color:#333;margin-bottom:15px;">${escapeHtml(getAktuarAbsenderLine())}</div>
-    <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${datum}</div>
-    ${bodyContent}
-</div>
-</body></html>`;
-        }
 
 
         function generateBeitragEmailHTML(member, includeAddress = false) {

@@ -31,11 +31,15 @@ async function absenderLaden(pool) {
 /** Einladung fuer ein Mitglied: Einleitung (Platzhalter von Mitglied und
  *  Anlass ersetzt) im Einladungs-Layout. [laden] = E.einladungDaten, in Tests
  *  ersetzbar. Wirft, wenn der Anlass fehlt. */
-async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten) {
+async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten, textHtml = null) {
     const daten = await laden(pool, eventId);
     if (!daten) throw Object.assign(new Error('Anlass nicht gefunden'), { status: 404 });
-    const intro = E.anlassPlatzhalter(L.platzhalterErsetzen(text, mitglied), daten.anlass);
-    return E.einladungHtml({ ...daten, introHtml: L.textZuHtml(intro) });
+    // Einleitung aus dem Editor der Website (HTML) oder reiner Text (App).
+    const introHtml = textHtml != null
+        ? E.anlassPlatzhalter(L.editorHtml(textHtml, mitglied), Object.fromEntries(
+            Object.entries(daten.anlass).map(([k, v]) => [k, typeof v === 'string' ? L.escapeHtml(v) : v])))
+        : L.textZuHtml(E.anlassPlatzhalter(L.platzhalterErsetzen(text, mitglied), daten.anlass));
+    return E.einladungHtml({ ...daten, introHtml });
 }
 
 /** Handler fuer POST /dispatch/brief. [vorschauPdf](html, rand, zonen) -> Buffer. */
@@ -44,11 +48,13 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
         try {
             // vorlage 'einladung' + event_id: Inhalt im Einladungs-Layout
             // (einladung-layout.js), body ist dann die Einleitung.
-            const { subject, body, member_id, vorschau = false, zonen = false, vorlage, event_id } = req.body || {};
+            // body_html: Text aus dem Editor der Website (L.editorHtml).
+            const { subject, body, body_html, member_id, vorschau = false, zonen = false, vorlage, event_id } = req.body || {};
+            const textHtml = typeof body_html === 'string' && body_html.trim() ? body_html : null;
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
             }
-            if (!String(body || '').trim()) {
+            if (!String(body || '').trim() && !textHtml) {
                 return res.status(400).json({ error: 'Text erforderlich' });
             }
             const r = await pool.query('SELECT * FROM members WHERE id = $1', [member_id]);
@@ -62,8 +68,9 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
                 text: body,
                 mitglied,
                 absender: await absenderLaden(pool),
+                textHtml,
                 inhaltHtml: vorlage === 'einladung'
-                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten)
+                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml)
                     : null
             });
             const antwort = {
@@ -77,6 +84,41 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
                 antwort.pdf_base64 = Buffer.from(pdf).toString('base64');
             }
             res.json(antwort);
+        } catch (error) {
+            res.status(error.status || 500).json({ error: error.message });
+        }
+    };
+}
+
+/** Handler fuer POST /dispatch/email-vorschau {member_id, subject, body,
+ *  body_html?, layout?, event_id?}: die E-Mail genau so, wie /email/bulk sie
+ *  fuer dieses Mitglied baut - fuer die Vorschau auf der Website. */
+function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
+    return async (req, res) => {
+        try {
+            const { subject, body, body_html, member_id, layout, event_id } = req.body || {};
+            if (!member_id || !UUID.test(String(member_id))) {
+                return res.status(400).json({ error: 'member_id erforderlich' });
+            }
+            const r = await pool.query('SELECT * FROM members WHERE id = $1', [member_id]);
+            const mitglied = r.rows[0];
+            if (!mitglied) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+            const textHtml = typeof body_html === 'string' && body_html.trim() ? body_html : null;
+            const html = L.emailHtml({
+                betreff: subject,
+                text: body,
+                mitglied,
+                absender: await absenderLaden(pool),
+                textHtml,
+                inhaltHtml: layout === 'einladung' && event_id
+                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml)
+                    : null
+            });
+            res.json({
+                html,
+                to: mitglied.versand_email || mitglied.email || null,
+                subject: L.platzhalterErsetzen(subject, mitglied).trim()
+            });
         } catch (error) {
             res.status(error.status || 500).json({ error: error.message });
         }
@@ -121,4 +163,4 @@ function variablenEinsetzen(text, variablen, alsHtml = false) {
 }
 
 module.exports = {
-    einladungInhalt, briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen };
+    einladungInhalt, emailVorschau, briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen };

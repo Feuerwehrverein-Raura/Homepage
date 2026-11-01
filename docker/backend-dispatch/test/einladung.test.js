@@ -78,3 +78,36 @@ test('Brief und E-Mail mit Einladung: eigener Titel und Gruss, kein Standard-Sch
     assert.match(json.html, /<p>Hallo Erika<\/p>/);
     assert.equal(json.subject, 'Einladung: Preisjassen 2026');
 });
+
+test('Editor-Text der Website: Formatierung bleibt, Skripte und Ereignisse weg, Platzhalter escaped', () => {
+    const roh = '<h2>Hallo {{vorname}}</h2><p><strong>fett</strong> <a href="https://x.ch" onclick="boese()">Link</a></p>'
+        + '<script>alert(1)</script><a href="javascript:alert(1)">x</a><iframe src="https://y"></iframe><ul><li>eins</li></ul>';
+    const html = L.editorHtml(roh, { vorname: '<b>Eri</b>' });
+    assert.match(html, /<h2>Hallo &lt;b&gt;Eri&lt;\/b&gt;<\/h2>/);
+    assert.match(html, /<strong>fett<\/strong>/);
+    assert.match(html, /<a href="https:\/\/x\.ch">Link<\/a>/);
+    assert.match(html, /<ul><li>eins<\/li><\/ul>/);
+    assert.doesNotMatch(html, /script|onclick|iframe|javascript:/i);
+    const brief = L.briefHtml({ betreff: 'B', text: '', textHtml: '<p><em>schoen</em></p>', mitglied: ERIKA, absender: 'A' });
+    assert.match(brief, /<p><em>schoen<\/em><\/p>/);
+});
+
+test('Einladung mit Editor-Einleitung: Anlass-Platzhalter escaped eingesetzt', async () => {
+    const inhalt = await einladungInhalt(null, JASS.id, 'egal', ERIKA,
+        async () => ({ anlass: { ...JASS, title: 'A & B' }, schichten: [], qr: '' }), '<p>Zum {{event_title}}, {{vorname}}</p>');
+    assert.match(inhalt, /<p>Zum A &amp; B, Erika<\/p>/);
+});
+
+test('E-Mail-Vorschau: wie /email/bulk, Einladung mit Editor-Text', async () => {
+    const { emailVorschau } = require('../src/nachricht-routen');
+    const pool = { query: async (sql) => (/FROM members WHERE id/.test(sql) ? { rows: [{ ...ERIKA, email: 'e@x.ch' }] } : { rows: [] }) };
+    const handler = emailVorschau({ pool, einladungDaten: async () => ({ anlass: JASS, schichten: [], qr: '' }) });
+    let json;
+    const res = { status() { return this; }, json(j) { json = j; } };
+    await handler({ body: { member_id: ERIKA.id, subject: 'Hallo {{vorname}}', body: 'x', body_html: '<p><b>Hi</b> {{vorname}}</p>' } }, res);
+    assert.equal(json.subject, 'Hallo Erika');
+    assert.equal(json.to, 'e@x.ch');
+    assert.match(json.html, /<p><b>Hi<\/b> Erika<\/p>/);
+    await handler({ body: { member_id: ERIKA.id, subject: 'E', body: 'x', layout: 'einladung', event_id: JASS.id } }, res);
+    assert.match(json.html, /Preisjassen 2026<\/div>/);
+});

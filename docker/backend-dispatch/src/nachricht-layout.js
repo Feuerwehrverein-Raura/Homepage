@@ -37,6 +37,20 @@ function platzhalterErsetzen(text, mitglied) {
         PLATZHALTER.includes(name) ? String((mitglied && mitglied[name]) ?? '') : ganz);
 }
 
+/** Text aus dem Editor der Website (Quill: Absaetze, fett, kursiv,
+ *  unterstrichen, Ueberschriften, Listen, Links) fuer Brief und E-Mail:
+ *  Skripte, eingebettete Inhalte, Ereignis-Attribute und javascript:-Links
+ *  fallen weg; Platzhalter werden mit escapten Werten ersetzt. */
+function editorHtml(html, mitglied) {
+    const sauber = String(html || '')
+        .replace(/<(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta|base)\b[\s\S]*?(<\/\1\s*>|$)/gi, '')
+        .replace(/<(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta|base)\b[^>]*>/gi, '')
+        .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/(href|src)\s*=\s*("|')\s*(javascript|data|vbscript):[^"']*\2/gi, '$1="#"');
+    return sauber.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (ganz, name) =>
+        PLATZHALTER.includes(name) ? escapeHtml((mitglied && mitglied[name]) ?? '') : ganz);
+}
+
 /** Reiner Text -> Absaetze; HTML wird escaped, Links klickbar. */
 function textZuHtml(text) {
     const link = /(https?:\/\/[^\s<]+)/g;
@@ -117,11 +131,12 @@ const SCHLUSS = `Mit freundlichen Grüssen<br><br>
  * 60mm mit engeren Zeilen (5 Zeilen mit "Deutschland" in 25.5mm) und das
  * Logo 30mm breit (endet bei 37.6mm).
  */
-function briefHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null }) {
+function briefHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null, textHtml = null }) {
     // inhaltHtml: fertiger Inhalt mit eigenem Titel und Gruss (Einladung,
     // einladung-layout.js) - dann ohne Betreffzeile und ohne SCHLUSS.
     const titel = inhaltHtml ? '' : platzhalterErsetzen(betreff, mitglied);
-    const inhalt = textZuHtml(platzhalterErsetzen(text, mitglied));
+    // textHtml: Text aus dem Editor der Website (editorHtml), sonst reiner Text.
+    const inhalt = textHtml != null ? editorHtml(textHtml, mitglied) : textZuHtml(platzhalterErsetzen(text, mitglied));
     const de = istDeutscherEmpfaenger(mitglied);
     const adresseCss = de
         ? 'top:45mm;left:22mm;width:85.5mm;max-height:25.5mm;overflow:hidden;line-height:1.15;'
@@ -162,10 +177,10 @@ function briefHtml({ betreff, text, mitglied, absender, datum = new Date(), inha
 }
 
 /** E-Mail im offiziellen Layout (generateDispatchEmailHTML, vorstand.html). */
-function emailHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null }) {
+function emailHtml({ betreff, text, mitglied, absender, datum = new Date(), inhaltHtml = null, textHtml = null }) {
     // inhaltHtml wie bei briefHtml: fertige Einladung mit eigenem Gruss.
     const titel = inhaltHtml ? '' : platzhalterErsetzen(betreff, mitglied);
-    const inhalt = textZuHtml(platzhalterErsetzen(text, mitglied));
+    const inhalt = textHtml != null ? editorHtml(textHtml, mitglied) : textZuHtml(platzhalterErsetzen(text, mitglied));
     const kopf = titel
         ? `<div style="font-weight:bold;font-size:13pt;">${escapeHtml(titel)}</div><hr style="border:none;border-top:1px solid #000;margin:8px 0 15px 0;">`
         : '';
@@ -199,6 +214,7 @@ module.exports = {
     escapeHtml,
     platzhalterErsetzen,
     textZuHtml,
+    editorHtml,
     istDeutscherEmpfaenger,
     adressZeilen,
     hatPostadresse,

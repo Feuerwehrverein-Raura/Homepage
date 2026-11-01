@@ -19,7 +19,7 @@ const crypto = require('crypto');
 const nachrichtLayout = require('./nachricht-layout');
 const { anlassPdf, mitAnlassPdf, seitenAnhaengen } = require('./anlass-pdf');
 const einladungLayout = require('./einladung-layout');
-const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen, einladungInhalt } = require('./nachricht-routen');
+const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen, einladungInhalt, emailVorschau } = require('./nachricht-routen');
 
 // ============================================
 // CONTACT FORM RATE LIMITING (in-memory)
@@ -827,6 +827,7 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
         // Aufrufers UND dem API-Schluessel: kam der Aufruf selbst mit Schluessel
         // (api-accounting, Beitragsversand), fehlte sonst jede Anmeldung.
         const internKopf = { Authorization: req.headers.authorization || '', 'x-api-key': process.env.API_KEY || '' };
+        const bodyHtml = typeof req.body.body_html === 'string' && req.body.body_html.trim() ? req.body.body_html : null;
 
         // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
@@ -886,8 +887,11 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                             text: req.body.body,
                             mitglied: member,
                             absender,
+                            // body_html: Text aus dem Editor der Website
+                            textHtml: bodyHtml,
                             inhaltHtml: einladung
-                                ? await einladungInhalt(pool, req.body.event_id, req.body.body, member, async () => einladungsDaten)
+                                ? await einladungInhalt(pool, req.body.event_id, req.body.body, member,
+                                    async () => einladungsDaten, bodyHtml)
                                 : null
                         })
                         : req.body.html,
@@ -4169,6 +4173,9 @@ app.post('/dispatch/preview-pdf', authenticateAny, requireRole('vorstand', 'admi
 // Empfaenger fuer /dispatch/send-post, mit vorschau=true auch als PDF (base64).
 app.post('/dispatch/brief', authenticateAny, requireRole('vorstand', 'admin'),
     briefErstellen({ pool, vorschauPdf: vorschauPdfRendern }));
+
+// E-Mail fuer ein Mitglied genau wie /email/bulk sie baut (Vorschau Website).
+app.post('/dispatch/email-vorschau', authenticateAny, requireRole('vorstand', 'admin'), emailVorschau({ pool }));
 
 // ============================================
 // SCHEDULED JOBS — zeitgesteuerter Hintergrund-Worker
