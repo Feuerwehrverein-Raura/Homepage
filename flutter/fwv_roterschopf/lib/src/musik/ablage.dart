@@ -8,7 +8,9 @@
 // und was gespeichert ist. Faellt ein Titel aus allen Sammlungen, wird
 // seine Datei geloescht.
 //
-// Die Mitglieder-App nutzt die Ablage nicht (MusikScreen ohne [MusikAblage]).
+// Die Mitglieder-App nutzt die Ablage nicht (MusikScreen ohne [MusikAblage]);
+// FWV Musik auf Android schon, dort mit [MusikAblage.freierPlatz] und
+// [MusikAblage.imWlan] vom System.
 
 import 'dart:async';
 import 'dart:convert';
@@ -67,14 +69,51 @@ class GespeicherteSammlung {
 }
 
 class MusikAblage extends ChangeNotifier {
-  MusikAblage({required this.ordner, required this.zugang, http.Client? client})
-    : _http = client ?? http.Client();
+  MusikAblage({
+    required this.ordner,
+    required this.zugang,
+    http.Client? client,
+    this.geraet = 'Computer',
+    this.freierPlatz,
+    this.imWlan,
+    this.ganzeSammlung = true,
+  }) : _http = client ?? http.Client();
 
   /// Wo die Dateien liegen (in der App: Application Support/Musik). Erst
   /// beim [laden] gebraucht.
   final Future<Directory> Function() ordner;
   final MusikZugang zugang;
   final http.Client _http;
+
+  /// Fuer die Texte: "auf diesem Computer", "vom Handy entfernen".
+  final String geraet;
+
+  /// Freier Platz am Ort der Ablage, null wenn unbekannt. Ohne: `df`
+  /// (macOS, Linux) bzw. PowerShell (Windows) - auf dem Handy geht das nicht.
+  final Future<int?> Function(Directory ort)? freierPlatz;
+
+  /// Auf dem Handy: Ist das Netz unbegrenzt (WLAN)? Sonst wird nur geladen,
+  /// wenn [mobilfunk] erlaubt ist. Ohne: immer laden.
+  final Future<bool> Function()? imWlan;
+
+  /// "Alles speichern" anbieten? Auf dem Handy nicht: Die ganze Sammlung ist
+  /// fuer die meisten Handys zu gross.
+  final bool ganzeSammlung;
+
+  /// Auch ueber Mobilfunk laden - nach der Rueckfrage beim Speichern, bis
+  /// die App beendet wird.
+  bool mobilfunk = false;
+
+  /// Darf jetzt geladen werden (WLAN oder Mobilfunk erlaubt)?
+  Future<bool> darfLaden() async {
+    final wlan = imWlan;
+    if (wlan == null || mobilfunk) return true;
+    try {
+      return await wlan();
+    } on Object {
+      return true;
+    }
+  }
 
   /// Kommt so lange kein Byte, gilt die Verbindung als eingeschlafen.
   Duration stillstand = const Duration(seconds: 30);
@@ -285,6 +324,13 @@ class MusikAblage extends ChangeNotifier {
   Future<int?> _freierPlatz() async {
     final ort = _ort;
     if (ort == null) return null;
+    if (freierPlatz case final f?) {
+      try {
+        return await f(ort);
+      } on Object {
+        return null;
+      }
+    }
     try {
       if (Platform.isWindows) {
         final r = await Process.run('powershell', [
@@ -434,6 +480,10 @@ class MusikAblage extends ChangeNotifier {
       while (true) {
         final pfad = _naechsterFehlender();
         if (pfad == null) break;
+        if (!await darfLaden()) {
+          _fehler = 'Kein WLAN – geladen wird, sobald du wieder im WLAN abgleichst.';
+          break;
+        }
         if (_holt != pfad) versuch = 0;
         _holt = pfad;
         notifyListeners();

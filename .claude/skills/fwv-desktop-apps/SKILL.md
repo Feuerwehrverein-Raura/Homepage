@@ -11,7 +11,7 @@ Download dort live funktioniert. Das wurde bei FWV Musik zuerst vergessen.
 | App | Projekt | Tag | Workflow | Karte auf apps.html |
 |---|---|---|---|---|
 | Mitglieder | `flutter/mitglieder` | `members-v*` | `build-android-members.yml` (Jobs desktop-*) | «Mitglieder» → «Programm für den Computer» (feste Links `members-latest-…`) |
-| FWV Musik | `flutter/musik` | `musik-v*` | `build-desktop-musik.yml` | «Musik» (`loadMusikDesktop()`, liest neuestes Release) |
+| FWV Musik | `flutter/musik` | `musik-v*` | `build-desktop-musik.yml` (auch Android-APK, `/download/musik.apk`, Skill `fwv-app-downloads`) | «Musik» (`loadMusikDesktop()`, liest neuestes Release) und Android-Karte «Musik» |
 | Vorstand Desktop (Tauri, alt) | `vorstand-desktop` | `vorstand-desktop-v*` | `build-desktop-vorstand.yml` | «Vorstand Desktop» |
 
 Doku: `docs/flutter-desktop.md`, `docs/flutter-musik-desktop.md`.
@@ -29,7 +29,9 @@ Doku: `docs/flutter-desktop.md`, `docs/flutter-musik-desktop.md`.
    auswerten und beheben.
 3. Dateien pruefen: `gh release view <tag> --json assets -q '.assets[].name'`
    Erwartet: `…-windows-x64-setup.exe`, `…-macos.dmg`, `…-macos.zip`,
-   `…_amd64.deb`, `…-linux-x64.tar.gz`.
+   `…_amd64.deb`, `…-linux-x64.tar.gz`; bei FWV Musik dazu
+   `fwv-musik-…-release.apk` (danach Abholung starten, Skill
+   `fwv-app-downloads`).
 4. **apps.html pruefen** (Abschnitt unten) - zeigt die Karte die neue
    Version und fuehren die Links auf die neuen Dateien?
 

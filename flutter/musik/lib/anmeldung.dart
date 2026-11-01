@@ -5,6 +5,7 @@
 import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben;
 import 'package:fwv_core/desktop.dart' show AbbrechbareAnmeldung;
 import 'package:fwv_core/fwv_core.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:material_ui/material_ui.dart';
 
 import 'dienste.dart';
@@ -52,73 +53,77 @@ class _AnmeldeSeiteState extends State<AnmeldeSeite> {
   Widget build(BuildContext context) {
     final authentik = widget.dienste.authentik;
     final meldung = _fehler ?? _sitzung.hinweis;
-    return Scaffold(
-      backgroundColor: FwvFarben.loginHintergrund,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Image(image: logo, width: 160, height: 160, semanticLabel: 'FWV Raura'),
-                const SizedBox(height: 12),
-                Text(
-                  'FWV Musik',
-                  style: Theme.of(context).textTheme.headlineMedium
-                      ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 24),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Playlists und Radiosender für den Roten Schopf zusammenstellen '
-                          'und hier am Computer hören.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          key: const Key('anmelden'),
-                          onPressed: _beschaeftigt ? null : _anmelden,
-                          icon: _beschaeftigt
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.login),
-                          label: const Text('Mit Vereinskonto anmelden'),
-                        ),
-                        if (_beschaeftigt) ...[
-                          const SizedBox(height: 12),
+    // Helle Symbole in der Statusleiste (Android) auf dem roten Grund.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: FwvFarben.loginHintergrund,
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Image(image: logo, width: 160, height: 160, semanticLabel: 'FWV Raura'),
+                  const SizedBox(height: 12),
+                  Text(
+                    'FWV Musik',
+                    style: Theme.of(context).textTheme.headlineMedium
+                        ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           const Text(
-                            'Die Anmeldung läuft im Browser. Danach geht es hier von selbst weiter.',
+                            'Playlists und Radiosender für den Roten Schopf zusammenstellen '
+                            'und hier hören.',
                             textAlign: TextAlign.center,
                           ),
-                          if (authentik is AbbrechbareAnmeldung)
-                            TextButton(
-                              key: const Key('abbrechen'),
-                              onPressed: () => (authentik as AbbrechbareAnmeldung).abbrechen(),
-                              child: const Text('Abbrechen'),
+                          const SizedBox(height: 20),
+                          FilledButton.icon(
+                            key: const Key('anmelden'),
+                            onPressed: _beschaeftigt ? null : _anmelden,
+                            icon: _beschaeftigt
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.login),
+                            label: const Text('Mit Vereinskonto anmelden'),
+                          ),
+                          if (_beschaeftigt) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Die Anmeldung läuft im Browser. Danach geht es hier von selbst weiter.',
+                              textAlign: TextAlign.center,
                             ),
+                            if (authentik is AbbrechbareAnmeldung)
+                              TextButton(
+                                key: const Key('abbrechen'),
+                                onPressed: () => (authentik as AbbrechbareAnmeldung).abbrechen(),
+                                child: const Text('Abbrechen'),
+                              ),
+                          ],
+                          if (meldung != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              meldung,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
+                            ),
+                          ],
                         ],
-                        if (meldung != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            meldung,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

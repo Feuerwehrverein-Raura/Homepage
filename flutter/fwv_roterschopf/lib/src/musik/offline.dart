@@ -60,8 +60,8 @@ class _SpeichernKnopfState extends State<SpeichernKnopf> {
         if (bytes != null) groesseText(bytes),
       ].join(' · ');
       final platz = frei == null
-          ? 'Wie viel auf diesem Computer frei ist, lässt sich nicht feststellen.'
-          : 'Frei auf diesem Computer: ${groesseText(frei)}.';
+          ? 'Wie viel auf diesem ${widget.ablage.geraet} frei ist, lässt sich nicht feststellen.'
+          : 'Frei auf diesem ${widget.ablage.geraet}: ${groesseText(frei)}.';
       if (!bedarf.reicht) {
         await showDialog<void>(
           context: context,
@@ -82,13 +82,43 @@ class _SpeichernKnopfState extends State<SpeichernKnopf> {
         context,
         titel: '„${widget.name}“ speichern?',
         text: [
-          bedarf.titel == 0 ? 'Alle Titel sind schon auf diesem Computer.' : 'Braucht $umfang.',
+          bedarf.titel == 0
+              ? 'Alle Titel sind schon auf diesem ${widget.ablage.geraet}.'
+              : 'Braucht $umfang.',
           platz,
           ?widget.hinweis,
         ].join('\n\n'),
         ja: 'Speichern',
       );
       if (!ja) return;
+      if (bedarf.titel > 0 && !await widget.ablage.darfLaden()) {
+        if (!mounted) return;
+        // Handy im Mobilfunk: nicht ungefragt das Datenvolumen aufbrauchen.
+        final mobil = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Kein WLAN'),
+            content: Text(
+              'Jetzt über Mobilfunk laden ($umfang)? Sonst wird geladen, sobald du '
+              'im WLAN bist und unter „Gespeichert“ abgleichst.',
+            ),
+            actions: [
+              TextButton(
+                key: const Key('im-wlan-laden'),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Im WLAN laden'),
+              ),
+              FilledButton(
+                key: const Key('mobilfunk-laden'),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Über Mobilfunk'),
+              ),
+            ],
+          ),
+        );
+        if (mobil == null) return;
+        widget.ablage.mobilfunk = mobil;
+      }
       await widget.speichern(titel);
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
@@ -116,7 +146,7 @@ class _SpeichernKnopfState extends State<SpeichernKnopf> {
           }
           return IconButton(
             key: Key('speichern-${widget.id}'),
-            tooltip: 'Auf diesem Computer speichern',
+            tooltip: 'Auf diesem ${ablage.geraet} speichern',
             icon: const Icon(Icons.download_for_offline_outlined),
             onPressed: _speichern,
           );
@@ -126,8 +156,8 @@ class _SpeichernKnopfState extends State<SpeichernKnopf> {
         return IconButton(
           key: Key('gespeichert-${widget.id}'),
           tooltip: fertig
-              ? 'Gespeichert – vom Computer entfernen'
-              : '$da von ${s.titel.length} Titeln geladen – vom Computer entfernen',
+              ? 'Gespeichert – vom ${ablage.geraet} entfernen'
+              : '$da von ${s.titel.length} Titeln geladen – vom ${ablage.geraet} entfernen',
           icon: fertig
               ? const Icon(Icons.offline_pin)
               : SizedBox.square(
@@ -162,7 +192,7 @@ Future<void> entfernenNachfragen(
 ) async {
   final ja = await nachfragen(
     context,
-    titel: '„${s.name}“ vom Computer entfernen?',
+    titel: '„${s.name}“ vom ${ablage.geraet} entfernen?',
     text: 'Ohne Netz lässt sich das dann nicht mehr hören. Auf dem Server bleibt alles.',
     ja: 'Entfernen',
   );
@@ -367,7 +397,7 @@ class GespeichertSeite extends StatelessWidget {
                 ablage.laedtHerunter
                     ? _laedtText()
                     : [
-                        '${groesseText(ablage.belegt)} auf diesem Computer',
+                        '${groesseText(ablage.belegt)} auf diesem ${ablage.geraet}',
                         ?ablage.fehler,
                         if (ablage.frei case final f?) '${groesseText(f)} frei',
                       ].join(' · '),
@@ -385,7 +415,7 @@ class GespeichertSeite extends StatelessWidget {
                     ),
             ),
             if (ablage.laedtHerunter) const LinearProgressIndicator(),
-            if (ablage.sammlung(GespeicherteSammlung.alleId) == null)
+            if (ablage.ganzeSammlung && ablage.sammlung(GespeicherteSammlung.alleId) == null)
               ListTile(
                 leading: const Icon(Icons.library_music),
                 title: const Text('Alles speichern'),
@@ -394,11 +424,11 @@ class GespeichertSeite extends StatelessWidget {
               ),
             const Divider(height: 1),
             if (liste.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
+              Padding(
+                padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Noch nichts gespeichert. Bei einer Playlist oder einem Interpreten auf '
-                  '„Auf diesem Computer speichern“ klicken – dann läuft die Musik auch ohne Netz.',
+                  'Noch nichts gespeichert. Bei einer Playlist oder einem Interpreten '
+                  '„Auf diesem ${ablage.geraet} speichern“ wählen – dann läuft die Musik auch ohne Netz.',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -423,7 +453,7 @@ class GespeichertSeite extends StatelessWidget {
                       onPressed: () => _abspielen(context, s),
                     ),
                     IconButton(
-                      tooltip: 'Vom Computer entfernen',
+                      tooltip: 'Vom ${ablage.geraet} entfernen',
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => entfernenNachfragen(context, ablage, s),
                     ),
@@ -447,7 +477,7 @@ class GespeichertSeite extends StatelessWidget {
             ? groesseText(ablage.holtBytes)
             : '${groesseText(ablage.holtBytes)} von ${groesseText(gesamt)}',
       'noch ${ablage.offen} Titel',
-      '${groesseText(ablage.belegt)} auf diesem Computer',
+      '${groesseText(ablage.belegt)} auf diesem ${ablage.geraet}',
       if (ablage.frei case final f?) '${groesseText(f)} frei',
     ].join(' · ');
   }

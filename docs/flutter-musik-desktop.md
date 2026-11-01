@@ -1,8 +1,9 @@
 # FWV Musik – Desktop-Programm
 
-Stand 30.10.2026. Der Musik-Bereich der Mitglieder-App (Playlist-Editor,
+Stand 01.11.2026. Der Musik-Bereich der Mitglieder-App (Playlist-Editor,
 Radiosender, Player, «Im Schopf») als **eigenes Programm** für macOS, Linux
-und Windows: `flutter/musik`, Paket `fwv_musik`.
+und Windows: `flutter/musik`, Paket `fwv_musik`. Seit 1.3 auch als
+**Android-App** ohne Play Store (Abschnitt «Android»).
 
 ## Was drin ist
 
@@ -95,6 +96,37 @@ Lokal:
     cd flutter/musik
     flutter test
     flutter run -d macos
+
+## Android
+
+Dasselbe Projekt, Paket `ch.fwvraura.musik`, **nicht im Play Store**:
+Download von `www.fwv-raura.ch/download/musik.apk` (Karte «Musik» im
+Android-Abschnitt von `apps.html`, erscheint erst, wenn
+`/download/versionen.json` einen Eintrag `musik` hat).
+
+- **Release:** derselbe Tag `musik-vX.Y.Z`; der Job «Android» in
+  `build-desktop-musik.yml` baut das APK, signiert es mit `apksigner` und
+  dem Schlüssel der Küchen- und Kassen-App (Secrets `KEYSTORE_BASE64`,
+  `KEYSTORE_PASSWORD`, Alias `kds`) und hängt
+  `fwv-musik-X.Y.Z-release.apk` ans Release. Den Schlüssel nie wechseln:
+  Android nimmt ein Update nur mit derselben Signatur an. Der
+  Vereinsserver holt das APK (`docker/app-downloads/holen.sh`, alle 15 min).
+- **Updates:** `lib/update.dart` liest `versionen.json`, zeigt oben einen
+  Hinweis; laden, SHA-256 prüfen und Installer öffnen macht
+  `MainActivity.kt` (wie die Kassen-App).
+- **Anmeldung:** `AppAuthAnmeldung` (`lib/appauth_anmeldung.dart`), Provider
+  `fwv-members-app` mit eigener Rückleitung
+  `ch.fwvraura.musik:/oauth2redirect` (in Authentik eingetragen am
+  01.11.2026). Mit `com.fwv.members` finge die Mitglieder-App die Anmeldung
+  ab.
+- **Offline speichern:** wie am Computer, aber ohne «Alles speichern» (die
+  ganze Sammlung ist für die meisten Handys zu gross). Freier Speicher und
+  WLAN kommen vom System (Kanal `ch.fwvraura.musik/geraet`: `StatFs`,
+  `NET_CAPABILITY_NOT_METERED`). Ohne WLAN fragt die App beim Speichern, ob
+  über Mobilfunk geladen werden soll; sonst wartet sie bis zum nächsten
+  Abgleich im WLAN.
+- **Hintergrund:** `just_audio_background` (AudioServiceActivity),
+  Steuerung in der Benachrichtigung.
 
 ## Songs ergänzen (spotDL)
 

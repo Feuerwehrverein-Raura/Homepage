@@ -102,9 +102,14 @@ void main() {
   late Set<String> kaputt;
   Completer<void>? sperre; // haelt den naechsten Download an
 
-  MusikAblage neueAblage() => MusikAblage(
+  MusikAblage neueAblage({
+    Future<int?> Function(Directory ort)? freierPlatz,
+    Future<bool> Function()? imWlan,
+  }) => MusikAblage(
     ordner: () async => ordner,
     zugang: zugang,
+    freierPlatz: freierPlatz,
+    imWlan: imWlan,
     client: MockClient((r) async {
       final pfad = r.url.queryParameters['pfad']!;
       geholt.add(pfad);
@@ -252,6 +257,29 @@ void main() {
     expect(groesseText(4200000), '4,2 MB');
     expect(groesseText(800000), '800 KB');
     expect(groesseText(6200000000), '6,2 GB');
+  });
+
+  test('Handy: freier Platz vom System, ohne WLAN nur nach Erlaubnis', () async {
+    var wlan = false;
+    final a = neueAblage(freierPlatz: (ort) async => 7000000000, imWlan: () async => wlan);
+    expect((await a.platzbedarf([_queen])).frei, 7000000000);
+
+    await a.interpretSpeichern('Queen', [_queen, _queen2]);
+    await fertig(a);
+    expect(geholt, isEmpty, reason: 'im Mobilfunk nichts ungefragt laden');
+    expect(a.fehler, contains('Kein WLAN'));
+    expect(a.offen, 2);
+
+    wlan = true;
+    await a.aktualisieren();
+    await fertig(a);
+    expect(a.offen, 0);
+
+    wlan = false;
+    a.mobilfunk = true;
+    await a.interpretSpeichern('Span', [_span]);
+    await fertig(a);
+    expect(geholt, contains(_span.pfad));
   });
 
   test('Eingeschlafene Verbindung: neuer Versuch, nach dem dritten Mal Schluss', () async {

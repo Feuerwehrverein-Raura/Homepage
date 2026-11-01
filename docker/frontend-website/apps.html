@@ -433,6 +433,55 @@
                     </div>
                 </div>
 
+                <!-- FWV Musik auf Android (flutter/musik, nicht im Play Store): APK aus
+                     dem Release musik-v*, aktualisiert sich selbst. Versteckt, bis
+                     /download/versionen.json einen Eintrag "musik" hat. -->
+                <div id="musik-android-karte" class="hidden bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/musik.png" alt="Musik" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Musik</h3>
+                            <p class="text-gray-500 text-sm">Playlists und Radio für den Roten Schopf</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Android 7+
+                                </span>
+                                <span id="musik-android-version" class="text-gray-400 text-xs">Lade...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Die Musik des Vereins auf dem Handy – auch unterwegs ohne Netz. Anmelden mit dem Vereinskonto.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Playlists und Interpreten aufs Handy speichern (im WLAN)
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Spielt im Hintergrund und bei gesperrtem Bildschirm
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Playlists und Radiosender bearbeiten
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Musik im Schopf fernbedienen (Gruppe Roter Schopf)
+                            </li>
+                        </ul>
+                        <a id="musik-android-download" href="/download/musik.apk" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            APK herunterladen
+                        </a>
+                        <p class="mt-3 text-xs text-gray-500">Nicht im Play Store: Android fragt beim ersten Mal, ob der Browser Apps installieren darf. Neue Versionen meldet die App selbst.</p>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -516,7 +565,8 @@
                             <a id="musik-windows" class="text-fire-600 hover:underline" href="#">Windows</a> ·
                             <a id="musik-macos" class="text-fire-600 hover:underline" href="#">macOS</a> ·
                             <a id="musik-deb" class="text-fire-600 hover:underline" href="#">Linux (.deb)</a> ·
-                            <a id="musik-tar" class="text-fire-600 hover:underline" href="#">.tar.gz</a>
+                            <a id="musik-tar" class="text-fire-600 hover:underline" href="#">.tar.gz</a><span id="musik-android-zeile" class="hidden"> ·
+                            <a id="musik-android-link" class="text-fire-600 hover:underline" href="/download/musik.apk">Android</a></span>
                         </p>
                         <p class="mt-3 text-xs text-gray-500">Noch nicht signiert: Windows warnt beim ersten Start («Weitere Informationen» → «Trotzdem ausführen»), auf dem Mac beim ersten Mal Rechtsklick → <strong>Öffnen</strong>.</p>
                     </div>
@@ -971,6 +1021,12 @@
                 setzen('kds', v.kueche);
                 setzen('members', v.mitglieder);
                 setzen('kasse', v.kasse);
+                if (v.musik) {
+                    setzen('musik-android', v.musik);
+                    document.getElementById('musik-android-karte').classList.remove('hidden');
+                    document.getElementById('musik-android-link').href = `/download/${v.musik.datei}`;
+                    document.getElementById('musik-android-zeile').classList.remove('hidden');
+                }
             } catch {
                 // Fallback: GitHub wie bisher
                 loadLatestRelease('kds');

@@ -6,7 +6,7 @@ name: Flutter-Apps
 # Oberflaeche, beide Apps), flutter/fwv_roterschopf (Licht und Tiefkuehler
 # im Roten Schopf, Vertrag aus docker/backend-members/test/fixtures),
 # flutter/mitglieder (Mitglieder + Organisatoren), flutter/musik (Musik des
-# Roten Schopfs als Desktop-Programm, docs/flutter-musik-desktop.md),
+# Roten Schopfs als Desktop-Programm und Android-App, docs/flutter-musik-desktop.md),
 # spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag des Backends
 # aendert — der Kern testet gegen dieselben Dateien. Die Vertraege der
 # Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json und
@@ -65,6 +65,31 @@ jobs:
     defaults:
       run:
         working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: APK bauen
+        run: flutter build apk --debug
+
+  # FWV Musik auf Android (Download von der Website, nicht im Play Store).
+  musik-android:
+    name: Musik-App Android (debug)
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/musik
     steps:
       - uses: actions/checkout@v4
 

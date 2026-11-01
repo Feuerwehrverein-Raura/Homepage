@@ -1,6 +1,7 @@
 // FWV Musik - der Musik-Bereich der Mitglieder-App als eigenes
-// Desktop-Programm (macOS, Linux, Windows): Playlists bearbeiten,
-// Radiosender pflegen, am Computer hoeren und - mit Gruppe Roter Schopf,
+// Programm (macOS, Linux, Windows) und als Android-App ohne Play Store
+// (Download auf www.fwv-raura.ch, aktualisiert sich selbst): Playlists bearbeiten,
+// Radiosender pflegen, hoeren und - mit Gruppe Roter Schopf,
 // Vorstand oder admin - den Laptop im Lokal fernbedienen. Die Bildschirme
 // kommen unveraendert aus fwv_roterschopf; hier stehen nur Anmeldung und
 // Start. Hintergrund: docs/flutter-musik-desktop.md.
@@ -15,10 +16,19 @@ import 'package:material_ui/material_ui.dart';
 
 import 'anmeldung.dart';
 import 'dienste.dart';
+import 'update.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isMacOS) {
+  if (Platform.isAndroid) {
+    // Weiterspielen bei gesperrtem Bildschirm, Steuerung in der Benachrichtigung.
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'ch.fwvraura.musik.wiedergabe',
+      androidNotificationChannelName: 'Musik',
+      androidNotificationOngoing: true,
+      androidNotificationIcon: 'drawable/ic_benachrichtigung',
+    );
+  } else if (Platform.isMacOS) {
     // Medientasten und "Jetzt laeuft" in der Menueleiste.
     await JustAudioBackground.init();
   } else {
@@ -41,11 +51,18 @@ class MusikApp extends StatefulWidget {
 class _MusikAppState extends State<MusikApp> {
   final _navigator = GlobalKey<NavigatorState>();
   late final Future<void> _start = widget.dienste.sitzung.laden();
+  NeueVersion? _update;
 
   @override
   void initState() {
     super.initState();
     widget.dienste.sitzung.addListener(_sitzungGeaendert);
+    // Android (nicht im Play Store): neuere Fassung auf www.fwv-raura.ch?
+    if (widget.dienste.handy) {
+      updatePruefen().then((v) {
+        if (mounted && v != null) setState(() => _update = v);
+      });
+    }
   }
 
   @override
@@ -74,6 +91,18 @@ class _MusikAppState extends State<MusikApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: fwvThema(),
       themeMode: ThemeMode.light,
+      builder: (context, kind) {
+        final update = _update;
+        if (update == null || kind == null) return kind ?? const SizedBox();
+        return Column(
+          children: [
+            SafeArea(bottom: false, child: UpdateHinweis(version: update)),
+            Expanded(
+              child: MediaQuery.removePadding(context: context, removeTop: true, child: kind),
+            ),
+          ],
+        );
+      },
       home: FutureBuilder<void>(
         future: _start,
         builder: (context, start) {
@@ -118,9 +147,10 @@ class _AbmeldenKnopf extends StatelessWidget {
         final ja = await nachfragen(
           context,
           titel: 'Abmelden?',
-          text:
-              'Die Musik hier am Computer hört auf, und was auf diesem Computer '
-              'gespeichert ist, wird gelöscht.',
+          text: dienste.handy
+              ? 'Die Musik hört auf, und was auf diesem Handy gespeichert ist, wird gelöscht.'
+              : 'Die Musik hier am Computer hört auf, und was auf diesem Computer '
+                    'gespeichert ist, wird gelöscht.',
           ja: 'Abmelden',
         );
         if (ja) await dienste.abmelden();

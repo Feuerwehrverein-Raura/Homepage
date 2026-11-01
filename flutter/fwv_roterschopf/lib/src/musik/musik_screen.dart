@@ -249,7 +249,8 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
                     icon: const Icon(Icons.shuffle),
                     onPressed: _alleAbspielen,
                   ),
-                  if (widget.ablage case final ablage?) alleSpeichernKnopf(ablage),
+                  if (widget.ablage case final ablage? when ablage.ganzeSammlung)
+                    alleSpeichernKnopf(ablage),
                 ],
               ),
             ),

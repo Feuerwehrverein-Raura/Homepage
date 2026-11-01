@@ -29,6 +29,17 @@ class OidcKonfiguration {
     tokenEndpunkt: 'https://auth.fwv-raura.ch/application/o/token/',
   );
 
+  /// FWV Musik auf Android: derselbe Provider, eigene Rueckleitung - mit
+  /// com.fwv.members fienge die Mitglieder-App die Anmeldung ab, wenn beide
+  /// auf dem Handy sind. In Authentik bei fwv-members-app eingetragen.
+  static const musikApp = OidcKonfiguration(
+    issuer: 'https://auth.fwv-raura.ch/application/o/fwv-members-app/',
+    clientId: 'fwv-members-app',
+    redirectUri: 'ch.fwvraura.musik:/oauth2redirect',
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    tokenEndpunkt: 'https://auth.fwv-raura.ch/application/o/token/',
+  );
+
   /// Mitglieder-Web (Client "fwv-members"): mein.html und die Mitglieder-App
   /// im Browser. Angemeldet wird ueber die Website (auth-callback.html tauscht
   /// den Code beim Backend). Der Client ist vertraulich, darum erneuert das

@@ -14,6 +14,7 @@ Die APKs liegen auf der **eigenen Website**, nicht mehr als GitHub-Link
 | Mitglieder | `/download/mitglieder.apk` | `members-latest` (Play-signiert) | `flutter/mitglieder` |
 | Kueche | `/download/kueche.apk` | neuestes `kds-v*` (`*-release.apk`) | `simple-order-system/kitchen-display-android` |
 | Kasse | `/download/kasse.apk` | neuestes `kasse-v*` (`*-release.apk`) | `flutter/kasse` |
+| Musik | `/download/musik.apk` | neuestes `musik-v*` (`fwv-musik-*-release.apk`, gleiches Release wie die Desktop-Programme) | `flutter/musik` |
 
 `/download/versionen.json` nennt je App Version, SHA-256 und Stand -
 `apps.html` liest daraus Link und Versionsnummer (GitHub nur als Fallback).
@@ -44,6 +45,8 @@ ssh stefan@docker.fwv-raura.ch 'sudo systemctl start app-downloads.service; jq -
   (Workflow `build-android-kasse.yml`, gleiche Signatur wie die Kueche).
   Vorher und nachher Skill `fwv-kasse-testen` (Emulator, Website-APK starten).
   **Nie auf einen `[skip ci]`-Commit taggen**: dort laeuft der Build nicht.
+- **Musik:** Tag `musik-vX.Y.Z` (Skill `fwv-desktop-apps`) - baut Desktop
+  und Android in einem Lauf. Signiert mit dem Kuechen-/Kassen-Schluessel.
 - **Mitglieder:** Skill `fwv-members-release` (Tag `members-vX.Y.Z`; der
   Workflow verschiebt `members-latest`).
 

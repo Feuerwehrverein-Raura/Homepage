@@ -1,5 +1,5 @@
 name: fwv_musik
-description: "FWV Musik — Playlists, Radiosender und Player des Roten Schopfs als Desktop-Programm"
+description: "FWV Musik — Playlists, Radiosender und Player des Roten Schopfs als Desktop-Programm und Android-App"
 publish_to: 'none'
 
 # Wird beim Release aus dem Tag musik-v* gesetzt (--build-name).
@@ -21,6 +21,8 @@ dependencies:
     path: ../fwv_roterschopf
   material_ui: ^1.6.0
   http: ^1.6.0
+  # Android: Anmeldung ueber Authentik (lib/appauth_anmeldung.dart).
+  flutter_appauth: ^12.1.0
   url_launcher: ^6.3.3
   # Gespeicherte Musik (Application Support/Musik), siehe lib/dienste.dart.
   path_provider: ^2.1.6
