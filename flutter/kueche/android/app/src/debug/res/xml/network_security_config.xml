@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nur Debug-Builds: wie src/main, zusaetzlich HTTP zum Mac (Emulator
+    10.0.2.2) fuer Tests mit dart-define KUECHE_CLOUD / KUECHE_DOWNLOAD.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <domain-config>
+        <domain includeSubdomains="false">kasse-lokal.fwv-raura.ch</domain>
+        <domain includeSubdomains="false">www.fwv-raura.ch</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

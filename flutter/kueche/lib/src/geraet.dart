@@ -13,6 +13,12 @@ import 'token.dart';
 
 const _kanal = MethodChannel('ch.fwvraura.kitchendisplay/geraet');
 
+/// Ablage der APKs; fuer Tests umstellbar (--dart-define KUECHE_DOWNLOAD=...).
+const downloadUrl = String.fromEnvironment(
+  'KUECHE_DOWNLOAD',
+  defaultValue: 'https://www.fwv-raura.ch/download',
+);
+
 class Geraet {
   const Geraet();
 
@@ -77,19 +83,13 @@ class NeueVersion {
 Future<NeueVersion?> updatePruefen(http.Client client, String? ich) async {
   if (ich == null) return null;
   try {
-    final r = await client
-        .get(Uri.parse('https://www.fwv-raura.ch/download/versionen.json'))
-        .timeout(const Duration(seconds: 10));
+    final r = await client.get(Uri.parse('$downloadUrl/versionen.json')).timeout(const Duration(seconds: 10));
     if (r.statusCode != 200) return null;
     final k = (jsonDecode(r.body) as Map)['kueche'];
     if (k is! Map || k['version'] is! String) return null;
     final neu = k['version'] as String;
     if (versionVergleichen(neu, ich) <= 0) return null;
-    return NeueVersion(
-      neu,
-      'https://www.fwv-raura.ch/download/${k['datei'] ?? 'kueche.apk'}',
-      k['sha256'] as String?,
-    );
+    return NeueVersion(neu, '$downloadUrl/${k['datei'] ?? 'kueche.apk'}', k['sha256'] as String?);
   } on Object {
     return null;
   }
