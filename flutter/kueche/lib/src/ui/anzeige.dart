@@ -33,6 +33,10 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
   String? _updateText;
   bool _laedt = false;
 
+  /// Geraetebesitzer (Sperre): Updates still und von selbst, sobald nichts offen ist.
+  bool _still = false;
+  DateTime? _letzterVersuch;
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +52,8 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
       updateSuche: d.updateSuche,
       jetzt: d.jetzt,
     )..starten();
+    _s.addListener(_vonSelbstAktualisieren);
+    d.geraet.sperre().then((s) => _still = s.besitzer);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -66,6 +72,7 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _putzen?.cancel();
+    _s.removeListener(_vonSelbstAktualisieren);
     _s.dispose();
     super.dispose();
   }
@@ -93,6 +100,17 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
         ),
       );
     }
+  }
+
+  /// Nie mitten im Betrieb: nur ohne offene Bestellungen, hoechstens einmal pro Stunde
+  /// (ein misslungener Versuch wiederholt sich sonst laufend).
+  void _vonSelbstAktualisieren() {
+    final v = _s.update;
+    if (!_still || v == null || _laedt || _s.sichtbar.isNotEmpty) return;
+    final jetzt = DateTime.now();
+    if (_letzterVersuch != null && jetzt.difference(_letzterVersuch!) < const Duration(hours: 1)) return;
+    _letzterVersuch = jetzt;
+    _updateInstallieren(v);
   }
 
   Future<void> _updateInstallieren(NeueVersion v) async {
@@ -129,7 +147,10 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
     });
     try {
       await g.installieren(v, fortschritt: (p) => setState(() => _updateText = 'Update wird geladen … $p %'));
-      setState(() => _updateText = null);
+      // still: Android beendet die App gleich und startet die neue Fassung
+      setState(
+        () => _updateText = _still ? 'Update wird installiert – die Anzeige startet gleich neu' : null,
+      );
     } on Object {
       setState(() => _updateText = 'Update konnte nicht geladen werden – hier tippen für neuen Versuch');
     } finally {

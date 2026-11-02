@@ -81,6 +81,8 @@ class Aufbau {
   AuthErgebnis erneuern = const AuthUnerreichbar('aus');
   AuthErgebnis anmelden = AuthOk(token);
 
+  NeueVersion? neu;
+
   Future<Dienste> dienste({Map<String, Object> werte = const {}}) async {
     SharedPreferences.setMockInitialValues({
       'uebernommen': true,
@@ -97,6 +99,7 @@ class Aufbau {
       anmelden: (url, pw) async => anmelden,
       qrAnmelden: (url, code) async => anmelden,
       erneuern: (url, t) async => erneuern,
+      updateSuche: () async => neu,
       version: '4.0',
       jetzt: () => jetzt,
     );
@@ -120,15 +123,46 @@ Future<void> abbauen(WidgetTester tester) async {
 
 void main() {
   late List<String> kanal;
+  var besitzer = false;
   setUp(() {
     kanal = [];
+    besitzer = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('ch.fwvraura.kitchendisplay/geraet'),
       (c) async {
         kanal.add(c.method);
-        return null;
+        return switch (c.method) {
+          'sperre' => {'besitzer': besitzer, 'aktiv': besitzer},
+          'darfInstallieren' => besitzer, // wie MainActivity: Geraetebesitzer darf immer
+          _ => null,
+        };
       },
     );
+  });
+
+  testWidgets('Geraetesperre: Update von selbst, aber erst wenn nichts mehr offen ist', (tester) async {
+    besitzer = true;
+    final a = Aufbau(FakeSystem([bestellung(1)]))..neu = const NeueVersion('4.1', 'https://x/k.apk', null);
+    await zeigen(tester, await a.dienste());
+    await tester.pump(const Duration(seconds: 16)); // erste Update-Suche nach 15 s
+    expect(find.textContaining('Neue Version 4.1'), findsOneWidget);
+    expect(kanal, isNot(contains('installieren')), reason: 'Bestellung offen');
+
+    await tester.tap(find.text('Erledigt (2)'));
+    await tester.pump();
+    await tester.pump();
+    expect(kanal, contains('installieren'));
+    expect(find.textContaining('startet gleich neu'), findsOneWidget);
+    await abbauen(tester);
+  });
+
+  testWidgets('Ohne Sperre: Update nur auf Tipp', (tester) async {
+    final a = Aufbau(FakeSystem([]))..neu = const NeueVersion('4.1', 'https://x/k.apk', null);
+    await zeigen(tester, await a.dienste());
+    await tester.pump(const Duration(seconds: 16));
+    expect(find.textContaining('Neue Version 4.1'), findsOneWidget);
+    expect(kanal, isNot(contains('installieren')));
+    await abbauen(tester);
   });
 
   testWidgets('Kueche: Bestellungen, Position antippen, Erledigt (N)', (tester) async {
