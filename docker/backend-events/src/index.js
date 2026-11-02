@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, authenticateAny, requireRole, hatRolle } = require('./auth-middleware');
 const arbeitsplan = require('./arbeitsplan');
+const arbeitsplanUpdate = require('./arbeitsplan-update');
 const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
@@ -459,6 +460,169 @@ Feuerwehrverein Raura
     return { sent, errors };
 }
 
+// DEUTSCH: Arbeitsplan an alle Eingeteilten (E-Mail mit PDF, Push, Brief bei
+// Post-Wunsch). Erstversand (checkAndSendArbeitsplan) und Aktualisierung
+// (arbeitsplanUpdateTick) nehmen denselben Weg. Mit [aenderungen] (Zeilen aus
+// arbeitsplan-update.js planVergleich) ist es eine Aktualisierung: Betreff
+// "geaendert", Aenderungen im Text, Brief nur bei genug Vorlauf, sonst Liste
+// an den Organisator ("bitte anrufen").
+async function arbeitsplanVerschicken(event, plan, { aenderungen = null } = {}) {
+    const eventId = event.id;
+    const update = Array.isArray(aenderungen);
+    const regsResult = await pool.query(`
+        SELECT r.id, r.guest_name, r.guest_email, r.member_id, r.shift_ids,
+               m.vorname, m.nachname, m.email as member_email, m.zustellung_email
+        FROM registrations r
+        LEFT JOIN members m ON r.member_id = m.id
+        WHERE r.event_id = $1
+        AND r.status IN ('approved', 'confirmed')
+    `, [eventId]);
+    const pdfBase64 = (await renderArbeitsplanPdf(plan)).toString('base64');
+
+    // Eine Mail pro Person, nicht pro Anmeldung.
+    const gesehen = new Set();
+    const empfaenger = regsResult.rows.filter(r => {
+        const schluessel = r.member_id || (r.guest_email || '').trim().toLowerCase() || (r.guest_name || '').trim().toLowerCase();
+        if (!schluessel || gesehen.has(schluessel)) return !schluessel;
+        gesehen.add(schluessel);
+        return true;
+    });
+
+    const liste = update ? aenderungen.map(z => `- ${z}`).join('\n') : '';
+    const betreff = update ? `Arbeitsplan geändert - ${event.title}` : `Arbeitsplan - ${event.title}`;
+    const einleitung = update
+        ? `Der Arbeitsplan für "${event.title}" hat sich geändert:\n\n${liste}\n\nAnbei der aktuelle Arbeitsplan als PDF mit allen Schichten und Helfern. Bitte nur noch diese Fassung verwenden.`
+        : `Der Arbeitsplan für "${event.title}" ist fertig.\n\nAnbei finden Sie den Arbeitsplan als PDF mit allen Schichten und Helfern.`;
+
+    let sentCount = 0;
+    const errors = [];
+    const successEmails = [];
+    const postOnlyMembers = [];
+    const pingenResults = [];
+    const anrufen = [];
+
+    for (const reg of empfaenger) {
+        const name = reg.member_id ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+        if (reg.member_id) {
+            pushToMember(reg.member_id, 'event_update', update ? `Arbeitsplan geändert: ${event.title}` : `Arbeitsplan: ${event.title}`,
+                update ? 'Der Arbeitsplan hat sich geändert.' : 'Der Arbeitsplan ist fertig.', { eventId: event.id }).catch(() => {});
+        }
+        if (reg.member_id && reg.zustellung_email === false) {
+            postOnlyMembers.push({ name, email: reg.member_email, member_id: reg.member_id });
+            continue;
+        }
+        const email = reg.member_email || reg.guest_email;
+        if (!email) {
+            errors.push({ name, error: 'Keine E-Mail-Adresse vorhanden' });
+            continue;
+        }
+        try {
+            await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
+                to: email,
+                subject: betreff,
+                body: `Guten Tag ${name},\n\n${einleitung}\n\nBei Fragen kontaktieren Sie uns bitte.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`,
+                attachments: [{
+                    filename: `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                    content: pdfBase64,
+                    contentType: 'application/pdf'
+                }]
+            }));
+            sentCount++;
+            successEmails.push({ name, email });
+        } catch (err) {
+            console.error(`Arbeitsplan an ${email} fehlgeschlagen:`, err.message);
+            errors.push({ name, email, error: err.message });
+        }
+    }
+
+    // Post: beim Erstversand immer, bei Aenderungen nur mit genug Vorlauf
+    // (Brief braucht 2-3 Tage) - sonst muss der Organisator anrufen.
+    const briefMoeglich = !update || arbeitsplanUpdate.briefNochSinnvoll(event.start_datum);
+    for (const postMember of postOnlyMembers) {
+        if (!postMember.member_id) continue;
+        if (!briefMoeglich) { anrufen.push(postMember.name); continue; }
+        try {
+            const pingenResponse = await axios.post(`${DISPATCH_API}/pingen/send-arbeitsplan`, {
+                event_id: eventId,
+                member_id: postMember.member_id,
+                pdf_base64: pdfBase64,
+                aenderungen: update ? aenderungen : undefined
+            });
+            if (pingenResponse.data.success) {
+                pingenResults.push({ name: postMember.name, letterId: pingenResponse.data.letterId, status: 'sent' });
+            }
+        } catch (pingenErr) {
+            console.error(`Pingen-Versand an ${postMember.name} fehlgeschlagen:`, pingenErr.message);
+            pingenResults.push({ name: postMember.name, status: 'failed', error: pingenErr.response?.data?.error || pingenErr.message });
+            anrufen.push(postMember.name);
+        }
+    }
+
+    // Organisator: bei Aenderungen eine Zusammenfassung, mit allen, die nicht
+    // rechtzeitig erreicht werden (Post-Wunsch, zu kurz vor dem Anlass).
+    if (update) {
+        const an = event.organizer_email || process.env.VORSTAND_EMAIL;
+        if (an) {
+            const anrufText = anrufen.length
+                ? `\n\nBITTE ANRUFEN - diese Helfer wollen Post, ein Brief kaeme zu spaet:\n${anrufen.map(n => `- ${n}`).join('\n')}`
+                : '';
+            await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
+                to: an,
+                subject: `Arbeitsplan geändert und verschickt - ${event.title}`,
+                body: `Hallo ${event.organizer_name || ''}\n\nDer Arbeitsplan für "${event.title}" hat sich geändert und ist an alle Eingeteilten verschickt (${sentCount} E-Mails, ${pingenResults.filter(r => r.status === 'sent').length} Briefe):\n\n${liste}${anrufText}\n\nFeuerwehrverein Raura`,
+                attachments: [{
+                    filename: `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                    content: pdfBase64,
+                    contentType: 'application/pdf'
+                }]
+            })).catch(err => console.error('Arbeitsplan-Aenderung an Organisator:', err.message));
+        }
+    }
+
+    return { sentCount, successEmails, errors, postOnlyMembers, pingenResults, anrufen };
+}
+
+// DEUTSCH: Taktgeber fuer Aenderungen nach dem Versand (arbeitsplan-update.js):
+// vergleicht den aktuellen Plan mit dem verschickten Stand und verschickt
+// gebuendelt, wenn sich eine Weile nichts mehr geaendert hat.
+async function arbeitsplanUpdateTick() {
+    const r = await pool.query(`
+        SELECT id, title, image_url, status, organizer_email, organizer_name,
+               to_char(start_date, 'YYYY-MM-DD"T"HH24:MI') AS start_datum,
+               arbeitsplan_stand_json, arbeitsplan_neu_stand, arbeitsplan_neu_seit
+          FROM events
+         WHERE arbeitsplan_sent_at IS NOT NULL AND COALESCE(status, '') <> 'cancelled'
+           AND COALESCE(end_date, start_date) >= NOW() - INTERVAL '6 hours'`);
+    for (const ev of r.rows) {
+        try {
+            const plan = await buildArbeitsplan(ev.id);
+            if (!plan) continue;
+            const aktuell = arbeitsplanUpdate.planSchichten(plan);
+            const schritt = arbeitsplanUpdate.naechsterSchritt({
+                standJson: ev.arbeitsplan_stand_json, neuStand: ev.arbeitsplan_neu_stand,
+                neuSeit: ev.arbeitsplan_neu_seit, aktuell, startDatum: ev.start_datum
+            });
+            if (schritt.art === 'anfangen') {
+                await pool.query('UPDATE events SET arbeitsplan_stand_json = $2 WHERE id = $1', [ev.id, JSON.stringify(aktuell)]);
+            } else if (schritt.art === 'zuruecksetzen') {
+                await pool.query('UPDATE events SET arbeitsplan_neu_stand = NULL, arbeitsplan_neu_seit = NULL WHERE id = $1', [ev.id]);
+            } else if (schritt.art === 'merken') {
+                await pool.query('UPDATE events SET arbeitsplan_neu_stand = $2, arbeitsplan_neu_seit = NOW() WHERE id = $1', [ev.id, schritt.hash]);
+            } else if (schritt.art === 'versenden') {
+                const aenderungen = arbeitsplanUpdate.planVergleich(ev.arbeitsplan_stand_json, aktuell);
+                // Erst den Stand setzen: scheitert der Versand halb, geht er nicht doppelt raus.
+                await pool.query(`UPDATE events SET arbeitsplan_stand_json = $2, arbeitsplan_neu_stand = NULL,
+                                  arbeitsplan_neu_seit = NULL WHERE id = $1`, [ev.id, JSON.stringify(aktuell)]);
+                const e = await arbeitsplanVerschicken(ev, plan, { aenderungen });
+                logInfo('Arbeitsplan-Aenderung verschickt', { event: ev.title, aenderungen: aenderungen.length, mails: e.sentCount, anrufen: e.anrufen.length });
+            }
+        } catch (err) {
+            console.error(`Arbeitsplan-Aenderung ${ev.title}:`, err.message);
+        }
+    }
+}
+
+
 // Helper: Prüfen ob alle Schichten eines Events besetzt sind und Arbeitsplan versenden
 // options.skipDeadlineCheck = true für manuellen Versand
 // options.skipFilledCheck = true um auch bei nicht voll besetzten Schichten zu senden
@@ -467,7 +631,8 @@ async function checkAndSendArbeitsplan(eventId, options = {}) {
     try {
         // Event-Daten mit Deadline und Versandstatus abrufen
         const eventResult = await pool.query(`
-            SELECT id, title, image_url, registration_deadline, arbeitsplan_sent_at, status
+            SELECT id, title, image_url, registration_deadline, arbeitsplan_sent_at, status,
+                   to_char(start_date, 'YYYY-MM-DD"T"HH24:MI') AS start_datum, organizer_email, organizer_name
             FROM events WHERE id = $1
         `, [eventId]);
 
@@ -521,141 +686,19 @@ async function checkAndSendArbeitsplan(eventId, options = {}) {
             }
         }
 
-        // Alle bestätigten Registrierungen mit Zustellpräferenzen abrufen
-        const regsResult = await pool.query(`
-            SELECT r.id, r.guest_name, r.guest_email, r.member_id, r.shift_ids,
-                   m.vorname, m.nachname, m.email as member_email, m.zustellung_email
-            FROM registrations r
-            LEFT JOIN members m ON r.member_id = m.id
-            WHERE r.event_id = $1
-            AND r.status IN ('approved', 'confirmed')
-        `, [eventId]);
-
-        const registrations = regsResult.rows;
-
-        // PDF: dieselbe Darstellung wie Anzeige und Download (arbeitsplan.js).
-        // Vorher stand hier ein eigener, alter pdfkit-Plan - der Versand
-        // verschickte deshalb eine andere (veraltete) Darstellung.
         const plan = await buildArbeitsplan(eventId);
-        const pdfBase64 = (await renderArbeitsplanPdf(plan)).toString('base64');
+        const ergebnis = await arbeitsplanVerschicken(event, plan);
 
-        // Eine Mail pro Person, nicht pro Anmeldung (wer mehrere Anmeldungen
-        // hat, bekam den Plan sonst mehrfach).
-        const gesehen = new Set();
-        const empfaenger = registrations.filter(r => {
-            const schluessel = r.member_id || (r.guest_email || '').trim().toLowerCase() || (r.guest_name || '').trim().toLowerCase();
-            if (!schluessel || gesehen.has(schluessel)) return !schluessel;
-            gesehen.add(schluessel);
-            return true;
-        });
-
-        // E-Mails versenden (mit Zustellpräferenzen)
-        let sentCount = 0;
-        const errors = [];
-        const successEmails = [];
-        const postOnlyMembers = [];
-        const pingenResults = [];
-
-        for (const reg of empfaenger) {
-            const name = reg.member_id ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
-
-            // Push an Mitglieder, unabhaengig von der Zustellung des PDFs
-            // (E-Mail oder Brief); Antippen fuehrt zum Anlass.
-            if (reg.member_id) {
-                pushToMember(reg.member_id, 'event_update', `Arbeitsplan: ${event.title}`,
-                    'Der Arbeitsplan ist fertig.', { eventId: event.id }).catch(() => {});
-            }
-
-            // Bei Mitgliedern: Zustellpräferenz prüfen
-            if (reg.member_id && reg.zustellung_email === false) {
-                console.log(`Arbeitsplan nicht per E-Mail an ${name} (zustellung_email = false)`);
-                postOnlyMembers.push({
-                    name,
-                    email: reg.member_email,
-                    member_id: reg.member_id
-                });
-                continue;
-            }
-
-            const email = reg.member_email || reg.guest_email;
-
-            if (!email) {
-                errors.push({ name, error: 'Keine E-Mail-Adresse vorhanden' });
-                continue;
-            }
-
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
-                    to: email,
-                    subject: `Arbeitsplan - ${event.title}`,
-                    body: `Guten Tag ${name},
-
-Der Arbeitsplan für "${event.title}" ist fertig.
-
-Anbei finden Sie den Arbeitsplan als PDF mit allen Schichten und Helfern.
-
-Bei Fragen kontaktieren Sie uns bitte.
-
-Mit freundlichen Grüssen
-Feuerwehrverein Raura`,
-                    attachments: [{
-                        filename: `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-                        content: pdfBase64,
-                        contentType: 'application/pdf'
-                    }]
-                }));
-                sentCount++;
-                successEmails.push({ name, email });
-                console.log(`Arbeitsplan gesendet an ${email}`);
-            } catch (err) {
-                console.error(`Arbeitsplan an ${email} fehlgeschlagen:`, err.message);
-                errors.push({ name, email, error: err.message });
-            }
-        }
-
-        // Pingen-Versand für Mitglieder mit Post-Zustellung
-        for (const postMember of postOnlyMembers) {
-            if (!postMember.member_id) continue;
-
-            try {
-                const pingenResponse = await axios.post(`${DISPATCH_API}/pingen/send-arbeitsplan`, {
-                    event_id: eventId,
-                    member_id: postMember.member_id,
-                    pdf_base64: pdfBase64
-                });
-
-                if (pingenResponse.data.success) {
-                    pingenResults.push({
-                        name: postMember.name,
-                        letterId: pingenResponse.data.letterId,
-                        status: 'sent'
-                    });
-                    console.log(`Arbeitsplan per Post gesendet an ${postMember.name} (Pingen: ${pingenResponse.data.letterId})`);
-                }
-            } catch (pingenErr) {
-                console.error(`Pingen-Versand an ${postMember.name} fehlgeschlagen:`, pingenErr.message);
-                pingenResults.push({
-                    name: postMember.name,
-                    status: 'failed',
-                    error: pingenErr.response?.data?.error || pingenErr.message
-                });
-            }
-        }
-
-        // Versandstatus markieren
+        // Versandstatus und verschickten Stand merken (Vergleich fuer spaetere
+        // Aenderungen, arbeitsplan-update.js).
         await pool.query(`
-            UPDATE events SET arbeitsplan_sent_at = NOW() WHERE id = $1
-        `, [eventId]);
+            UPDATE events SET arbeitsplan_sent_at = NOW(), arbeitsplan_stand_json = $2,
+                              arbeitsplan_neu_stand = NULL, arbeitsplan_neu_seit = NULL
+             WHERE id = $1
+        `, [eventId, JSON.stringify(arbeitsplanUpdate.planSchichten(plan))]);
 
-        console.log(`Arbeitsplan für Event "${event.title}" versendet: ${sentCount} E-Mails, ${pingenResults.filter(r => r.status === 'sent').length} Briefe`);
-        return {
-            sent: true,
-            sentCount,
-            successEmails,
-            errors,
-            postOnlyMembers,
-            pingenResults
-        };
+        console.log(`Arbeitsplan für Event "${event.title}" versendet: ${ergebnis.sentCount} E-Mails, ${ergebnis.pingenResults.filter(r => r.status === 'sent').length} Briefe`);
+        return { sent: true, ...ergebnis };
 
     } catch (error) {
         console.error('Fehler beim Arbeitsplan-Versand:', error);
@@ -838,6 +881,13 @@ function jsonbWert(feld, wert) {
 //  - GET    /events/kasse/anlaesse/:id    Kasse: ein bestimmter Anlass
 // Stehen vor GET /events/:id, damit "kasse" nie als Anlass-id gilt.
 // ---------------------------------------------------------------------------
+async function ensureArbeitsplanUpdateSchema() {
+    await pool.query(`ALTER TABLE events
+        ADD COLUMN IF NOT EXISTS arbeitsplan_stand_json JSONB,
+        ADD COLUMN IF NOT EXISTS arbeitsplan_neu_stand TEXT,
+        ADD COLUMN IF NOT EXISTS arbeitsplan_neu_seit TIMESTAMP`);
+}
+
 async function ensureKasseAnlassSchema() {
     for (const sql of kasseAnlass.SCHEMA_SQL) await pool.query(sql);
 }
@@ -5346,6 +5396,18 @@ async function arbeitsplanReminderTick() {
     }
 }
 
+// DEUTSCH: Arbeitsplan-Aenderungen sofort pruefen (sonst alle 5 Minuten,
+// arbeitsplanUpdateTick) - fuer Tests und von Hand. Verschickt nur, was der
+// Taktgeber auch verschicken wuerde (Ruhezeit eingehalten).
+app.post('/reminders/arbeitsplan-aenderungen', requireApiKey, async (req, res) => {
+    try {
+        await arbeitsplanUpdateTick();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Manuell / per Cron ausloesen (API-Key). { dry_run: true } = nur Vorschau.
 // Ignoriert die 08:00-Uhr-Grenze.
 app.post('/reminders/arbeitsplan', requireApiKey, async (req, res) => {
@@ -7107,6 +7169,19 @@ app.listen(PORT, () => {
     // ein blosses Deploy ausloesen.
     ensureAnmeldungGemeldetSchema()
         .catch(e => console.error('Schema anmeldung_gemeldet_at:', e.message));
+
+    // Arbeitsplan nach dem Versand geaendert: alle 5 Minuten vergleichen,
+    // gebuendelt verschicken (arbeitsplan-update.js). Beim ersten Lauf wird
+    // fuer schon verschickte Plaene nur der Stand gemerkt - nichts rueckwirkend.
+    // Abschalten mit ARBEITSPLAN_UPDATE_ENABLED=false.
+    ensureArbeitsplanUpdateSchema()
+        .then(() => {
+            if (process.env.NODE_ENV === 'test' || process.env.ARBEITSPLAN_UPDATE_ENABLED === 'false') return;
+            setTimeout(() => arbeitsplanUpdateTick().catch(e => console.error('arbeitsplanUpdateTick:', e.message)), 2 * 60 * 1000);
+            setInterval(() => arbeitsplanUpdateTick().catch(e => console.error('arbeitsplanUpdateTick:', e.message)), 5 * 60 * 1000);
+            console.log('Arbeitsplan-Aenderungen: Timer gestartet');
+        })
+        .catch(e => console.error('ensureArbeitsplanUpdateSchema failed:', e.message));
 
     ensureArbeitsplanReminderSchema()
         .then(() => {

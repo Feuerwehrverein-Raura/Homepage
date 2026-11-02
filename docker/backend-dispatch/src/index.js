@@ -1557,18 +1557,23 @@ app.post('/pingen/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'a
         // Erinnerung): Deckblatt im Vereinslayout mit Adresse im richtigen
         // Fenster, dahinter der Arbeitsplan - ueber den Versandkern. Vorher
         // wurde die Adresse mit pdf-lib auf die erste Seite gedruckt.
-        const { event_id, member_id, pdf_base64, staging = false } = req.body || {};
+        // aenderungen: Liste aus api-events (arbeitsplan-update.js) - dann ist
+        // es die geaenderte Fassung eines schon verschickten Plans.
+        const { event_id, member_id, pdf_base64, staging = false, aenderungen } = req.body || {};
         if (!member_id || !pdf_base64) return res.status(400).json({ error: 'member_id und pdf_base64 erforderlich' });
+        const geaendert = Array.isArray(aenderungen) && aenderungen.length > 0;
         let titel = 'Arbeitsplan';
         if (event_id) {
             const ev = await pool.query('SELECT title FROM events WHERE id = $1', [event_id]);
             if (ev.rows.length > 0) titel = `Arbeitsplan ${ev.rows[0].title}`;
         }
         const r = await pdfBriefAnMitglied({
-            memberId: member_id, subject: titel, pdfBase64: pdf_base64, staging, eventId: event_id,
+            memberId: member_id, subject: geaendert ? `${titel} (geändert)` : titel, pdfBase64: pdf_base64, staging, eventId: event_id,
             // Der Arbeitsplan ist fuer alle gleich (alle Schichten und Helfer),
             // wie in der Mail von api-events.
-            hinweis: `Der Arbeitsplan ist fertig. Beiliegend erhalten Sie den ${titel} mit allen Schichten und Helfern. Vielen Dank fürs Mithelfen!`
+            hinweis: geaendert
+                ? `Der ${titel} hat sich geändert:\n\n${aenderungen.slice(0, 15).map(z => `- ${String(z).slice(0, 200)}`).join('\n')}${aenderungen.length > 15 ? `\n- und ${aenderungen.length - 15} weitere` : ''}\n\nBeiliegend die aktuelle Fassung mit allen Schichten und Helfern. Bitte nur noch diese verwenden.`
+                : `Der Arbeitsplan ist fertig. Beiliegend erhalten Sie den ${titel} mit allen Schichten und Helfern. Vielen Dank fürs Mithelfen!`
         });
         res.json({ success: true, letterId: r.letterId, recipient: r.name });
     } catch (error) {
