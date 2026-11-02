@@ -133,7 +133,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [x] | Versandart Auto/E-Mail/Post/PDF-Brief | ✓ | ½ | ✓ | – | ✓ | /email/bulk, /dispatch/send-post, /send-pdf-post, /dispatch/smart (D); F: Auto/E-Mail/Brief, PDF-Brief = Pingen-Massen-PDF |
+| [x] | Versandart Auto/E-Mail/Post/PDF-Brief | ✓ | ½ | ✓ | – | ✓ | /email/bulk, /dispatch/brief + /dispatch/send-post, /send-pdf-post (Versandkern, 02.11.2026: Layout und Brief im Server fuer W und F; /dispatch/smart entfernt); F: Auto/E-Mail/Brief, PDF-Brief = Pingen-Massen-PDF |
 | [x] | Empfaenger: alle / nach Status / nach Zustellart | ½ | ½ | ✓ | – | ✓ | W+A Statusfilter kaputt (Werte passen nicht); F echte Werte, «Alle» ohne Ausgetreten/Verstorben/Testkonto |
 | [x] | Empfaenger einzeln auswaehlen | ½ | – | ✓ | – | ✓ | W Knopf ohne Funktion |
 | [x] | Vorlage waehlen | ½ | ✓ | ✓ | – | ✓ | GET /templates; W nur eine fest eingebaute |
@@ -203,7 +203,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Audit-Log mit Aktionsfilter | ✓ | ½ | ✓ | – | – | GET /audit (M); A ohne Filter |
+| [x] | Audit-Log mit Aktionsfilter | ✓ | ½ | ✓ | – | ✓ | GET /audit (M); A ohne Filter; F: Bereich «Audit» |
 | [x] | Benachrichtigung bei neuen Audit-Ereignissen (Antrag, Austritt, Löschung, Anmeldung) | – | ✓ | – | – | ✓ | Push vom Backend (M src/vorstand-melder.js), Kanal "Vorstand", abschaltbar |
 | [x] | Geraete und App-Versionen der Mitglieder (wer hat welche Version, veraltete, ohne Meldung) | – | – | – | – | ✓ | **neu in F** (15.10.2026): Bereich «Geräte», GET /vorstand/app-geraete (M src/app-geraete.js); App meldet POST /members/me/geraet; neuste Version aus env APP_NEUSTE_VERSION oder hoechster Android-Meldung |
 

@@ -82,6 +82,12 @@ Mitglieder, Organisatoren und Vorstand:
 - Damit nichts verloren geht: Checkliste aller Funktionen aller Varianten
   in `docs/vorstand-funktionen.md` (Phasen 1–3).
 
+**Stand 02.11.2026:** `vorstand-android` und `vorstand-desktop` (Tauri) sind
+stillgelegt - nicht mehr auf apps.html, Build-Workflows entfernt (der Code
+bleibt im Verlauf). Eine eigene Vorstand-App gibt es nicht mehr; der
+Vorstand arbeitet in der Mitglieder-App (Reiter «Vorstand») und, wo die App
+noch nicht alles kann, in `vorstand.html`.
+
 ## Inventar, Einkauf, Kasse (entschieden 11.10.2026)
 
 Bisher eigene PWAs (`simple-inventory-system`, `simple-order-system`).

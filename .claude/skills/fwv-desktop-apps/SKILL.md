@@ -12,7 +12,6 @@ Download dort live funktioniert. Das wurde bei FWV Musik zuerst vergessen.
 |---|---|---|---|---|
 | Mitglieder | `flutter/mitglieder` | `members-v*` | `build-android-members.yml` (Jobs desktop-*) | «Mitglieder» → «Programm für den Computer» (feste Links `members-latest-…`) |
 | FWV Musik | `flutter/musik` | `musik-v*` | `build-desktop-musik.yml` (auch Android-APK, `/download/musik.apk`, Skill `fwv-app-downloads`) | «Musik» (`loadMusikDesktop()`, liest neuestes Release) und Android-Karte «Musik» |
-| Vorstand Desktop (Tauri, alt) | `vorstand-desktop` | `vorstand-desktop-v*` | `build-desktop-vorstand.yml` | «Vorstand Desktop» |
 
 Doku: `docs/flutter-desktop.md`, `docs/flutter-musik-desktop.md`.
 

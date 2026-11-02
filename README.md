@@ -245,11 +245,8 @@ Event-Management mit Schichten, Anmeldungen, Arbeitsplänen und Event-Gruppen.
 | `/events/:id/pdf/teilnehmerliste` | GET | Teilnehmerliste PDF |
 | `/teilnehmerliste/pdf` | POST | Teilnehmerliste generieren |
 | **Erinnerungen** | | |
-| `/shifts/send-reminders` | POST | Schicht-Erinnerungen senden (Vorstand) |
-| `/shifts/cron-reminders` | POST | Automatische Erinnerungen (Cronjob) |
 | `/reminders/send-daily` | POST | Tägliche Erinnerung (Cronjob) |
 | `/reminders/preview` | GET | Erinnerungs-Vorschau (Vorstand) |
-| `/reminders/send` | POST | Erinnerungen manuell senden |
 | **Event-Gruppen** | | |
 | `/event-groups` | GET | Alle Event-Gruppen |
 | `/event-groups/:id` | GET | Event-Gruppen-Details |

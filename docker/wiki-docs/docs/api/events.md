@@ -619,27 +619,14 @@ Authorization: Bearer <token>
 
 ## Erinnerungen
 
-### Schicht-Erinnerungen senden (Vorstand)
-```http
-POST /shifts/send-reminders
-Authorization: Bearer <token>
-```
-
-Sendet Erinnerungen an alle Helfer mit bevorstehenden Schichten.
-
-### Automatische Erinnerungen (Cronjob)
-```http
-POST /shifts/cron-reminders
-X-API-Key: <api-key>
-```
-
-Wird vom Cronjob (`docker/cron/shift-reminders.sh`) aufgerufen.
-
 ### Tägliche Erinnerung (Cronjob)
 ```http
 POST /reminders/send-daily
 X-API-Key: <api-key>
 ```
+
+Ruft der Cronjob `docker/cron/shift-reminders.sh` im Container ueber
+localhost auf; von aussen nur mit API-Schluessel.
 
 ### Arbeitsplan eine Woche vorher
 ```http
@@ -653,6 +640,17 @@ Authorization: Bearer <token>
 Läuft stündlich im Container (ab 08:00 Uhr), aber nur mit
 `ARBEITSPLAN_REMINDER_ENABLED=true` — ohne die Variable ist er aus. `POST` löst den Lauf sofort aus
 (`{"dry_run": true}` = nur Vorschau). Siehe Vorstand-Doku "Event-Management".
+
+### Arbeitsplan geaendert (nach dem Versand)
+```http
+POST /reminders/arbeitsplan-aenderungen
+X-API-Key: <api-key>
+```
+
+Laeuft alle 5 Minuten im Container (abschalten mit
+`ARBEITSPLAN_UPDATE_ENABLED=false`): vergleicht den Plan mit dem verschickten
+Stand und schickt Aenderungen gebuendelt an alle Eingeteilten. `POST` prueft
+sofort (Ruhezeit gilt trotzdem).
 
 ### Erinnerungs-Vorschau (Vorstand)
 ```http
