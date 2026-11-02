@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nur fuer den nativen Teil (Update-Download in MainActivity.kt). Dart
+    (HTTP, WebSocket) beachtet diese Datei nicht - dort legt lib/src/netz.dart
+    dieselben Wurzeln in einen eigenen SecurityContext.
+
+    Kasse vor Ort (T400) und www.fwv-raura.ch: Let's-Encrypt-Kette ECC (YE1 ->
+    Root YE -> ISRG Root X2). Android 7.1 kennt X1, aber nicht X2; beide
+    Wurzeln liegen deshalb zusaetzlich zu den System-CAs bei.
+-->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="false">kasse-lokal.fwv-raura.ch</domain>
+        <domain includeSubdomains="false">www.fwv-raura.ch</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

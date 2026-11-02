@@ -1,0 +1,27 @@
+name: kueche
+description: "Kuechendisplay des FWV Raura - zeigt Bestellungen fuer Kueche und Bar."
+publish_to: 'none'
+# Version setzt der Release-Workflow aus dem Tag kds-vX.Y[.Z]
+version: 4.0.0+4000
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  # Gleiche Versionen wie flutter/kasse
+  mobile_scanner: ^7.4.2
+  wakelock_plus: ^1.8.1
+  shared_preferences: ^2.5.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

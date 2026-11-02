@@ -12,7 +12,7 @@ Die APKs liegen auf der **eigenen Website**, nicht mehr als GitHub-Link
 | App | Adresse | Quelle (GitHub-Release) | Projekt |
 |---|---|---|---|
 | Mitglieder | `/download/mitglieder.apk` | `members-latest` (Play-signiert) | `flutter/mitglieder` |
-| Kueche | `/download/kueche.apk` | neuestes `kds-v*` (`*-release.apk`) | `simple-order-system/kitchen-display-android` |
+| Kueche | `/download/kueche.apk` | neuestes `kds-v*` (`*-release.apk`) | `flutter/kueche` (ab 4.0; bis 3.4 nativ in `simple-order-system/kitchen-display-android`) |
 | Kasse | `/download/kasse.apk` | neuestes `kasse-v*` (`*-release.apk`) | `flutter/kasse` |
 | Musik | `/download/musik.apk` | neuestes `musik-v*` (`fwv-musik-*-release.apk`, gleiches Release wie die Desktop-Programme) | `flutter/musik` |
 
@@ -40,7 +40,10 @@ ssh stefan@docker.fwv-raura.ch 'sudo systemctl start app-downloads.service; jq -
 ## Neue Version einer App
 
 - **Kueche:** `git tag kds-vX.Y && git push origin kds-vX.Y`
-  (Workflow `build-android-kds.yml`, versionCode = X*1000+Y*100+Z).
+  (Workflow `build-android-kds.yml`, Flutter, versionCode = X*1000+Y*100+Z,
+  muss ueber 3400 liegen). Vorher im Emulator testen wie die Kasse
+  (`--dart-define=KUECHE_CLOUD=... KUECHE_LOKAL=...`).
+  **Nie auf einen `[skip ci]`-Commit taggen.**
 - **Kasse:** `git tag kasse-vX.Y && git push origin kasse-vX.Y`
   (Workflow `build-android-kasse.yml`, gleiche Signatur wie die Kueche).
   Vorher und nachher Skill `fwv-kasse-testen` (Emulator, Website-APK starten).
