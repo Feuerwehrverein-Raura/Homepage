@@ -93,6 +93,29 @@ jobs:
         # nachgebautes Authentik (ohne Datenbank)
         run: npm test
 
+  backend-accounting:
+    name: Backend Accounting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Abhaengigkeiten
+        working-directory: docker/backend-accounting
+        run: npm install --no-audit --no-fund --no-package-lock
+
+      - name: Syntax
+        working-directory: docker/backend-accounting
+        run: node --check src/index.js
+
+      - name: Tests
+        working-directory: docker/backend-accounting
+        # Beitragsbrief: Referenz, Land, Adressfenster (ohne Datenbank)
+        run: npm test
+
   inventory-backend:
     name: Inventar-Backend
     runs-on: ubuntu-latest

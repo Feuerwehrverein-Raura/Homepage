@@ -627,7 +627,7 @@ app.patch('/membership-fees/payments/:id/reference', vorstand, async (req, res) 
 //
 // Auth: authenticateAny (Vorstand-JWT oder Authentik-JWT mit Vorstand-Gruppe).
 const axios = require('axios');
-const { buildBeitragEmailForPayment, buildBeitragLetterForPayment, getKassier } = require('./beitrag-helpers');
+const { buildBeitragEmailForPayment, buildBeitragLetterForPayment, getKassier, referenzGueltig, postEmpfaenger } = require('./beitrag-helpers');
 
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 const MEMBERS_API_URL = process.env.MEMBERS_API_URL || 'http://api-members:3000';
@@ -688,7 +688,7 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
             r.zustellung_email === true &&
             (r.email || '').trim() !== '' &&
             (r.member_status || '') !== 'Ehrenmitglied' &&
-            (r.reference_nr || '').replace(/\D/g, '').length > 0
+            referenzGueltig(r.reference_nr)
         );
 
         const subject = `Mitgliederbeitrag ${year} - Feuerwehrverein Raura`;
@@ -760,7 +760,7 @@ app.post('/membership-fees/payments/:id/send', authenticateAny, requireRole('vor
         }
         const r = paymentRes.rows[0];
 
-        if ((r.reference_nr || '').replace(/\D/g, '').length === 0) {
+        if (!referenzGueltig(r.reference_nr)) {
             return res.status(400).json({ error: 'Keine Referenznummer hinterlegt — QR-Rechnung waere unbrauchbar.' });
         }
         if ((r.member_status || '') === 'Ehrenmitglied') {
@@ -801,13 +801,7 @@ app.post('/membership-fees/payments/:id/send', authenticateAny, requireRole('vor
             const html = await buildBeitragLetterForPayment({ member, payment, settings, kassier });
             await axios.post(`${DISPATCH_API}/dispatch/send-post`, {
                 html,
-                recipient: {
-                    name: `${r.vorname || ''} ${r.nachname || ''}`.trim(),
-                    street: r.strasse,
-                    zip: r.plz,
-                    city: r.ort,
-                    country: 'CH'
-                },
+                recipient: postEmpfaenger(r),
                 member_id: r.member_id
             }, { headers: dispatchHeaders, timeout: 60000 });
         }
@@ -856,7 +850,7 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
             (r.plz || '').trim() !== '' &&
             (r.ort || '').trim() !== '' &&
             (r.member_status || '') !== 'Ehrenmitglied' &&
-            (r.reference_nr || '').replace(/\D/g, '').length > 0
+            referenzGueltig(r.reference_nr)
         );
 
         const dispatchUrl = `${DISPATCH_API}/dispatch/send-post`;
@@ -876,13 +870,7 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
                 });
                 await axios.post(dispatchUrl, {
                     html,
-                    recipient: {
-                        name: `${r.vorname || ''} ${r.nachname || ''}`.trim(),
-                        street: r.strasse,
-                        zip: r.plz,
-                        city: r.ort,
-                        country: 'CH'
-                    },
+                    recipient: postEmpfaenger(r),
                     member_id: r.member_id
                 }, { headers: dispatchHeaders, timeout: 60000 });
                 success++;
@@ -947,7 +935,7 @@ app.get('/membership-fees/payments/:id/brief.pdf', vorstand, async (req, res) =>
             FROM membership_fee_payments p JOIN members m ON p.member_id = m.id
             WHERE p.id = $1`, [req.params.id])).rows[0];
         if (!r) return res.status(404).json({ error: 'Zahlung nicht gefunden' });
-        if ((r.reference_nr || '').replace(/\D/g, '').length === 0) {
+        if (!referenzGueltig(r.reference_nr)) {
             return res.status(400).json({ error: 'Keine Referenznummer hinterlegt — QR-Rechnung waere unbrauchbar.' });
         }
         const settings = (await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [r.year])).rows[0];
@@ -979,7 +967,7 @@ app.get('/membership-fees/briefe.pdf', vorstand, async (req, res) => {
             WHERE p.year = $1 AND p.status = 'offen'
             ORDER BY m.nachname, m.vorname`, [year])).rows
             .filter(r => (r.member_status || '') !== 'Ehrenmitglied' &&
-                (r.reference_nr || '').replace(/\D/g, '').length > 0);
+                referenzGueltig(r.reference_nr));
         if (zeilen.length === 0) {
             return res.status(404).json({ error: 'Keine offenen Beitragsbriefe mit Referenznummer.' });
         }

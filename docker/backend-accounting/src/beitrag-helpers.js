@@ -227,6 +227,35 @@ function generateBeitragEmailHTML({ member, payment, settings, kassier, qrImgSrc
 </body></html>`;
 }
 
+/** Brauchbare QR-Referenz: Ziffern vorhanden und nicht nur Nullen (sonst
+ *  liesse sich die Zahlung keinem Mitglied zuordnen). */
+function referenzGueltig(ref) {
+    const ziffern = String(ref || '').replace(/\D/g, '');
+    return ziffern.length > 0 && !/^0+$/.test(ziffern);
+}
+
+/** Deutsche Adresse: PLZ mit "DE" oder fuenfstellig (wie nachricht-layout.js
+ *  in api-dispatch). */
+function istDeutsch(member) {
+    const plz = String(member?.plz ?? '').trim();
+    return /^de/i.test(plz) || /^\d{5}/.test(plz);
+}
+
+function plzOhneLand(member) {
+    return String(member?.plz ?? '').trim().replace(/^de[-\s]?/i, '');
+}
+
+/** Empfaenger fuer /dispatch/send-post (Land fuer Pingens Adressfenster). */
+function postEmpfaenger(member) {
+    return {
+        name: `${member.vorname || ''} ${member.nachname || ''}`.trim(),
+        street: member.strasse,
+        zip: plzOhneLand(member),
+        city: member.ort,
+        country: istDeutsch(member) ? 'DE' : 'CH'
+    };
+}
+
 /**
  * Generiert das HTML-A4-Layout fuer den Beitragsbrief (Pingen-kompatibel).
  *
@@ -250,6 +279,7 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
     const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const gvDatum = settings.gv_date || '';
     const footer = getKassierFooter(kassier);
+    const de = istDeutsch(member);
 
     return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -258,9 +288,11 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
 <body>
 <div style="width:210mm;height:297mm;padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.5;position:relative;box-sizing:border-box;background:white;">
 
-    <!-- Briefkopf: Logo links, Titel rechts -->
-    <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
-        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;">
+    <!-- Briefkopf: Logo links, Titel rechts. Deutsche Empfaenger: Fenster
+         links (DIN 5008, Pingen address_position left) - das Logo endet dann
+         oberhalb des linken Frankierbereichs (20/40mm), darum 30mm breit. -->
+    <div style="position:absolute;top:15mm;left:25mm;width:${de ? 30 : 35}mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:${de ? 30 : 35}mm;height:auto;">
     </div>
     <div style="position:absolute;top:15mm;left:118mm;">
         <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
@@ -272,11 +304,13 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
         ${getAbsenderLine(kassier)}
     </div>
 
-    <!-- Empfaenger im Adressfenster (Swiss Standard X=118mm, Y=60mm, W=85mm, H=25.5mm) -->
-    <div style="position:absolute;top:60mm;left:118mm;width:85mm;height:25.5mm;">
+    <!-- Empfaenger im Adressfenster: CH rechts (X=118mm, Y=60mm, W=85mm,
+         H=25.5mm), DE links (X=22mm) mit Zeile "Deutschland" -->
+    <div style="position:absolute;top:60mm;left:${de ? 22 : 118}mm;width:85mm;height:25.5mm;${de ? 'line-height:1.15;' : ''}">
         <span style="display:block;font-size:11pt;">${name}</span>
         <span style="display:block;font-size:11pt;">${member.strasse || ''}</span>
-        <span style="display:block;font-size:11pt;">${[member.plz, member.ort].filter(Boolean).join(' ')}</span>
+        <span style="display:block;font-size:11pt;">${[plzOhneLand(member), member.ort].filter(Boolean).join(' ')}</span>
+        ${de ? '<span style="display:block;font-size:11pt;">Deutschland</span>' : ''}
     </div>
 
     <!-- Datum rechtsbuendig -->
@@ -299,8 +333,9 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
 
         <div style="margin-bottom:3mm;">
             Mir obliegt es nun traditionsgemäss Euch um die Entrichtung dieses Beitrages
-            anzugehen. Ich danke Euch herzlich für eine baldige Überweisung mit beiliegendem
-            Einzahlungsschein, Ref. Nr. ${refShort}
+            anzugehen. Ich danke Euch herzlich für eine baldige Überweisung ${de
+                ? '(Zahlungsangaben unten)'
+                : 'mit beiliegendem\n            Einzahlungsschein'}, Ref. Nr. ${refShort}
         </div>
 
         <div style="margin-bottom:6mm;">
@@ -316,6 +351,25 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
         </div>
     </div>
 
+${de ? `
+    <!-- Deutschland: Pingen druckt die Schweizer QR-Rechnung (perforiertes
+         Papier) nur fuer Briefe in der Schweiz - darum hier die
+         Zahlungsangaben als Text, nichts zum Abtrennen. -->
+    <div style="position:absolute;top:192mm;left:25mm;right:25mm;font-size:10pt;line-height:1.5;">
+        <div style="font-weight:bold;font-size:11pt;border-bottom:1px solid #000;margin-bottom:3mm;">Zahlungsangaben</div>
+        <table style="border-collapse:collapse;">
+            <tr><td style="padding:0.5mm 6mm 0.5mm 0;font-weight:bold;vertical-align:top;">Konto (IBAN)</td><td>CH64 3076 9442 4924 3200 1</td></tr>
+            <tr><td style="padding:0.5mm 6mm 0.5mm 0;font-weight:bold;vertical-align:top;">Empfänger</td><td>Feuerwehrverein Raura, Marksteinweg 12, 4304 Giebenach, Schweiz</td></tr>
+            <tr><td style="padding:0.5mm 6mm 0.5mm 0;font-weight:bold;vertical-align:top;">Betrag</td><td>CHF ${betragFormatted}</td></tr>
+            <tr><td style="padding:0.5mm 6mm 0.5mm 0;font-weight:bold;vertical-align:top;">Referenz</td><td>${refFormatted}</td></tr>
+            <tr><td style="padding:0.5mm 6mm 0.5mm 0;font-weight:bold;vertical-align:top;">Mitteilung</td><td>Mitgliederbeitrag ${jahr} - Ref. ${refShort} - ${name}</td></tr>
+        </table>
+        <div style="font-size:7pt;color:#555;margin-top:8mm;display:flex;justify-content:space-between;">
+            <div>${footer.left}</div>
+            <div>${footer.right}</div>
+        </div>
+    </div>
+` : `
     <!-- Scherenlinie 188mm -->
     <div style="position:absolute;top:188mm;left:0;right:0;text-align:center;font-size:7pt;color:#555;letter-spacing:0.5mm;">
         &#9660; &#9660; &#9660;&nbsp; Vor der Einzahlung abzutrennen / A détacher avant le versement / Da staccare prima del versamento &nbsp;&#9660; &#9660; &#9660;
@@ -383,6 +437,7 @@ function generateBeitragLetterHTML({ member, payment, settings, kassier, qrImgSr
             <div>${footer.right}</div>
         </div>
     </div>
+`}
 </div>
 </body></html>`;
 }
@@ -446,6 +501,9 @@ async function buildBeitragEmailForPayment({ member, payment, settings, kassier 
 }
 
 module.exports = {
+    referenzGueltig,
+    istDeutsch,
+    postEmpfaenger,
     BEITRAG_IBAN,
     buildQRReference,
     formatQRReference,
