@@ -1566,7 +1566,9 @@ app.post('/pingen/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'a
         }
         const r = await pdfBriefAnMitglied({
             memberId: member_id, subject: titel, pdfBase64: pdf_base64, staging, eventId: event_id,
-            hinweis: `Beiliegend erhalten Sie den ${titel} mit Ihren Einsätzen. Vielen Dank fürs Mithelfen!`
+            // Der Arbeitsplan ist fuer alle gleich (alle Schichten und Helfer),
+            // wie in der Mail von api-events.
+            hinweis: `Der Arbeitsplan ist fertig. Beiliegend erhalten Sie den ${titel} mit allen Schichten und Helfern. Vielen Dank fürs Mithelfen!`
         });
         res.json({ success: true, letterId: r.letterId, recipient: r.name });
     } catch (error) {
