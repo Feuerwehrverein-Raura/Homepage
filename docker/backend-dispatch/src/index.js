@@ -2349,6 +2349,12 @@ app.post('/internal/run-backup-now', authenticateAny, requireRole('vorstand', 'a
     runDailyBackup(pool).catch(err => console.error('Manual backup trigger failed:', err.message));
 });
 
+// Nachricht-Entwuerfe des Vorstands (src/entwuerfe.js), in der Datenbank
+// statt im localStorage - fuer alle Vorstandsmitglieder und Geraete.
+const { entwurfSchema, mountEntwuerfe } = require('./entwuerfe');
+entwurfSchema(pool).catch((e) => console.error('[ENTWURF] Tabelle:', e.message));
+mountEntwuerfe(app, pool, [authenticateAny, requireRole('vorstand', 'admin')]);
+
 // Voll-Export fuer die Vorstand-App (Mitglieder > Exportieren): dieselbe XLSX
 // wie die Sicherung per Mail, sofort als Download. Pfad unter /dispatch, weil
 // Traefik den schon an api-dispatch leitet.

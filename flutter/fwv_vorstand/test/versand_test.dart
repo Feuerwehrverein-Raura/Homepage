@@ -102,10 +102,37 @@ class Dispatch {
   /// member_id, deren Brief beim Senden scheitert.
   final briefFehler = <String>{};
 
+  /// Entwuerfe wie in nachricht_entwuerfe, neueste zuerst.
+  final entwuerfe = <Map<String, dynamic>>[];
+
   Object? antwort(http.Request a) {
     final weg = '${a.method} ${a.url.path}';
     final q = a.url.queryParameters;
     final body = a.body.isEmpty ? const <String, dynamic>{} : jsonDecode(a.body) as Map;
+    if (a.url.path.startsWith('/dispatch/entwuerfe')) {
+      final id = a.url.pathSegments.length > 2 ? a.url.pathSegments[2] : null;
+      final gespeichert = {
+        ...body.cast<String, dynamic>(),
+        'id': id ?? 'd${entwuerfe.length + 1}',
+        'geaendert_von': 'Anna Aktuar',
+        'geaendert_am': '2026-11-02T15:00:00.000Z',
+      };
+      switch (a.method) {
+        case 'GET':
+          return entwuerfe;
+        case 'POST':
+          entwuerfe.insert(0, gespeichert);
+          return (201, gespeichert);
+        case 'PUT':
+          entwuerfe
+            ..removeWhere((e) => e['id'] == id)
+            ..insert(0, gespeichert);
+          return gespeichert;
+        case 'DELETE':
+          entwuerfe.removeWhere((e) => e['id'] == id);
+          return {'success': true};
+      }
+    }
     switch (weg) {
       case 'GET /members':
         return members;
@@ -554,6 +581,45 @@ void main() {
       expect(find.text('3 E-Mails gesendet'), findsOneWidget);
       // Formular leer - kein zweites Senden.
       expect(tester.widget<FilledButton>(senden).onPressed, isNull);
+    });
+
+    testWidgets('Entwurf speichern, aktualisieren, laden; nach dem Senden geloescht', (
+      tester,
+    ) async {
+      await oeffnen(tester);
+      await tippen(
+        tester,
+        find.descendant(of: find.byKey(const Key('versand-art')), matching: find.text('E-Mail')),
+      );
+      await tester.enterText(find.byKey(const Key('versand-betreff')), 'GV 2027');
+      await tester.enterText(find.byKey(const Key('versand-text')), 'Liebe {{vorname}}');
+      await tester.pumpAndSettle();
+      await tippen(tester, find.byKey(const Key('versand-entwurf-speichern')));
+      expect(d.entwuerfe.single['art'], 'email');
+      expect(d.entwuerfe.single['wahl'], containsPair('art', 'alle'));
+
+      await tester.enterText(find.byKey(const Key('versand-text')), 'Neuer Text');
+      await tester.pumpAndSettle();
+      await tippen(tester, find.text('Entwurf aktualisieren'));
+      expect(d.entwuerfe, hasLength(1), reason: 'ueberschrieben, nicht neu');
+      expect(d.entwuerfe.single['text'], 'Neuer Text');
+
+      // Frisch geoeffnet: Entwurf laden.
+      await tester.pumpWidget(const SizedBox());
+      await oeffnen(tester);
+      await tippen(tester, find.byKey(const Key('versand-entwuerfe')));
+      expect(find.textContaining('Anna Aktuar'), findsOneWidget);
+      await tippen(tester, find.text('GV 2027'));
+      expect(
+        tester.widget<TextField>(find.byKey(const Key('versand-text'))).controller!.text,
+        'Neuer Text',
+      );
+
+      await tippen(tester, find.byKey(const Key('versand-senden')));
+      await tippen(tester, imDialog('Senden'));
+      expect(d.posts('/email/bulk'), isNotEmpty);
+      await tester.pumpAndSettle();
+      expect(d.entwuerfe, isEmpty, reason: 'gesendet - Entwurf weg');
     });
 
     testWidgets('Auto mit Briefen: Rueckfrage nennt Kosten, Staging schaltet sie ab', (

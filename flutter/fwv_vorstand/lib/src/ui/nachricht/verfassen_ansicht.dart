@@ -7,8 +7,9 @@
 // Vorbild: vorstand-desktop (pages/dispatch, SendTab). Das Brief-HTML baut
 // das Backend (POST /dispatch/brief), nicht die App. Eigene Anhaenge (PDF,
 // JPG, PNG) gehen mit jeder E-Mail mit, an Briefe haengt das Backend nur die
-// PDFs als weitere Seiten. Entwuerfe und zeitgesteuertes Senden gibt es hier
-// nicht.
+// PDFs als weitere Seiten. Entwuerfe liegen auf dem Server (fuer den ganzen
+// Vorstand, ohne Anhaenge); nach dem Senden wird der geladene Entwurf
+// geloescht. Zeitgesteuertes Senden gibt es hier nicht.
 
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
@@ -18,6 +19,7 @@ import '../../mitglieder/modelle.dart';
 import '../../versand/einladung.dart';
 import '../../versand/versand.dart';
 import '../../versand/versand_dienst.dart';
+import '../../zeit.dart';
 import 'empfaenger_auswahl.dart';
 import 'versand_bausteine.dart';
 
@@ -48,6 +50,10 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
   (int, int)? _fortschritt;
   VersandErgebnis? _ergebnis;
   final _anhaenge = <Anhang>[];
+
+  /// Geladener bzw. zuletzt gespeicherter Entwurf (Speichern ueberschreibt ihn).
+  String? _entwurfId;
+  var _speichert = false;
 
   VersandDienst get _dienst => widget.dienste.versand;
 
@@ -101,6 +107,62 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
       _vorlage = v.id;
       _betreff.text = v.betreff;
       _text.text = v.text;
+    });
+  }
+
+  Future<void> _entwurfSpeichern() async {
+    setState(() => _speichert = true);
+    try {
+      final e = await _dienst.entwurfSpeichern(
+        id: _entwurfId,
+        betreff: _betreff.text,
+        text: _text.text,
+        art: _art,
+        wahl: _wahl,
+        anlassId: widget.entwurf?.anlassId,
+      );
+      _entwurfId = e.id;
+      if (mounted) {
+        meldung(
+          context,
+          _anhaenge.isEmpty
+              ? 'Entwurf gespeichert.'
+              : 'Entwurf gespeichert – Anhänge werden nicht mitgespeichert.',
+        );
+      }
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _speichert = false);
+    }
+  }
+
+  /// Liste der Entwuerfe; Antippen laedt, Papierkorb loescht.
+  Future<void> _entwuerfeZeigen() async {
+    final gewaehlt = await showModalBottomSheet<GespeicherterEntwurf>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _EntwurfListe(dienst: _dienst),
+    );
+    if (gewaehlt == null || !mounted) return;
+    if (_betreff.text.trim().isNotEmpty || _text.text.trim().isNotEmpty) {
+      final ok = await nachfragen(
+        context,
+        titel: 'Entwurf laden?',
+        text: 'Betreff, Text und Empfänger werden durch «${gewaehlt.betreff}» ersetzt.',
+        ja: 'Laden',
+        gefaehrlich: false,
+      );
+      if (!ok || !mounted) return;
+    }
+    setState(() {
+      _entwurfId = gewaehlt.id;
+      _betreff.text = gewaehlt.betreff;
+      _text.text = gewaehlt.text;
+      _art = gewaehlt.art;
+      _wahl = gewaehlt.wahl;
+      _vorlage = null;
     });
   }
 
@@ -183,6 +245,8 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
       _ergebnis = ergebnis;
       // Kein versehentliches zweites Senden an dieselben Leute.
       if (ergebnis.emails + ergebnis.briefe > 0) {
+        if (_entwurfId case final id?) _dienst.entwurfLoeschen(id).ignore();
+        _entwurfId = null;
         _betreff.clear();
         _text.clear();
         _vorlage = null;
@@ -399,6 +463,29 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     return Karte(
       titel: 'Inhalt',
       kinder: [
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              key: const Key('versand-entwuerfe'),
+              icon: const Icon(Icons.drafts_outlined),
+              label: const Text('Entwürfe'),
+              onPressed: _sendet ? null : _entwuerfeZeigen,
+            ),
+            TextButton.icon(
+              key: const Key('versand-entwurf-speichern'),
+              icon: const Icon(Icons.save_outlined),
+              label: Text(_entwurfId == null ? 'Entwurf speichern' : 'Entwurf aktualisieren'),
+              onPressed:
+                  _sendet ||
+                      _speichert ||
+                      (_betreff.text.trim().isEmpty && _text.text.trim().isEmpty)
+                  ? null
+                  : _entwurfSpeichern,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
         if (vorlagen.isNotEmpty) ...[
           DropdownButton<String?>(
             key: const Key('versand-vorlage'),
@@ -568,4 +655,82 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
       ],
     );
   }
+}
+
+class _EntwurfListe extends StatefulWidget {
+  const _EntwurfListe({required this.dienst});
+
+  final VersandDienst dienst;
+
+  @override
+  State<_EntwurfListe> createState() => _EntwurfListeState();
+}
+
+class _EntwurfListeState extends State<_EntwurfListe> {
+  late Future<List<GespeicherterEntwurf>> _liste = widget.dienst.entwuerfe();
+
+  Future<void> _loeschen(GespeicherterEntwurf e) async {
+    final ok = await nachfragen(
+      context,
+      titel: 'Entwurf löschen?',
+      text: '«${e.betreff.isEmpty ? '(ohne Betreff)' : e.betreff}» ist danach für alle weg.',
+      ja: 'Löschen',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await widget.dienst.entwurfLoeschen(e.id);
+      setState(() => _liste = widget.dienst.entwuerfe());
+    } on Object catch (f) {
+      if (mounted) meldung(context, fehlerText(f));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+      child: FutureBuilder(
+        future: _liste,
+        builder: (context, s) {
+          if (s.hasError) {
+            return Padding(padding: const EdgeInsets.all(24), child: Text(fehlerText(s.error!)));
+          }
+          final liste = s.data;
+          if (liste == null) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (liste.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('Noch keine Entwürfe.', textAlign: TextAlign.center),
+            );
+          }
+          final jetzt = DateTime.now();
+          return ListView(
+            shrinkWrap: true,
+            children: [
+              for (final e in liste)
+                ListTile(
+                  key: Key('entwurf-${e.id}'),
+                  leading: const Icon(Icons.drafts_outlined),
+                  title: Text(e.betreff.isEmpty ? '(ohne Betreff)' : e.betreff),
+                  subtitle: Text(
+                    [?e.von, if (e.geaendert case final g?) vorZeit(g, jetzt)].join(' · '),
+                  ),
+                  onTap: () => Navigator.of(context).pop(e),
+                  trailing: IconButton(
+                    tooltip: 'Löschen',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => _loeschen(e),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
 }

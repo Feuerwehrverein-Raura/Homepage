@@ -8,6 +8,8 @@
 //                                       Mitglied (nachricht-layout.js)
 // - POST dispatch/send-post             diesen Brief an Pingen
 // - GET  dispatch-log                   Versandverlauf
+// - GET/POST/PUT/DELETE dispatch/entwuerfe  Entwuerfe (fuer den ganzen
+//                                       Vorstand, src/entwuerfe.js)
 // - GET  pingen/account|stats|letters   Konto, Statistik, Briefe
 // - GET  pingen/letters/:id/status      Status bei Pingen abfragen
 // - POST pingen/send-bulk-pdf           ein PDF an ausgewaehlte Mitglieder
@@ -108,6 +110,39 @@ class VersandDienst {
   final ApiClient api;
 
   Future<List<Vorlage>> vorlagen() async => jsonListe(await api.get('templates'), Vorlage.ausJson);
+
+  /// Gespeicherte Entwuerfe, neueste zuerst.
+  Future<List<GespeicherterEntwurf>> entwuerfe() async =>
+      jsonListe(await api.get('dispatch/entwuerfe'), GespeicherterEntwurf.ausJson);
+
+  /// Neu ([id] null) oder ueberschreiben; liefert den gespeicherten Stand.
+  Future<GespeicherterEntwurf> entwurfSpeichern({
+    String? id,
+    required String betreff,
+    required String text,
+    required Versandart art,
+    required Empfaengerwahl wahl,
+    String? anlassId,
+  }) async {
+    final daten = {
+      'betreff': betreff,
+      'text': text,
+      'art': art.name,
+      'wahl': {
+        'art': wahl.art.name,
+        'status': wahl.status,
+        'zustellart': wahl.zustellart.name,
+        'ids': [...wahl.ids],
+      },
+      'anlass_id': ?anlassId,
+    };
+    final j = id == null
+        ? await api.post('dispatch/entwuerfe', daten: daten)
+        : await api.put('dispatch/entwuerfe/$id', daten: daten);
+    return GespeicherterEntwurf.ausJson(j is Map ? Map<String, dynamic>.from(j) : const {});
+  }
+
+  Future<void> entwurfLoeschen(String id) => api.delete('dispatch/entwuerfe/$id');
 
   /// Brief fuer [mitgliedId] als PDF (mit Pingen-Zonen) - fuer die Vorschau.
   Future<Uint8List> briefVorschau({
@@ -312,6 +347,59 @@ class VersandDienst {
 }
 
 /// Zeile aus dispatch_log (GET dispatch-log, GET pingen/letters).
+/// Entwurf aus api-dispatch (nachricht_entwuerfe); Anhaenge speichert der
+/// Server nicht.
+class GespeicherterEntwurf {
+  const GespeicherterEntwurf({
+    required this.id,
+    required this.betreff,
+    required this.text,
+    this.art = Versandart.auto,
+    this.wahl = const Empfaengerwahl(),
+    this.anlassId,
+    this.von,
+    this.geaendert,
+  });
+
+  factory GespeicherterEntwurf.ausJson(Map<String, dynamic> j) {
+    T wert<T extends Enum>(List<T> werte, Object? name, T sonst) =>
+        werte.where((w) => w.name == name).firstOrNull ?? sonst;
+    final w = j['wahl'] is Map
+        ? Map<String, dynamic>.from(j['wahl'] as Map)
+        : const <String, dynamic>{};
+    const leer = Empfaengerwahl();
+    return GespeicherterEntwurf(
+      id: jsonText(j['id']) ?? '',
+      betreff: jsonText(j['betreff']) ?? '',
+      text: jsonText(j['text']) ?? '',
+      art: wert(Versandart.values, j['art'], Versandart.auto),
+      wahl: Empfaengerwahl(
+        art: wert(EmpfaengerArt.values, w['art'], leer.art),
+        status: jsonText(w['status']) ?? leer.status,
+        zustellart: wert(Zustellart.values, w['zustellart'], leer.zustellart),
+        ids: {
+          if (w['ids'] is List)
+            for (final i in w['ids'] as List) ?jsonText(i),
+        },
+      ),
+      anlassId: jsonText(j['anlass_id']),
+      von: jsonText(j['geaendert_von']) ?? jsonText(j['erstellt_von']),
+      geaendert: utcZeitpunkt(j['geaendert_am']),
+    );
+  }
+
+  final String id;
+  final String betreff;
+  final String text;
+  final Versandart art;
+  final Empfaengerwahl wahl;
+  final String? anlassId;
+
+  /// Wer zuletzt gespeichert hat.
+  final String? von;
+  final DateTime? geaendert;
+}
+
 class VersandEintrag {
   const VersandEintrag({
     required this.id,
