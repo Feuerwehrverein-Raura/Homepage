@@ -114,6 +114,40 @@ async function sendPushToMember(memberId, notificationType, title, body, data = 
     }
 }
 
+/**
+ * Tiefkuehler-Alarm als Push. Apps mit Knopf (fcm_tokens.alarm_knopf) bekommen
+ * einen reinen Daten-Push mit hoher Prioritaet und bauen die Mitteilung samt
+ * "Ich gehe schauen" selbst; aeltere Apps die gewohnte Mitteilung.
+ */
+async function sendAlarmPush(memberId, title, body, data = {}) {
+    if (!fcmInitialized) return;
+    try {
+        const pref = await pool.query(
+            "SELECT enabled FROM notification_preferences WHERE member_id=$1 AND notification_type='general'", [memberId]);
+        if (pref.rows[0]?.enabled === false) return;
+        await pool.query('ALTER TABLE fcm_tokens ADD COLUMN IF NOT EXISTS alarm_knopf BOOLEAN NOT NULL DEFAULT false');
+        const tokens = (await pool.query('SELECT token, alarm_knopf FROM fcm_tokens WHERE member_id=$1', [memberId])).rows;
+        const stringData = fcmDaten('kuehler_alarm', { ...data, title, body });
+        const kaputt = [];
+        for (const knopf of [true, false]) {
+            const t = tokens.filter(r => r.alarm_knopf === knopf).map(r => r.token);
+            if (!t.length) continue;
+            const message = knopf
+                ? { data: stringData, android: { priority: 'high' }, tokens: t }
+                : { notification: { title, body }, data: stringData, tokens: t };
+            const response = await admin.messaging().sendEachForMulticast(message);
+            response.responses.forEach((resp, i) => {
+                const code = resp.error && resp.error.code;
+                if (code === 'messaging/registration-token-not-registered' ||
+                    code === 'messaging/invalid-registration-token') kaputt.push(t[i]);
+            });
+        }
+        if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
+    } catch (err) {
+        console.error('sendAlarmPush failed:', err.message);
+    }
+}
+
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
 // DEUTSCH: Datums- und Zeitwerte als Strings zurückgeben, um Zeitzonen-Probleme zu vermeiden
@@ -5780,6 +5814,12 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
                   updated_at = NOW()
         `, [memberId, token, device_id || null, platform || 'android']);
 
+        // Ab App 1.0.36: die App baut Tiefkuehler-Alarme selbst (Knopf
+        // "Ich gehe schauen") und braucht dafuer reine Daten-Pushes.
+        await pool.query('ALTER TABLE fcm_tokens ADD COLUMN IF NOT EXISTS alarm_knopf BOOLEAN NOT NULL DEFAULT false');
+        await pool.query('UPDATE fcm_tokens SET alarm_knopf = $3 WHERE member_id = $1 AND token = $2',
+            [memberId, token, req.body.alarm_knopf === true]);
+
         // Ab App 1.0.24 kommen Version, Quelle usw. mit (src/app-geraete.js).
         // Nur Beiwerk: ein Fehler dort laesst die Token-Anmeldung gelingen.
         const geraet = geraetAusFcmEingabe(req.body);
@@ -7740,7 +7780,10 @@ async function periodicAuthentikSync() {
 // Der Waechter legt SMS in kiosk_alarm_sms; der SMS-Gateway im PJC holt sie
 // jede Minute ab (GET /kiosk/alarm-sms, X-Alarm-Key) und meldet, ob sie
 // rausgingen. Scharf nur mit KUEHLER_ALARM=an.
-const { kuehlerAlarm, alarmBenutzer, alarmEmpfaenger, pushTitel } = require('./kuehler-alarm');
+const {
+    kuehlerAlarm, alarmBenutzer, alarmEmpfaenger, pushTitel, schauenText, mitSchauer,
+    stickerInhalt, stickerPruefen, stickerPasst,
+} = require('./kuehler-alarm');
 
 let alarmTabelleDa = false;
 async function alarmTabelle() {
@@ -7767,6 +7810,20 @@ async function alarmTabelle() {
             geaendert TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
     await pool.query('INSERT INTO kiosk_alarm_einstellung (id) VALUES (1) ON CONFLICT DO NOTHING');
+    // "Ich gehe schauen": wer sich um einen offenen Fall kuemmert.
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS kiosk_alarm_schauen (
+            id SERIAL PRIMARY KEY,
+            schluessel TEXT NOT NULL,
+            member_id UUID,
+            name TEXT NOT NULL,
+            zeit TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    await pool.query('ALTER TABLE kiosk_alarm_schauen ADD COLUMN IF NOT EXISTS vor_ort BOOLEAN NOT NULL DEFAULT false');
+    // Geheimnis fuer die QR-Sticker an den Geraeten (stickerInhalt).
+    await pool.query('ALTER TABLE kiosk_alarm_einstellung ADD COLUMN IF NOT EXISTS sticker_geheimnis TEXT');
+    await pool.query('UPDATE kiosk_alarm_einstellung SET sticker_geheimnis = $1 WHERE id = 1 AND sticker_geheimnis IS NULL',
+        [crypto.randomBytes(24).toString('hex')]);
     alarmTabelleDa = true;
 }
 
@@ -7794,6 +7851,37 @@ async function kuehlerAlarmEmpfaenger() {
         `SELECT vorname, nachname, mobile, telefon, status FROM members
           WHERE authentik_user_id::text = ANY($1::text[])`, [pks.map(String)]);
     return alarmEmpfaenger(r.rows);
+}
+
+/** Offene Faelle (gemeldet, noch keine Entwarnung) mit letzter Meldung und
+ *  wer nachschaut (nur wer sich nach dem Alarm gemeldet hat). */
+async function offeneAlarme() {
+    await alarmTabelle();
+    const r = await pool.query(`
+        SELECT DISTINCT ON (a.schluessel) a.schluessel, a.text, a.erstellt,
+               (SELECT MIN(b.erstellt) FROM kiosk_alarm_sms b
+                 WHERE b.schluessel = a.schluessel AND b.art = 'alarm'
+                   AND NOT EXISTS (SELECT 1 FROM kiosk_alarm_sms e WHERE e.schluessel = b.schluessel
+                                    AND e.art = 'entwarnung' AND e.erstellt > b.erstellt)) AS seit
+          FROM kiosk_alarm_sms a
+         WHERE a.art IN ('alarm', 'erinnerung') AND a.erstellt > NOW() - INTERVAL '3 days'
+           AND NOT EXISTS (SELECT 1 FROM kiosk_alarm_sms e WHERE e.schluessel = a.schluessel
+                            AND e.art = 'entwarnung' AND e.erstellt > a.erstellt)
+         ORDER BY a.schluessel, a.erstellt DESC`);
+    const faelle = [];
+    for (const f of r.rows) {
+        const s = await pool.query(
+            `SELECT member_id, name, zeit, vor_ort FROM kiosk_alarm_schauen
+              WHERE schluessel = $1 AND zeit >= $2 ORDER BY zeit DESC LIMIT 1`, [f.schluessel, f.seit || f.erstellt]);
+        const v = await pool.query(
+            `SELECT MAX(zeit) AS zeit FROM kiosk_alarm_schauen
+              WHERE schluessel = $1 AND zeit >= $2 AND vor_ort`, [f.schluessel, f.seit || f.erstellt]);
+        faelle.push({
+            schluessel: f.schluessel, text: f.text, seit: f.seit || f.erstellt,
+            schaut: s.rows[0] || null, vor_ort_seit: v.rows[0]?.zeit || null,
+        });
+    }
+    return faelle;
 }
 
 /** Dieselben Leute als Mitglieder-Ids fuer den App-Push - auch wer keine
@@ -7836,8 +7924,16 @@ async function kuehlerAlarmStarten() {
                 waechter = kuehlerAlarm();
             }
             const z = await roterSchopfDienst.zustand();
-            const meldungen = waechter.pruefen(z.kuehlung);
+            // Wer nachschaut, steht in der Erinnerung; wer vor Ort war,
+            // verschiebt sie auf 12 h.
+            const laufend = new Map((await offeneAlarme()).map(f => [f.schluessel, f]));
+            const vorOrt = new Map([...laufend].filter(([, f]) => f.vor_ort_seit)
+                .map(([k, f]) => [k, new Date(f.vor_ort_seit).getTime()]));
+            const meldungen = waechter.pruefen(z.kuehlung, vorOrt);
             if (!meldungen.length) return;
+            for (const m of meldungen) {
+                if (m.art === 'erinnerung') m.text = mitSchauer(m.text, laufend.get(m.schluessel)?.schaut);
+            }
             const empfaenger = await kuehlerAlarmEmpfaenger();
             const pushAn = await kuehlerAlarmMitglieder().catch(() => []);
             for (const m of meldungen) {
@@ -7848,10 +7944,11 @@ async function kuehlerAlarmStarten() {
                         [m.schluessel, m.art, e.nummer, e.name, m.text]);
                 }
                 // Zusaetzlich als Push in der App (gleiche Leute, gleicher Text).
-                // Antippen zeigt die Meldung; abschaltbar unter "Allgemein".
+                // notificationType kuehler_alarm: ab Mitglieder-App 1.0.36 baut
+                // die App die Mitteilung selbst, mit Knopf "Ich gehe schauen".
                 const titel = pushTitel(m.art);
                 for (const id of pushAn) {
-                    sendPushToMember(id, 'general', titel, m.text, { title: titel, body: m.text }).catch(() => {});
+                    sendAlarmPush(id, titel, m.text, { alarm: m.art, schluessel: m.schluessel }).catch(() => {});
                 }
             }
         } catch (error) {
@@ -7869,10 +7966,82 @@ async function kuehlerAlarmStarten() {
 app.get('/kiosk/kuehler-alarm', authenticateToken, roterSchopfGruppe, async (req, res) => {
     try {
         const e = await alarmEinstellung();
-        res.json({ ...e, aktiv: process.env.KUEHLER_ALARM === 'an' });
+        res.json({ ...e, aktiv: process.env.KUEHLER_ALARM === 'an', offen: await offeneAlarme() });
     } catch (error) {
         console.error('GET /kiosk/kuehler-alarm:', error.message);
         res.status(500).json({ error: 'Alarm-Einstellung nicht lesbar' });
+    }
+});
+
+async function stickerGeheimnis() {
+    await alarmTabelle();
+    return (await pool.query('SELECT sticker_geheimnis FROM kiosk_alarm_einstellung WHERE id = 1')).rows[0]?.sticker_geheimnis;
+}
+
+// "Ich gehe schauen" zu einem offenen Fall: alle anderen erfahren es per Push
+// und SMS; Erinnerungen nennen den Namen. Mit { sticker } (QR-Sticker am
+// Geraet gescannt, "Ich bin vor Ort"): die naechste Erinnerung erst 12 h danach.
+app.post('/kiosk/kuehler-alarm/schauen', authenticateToken, roterSchopfGruppe, async (req, res) => {
+    try {
+        const offen = await offeneAlarme();
+        const schluessel = String(req.body?.schluessel || '');
+        let messstelle = null;
+        if (req.body?.sticker !== undefined) {
+            messstelle = stickerPruefen(await stickerGeheimnis(), req.body.sticker);
+            if (!messstelle) return res.status(403).json({ error: 'Das ist kein Vor-Ort-Sticker eines Tiefkühlers' });
+        }
+        const vorOrt = messstelle !== null;
+        const fall = schluessel ? offen.find(f => f.schluessel === schluessel)
+            : offen.find(f => !vorOrt || stickerPasst(messstelle, f.schluessel));
+        if (!fall) return res.status(404).json({ error: 'Kein offener Alarm' });
+        if (vorOrt && !stickerPasst(messstelle, fall.schluessel)) {
+            return res.status(403).json({ error: 'Der Sticker gehört zu einem anderen Tiefkühler' });
+        }
+        const ich = await mitgliedZurAnmeldung(req).catch(() => null);
+        const name = ich ? `${ich.vorname || ''} ${ich.nachname || ''}`.trim()
+            : (req.user?.name || req.user?.preferred_username || req.user?.email || 'Jemand');
+        if (!vorOrt && fall.schaut && (ich ? fall.schaut.member_id === ich.id : fall.schaut.name === name)) {
+            return res.json({ ok: true, schaut: fall.schaut, schon: true });
+        }
+        const r = await pool.query(
+            `INSERT INTO kiosk_alarm_schauen (schluessel, member_id, name, vor_ort) VALUES ($1, $2, $3, $4)
+             RETURNING member_id, name, zeit, vor_ort`,
+            [fall.schluessel, ich?.id || null, name, vorOrt]);
+        const text = schauenText(name, fall.text, vorOrt);
+        logWarn('KUEHLER-ALARM', { art: vorOrt ? 'vor Ort' : 'schaut nach', schluessel: fall.schluessel, name });
+        // SMS an alle ausser der Person selbst (gleiche Empfaenger wie der Alarm).
+        const eigeneNummern = new Set([ich?.mobile, ich?.telefon].map(n => n && require('./kuehler-alarm').smsNummer(n)).filter(Boolean));
+        for (const e of await kuehlerAlarmEmpfaenger()) {
+            if (eigeneNummern.has(e.nummer)) continue;
+            await pool.query(
+                'INSERT INTO kiosk_alarm_sms (schluessel, art, nummer, name, text) VALUES ($1, $2, $3, $4, $5)',
+                [fall.schluessel, 'schauen', e.nummer, e.name, text]);
+        }
+        for (const id of await kuehlerAlarmMitglieder().catch(() => [])) {
+            if (ich && id === ich.id) continue;
+            sendAlarmPush(id, vorOrt ? 'Tiefkühler: jemand ist vor Ort' : 'Tiefkühler: jemand schaut nach', text,
+                { alarm: 'schauen', schluessel: fall.schluessel }).catch(() => {});
+        }
+        res.json({ ok: true, schaut: r.rows[0] });
+    } catch (error) {
+        console.error('POST /kiosk/kuehler-alarm/schauen:', error.message);
+        res.status(500).json({ error: 'Nicht gespeichert' });
+    }
+});
+
+// Inhalte der QR-Sticker zum Ausdrucken, je Tiefkuehler einer.
+app.get('/kiosk/kuehler-alarm/sticker', authenticateToken, roterSchopfGruppe, async (req, res) => {
+    try {
+        const geheimnis = await stickerGeheimnis();
+        const z = await roterSchopfDienst.zustand();
+        res.json({
+            sticker: (z.kuehlung || []).map(k => ({
+                messstelle: k.messstelle, name: k.name || k.messstelle, inhalt: stickerInhalt(geheimnis, k.messstelle),
+            })),
+        });
+    } catch (error) {
+        console.error('GET /kiosk/kuehler-alarm/sticker:', error.message);
+        res.status(500).json({ error: 'Sticker nicht verfügbar' });
     }
 });
 

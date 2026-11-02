@@ -275,7 +275,14 @@ class SchopfFreigabe {
 /// SMS-Alarm der Tiefkuehler (api-members, src/kuehler-alarm.js): scharf
 /// oder fuer eine Weile entschaerft.
 class KuehlerAlarm {
-  const KuehlerAlarm({required this.scharf, this.bis, this.von, this.geaendert, this.aktiv = true});
+  const KuehlerAlarm({
+    required this.scharf,
+    this.bis,
+    this.von,
+    this.geaendert,
+    this.aktiv = true,
+    this.offen = const [],
+  });
 
   factory KuehlerAlarm.ausJson(Object? roh) {
     final j = roh is Map ? roh : const {};
@@ -287,6 +294,10 @@ class KuehlerAlarm {
       von: von.isEmpty ? null : von,
       geaendert: zeit(j['geaendert']),
       aktiv: j['aktiv'] != false,
+      offen: [
+        for (final f in j['offen'] is List ? j['offen'] as List : const [])
+          if (f is Map) OffenerAlarm.ausJson(f),
+      ],
     );
   }
 
@@ -299,4 +310,47 @@ class KuehlerAlarm {
 
   /// false: auf dem Server ganz abgeschaltet (KUEHLER_ALARM).
   final bool aktiv;
+
+  /// Gemeldete Faelle ohne Entwarnung.
+  final List<OffenerAlarm> offen;
+}
+
+/// Ein gemeldeter Fall ("kuehler:eis:warm") und wer nachschaut
+/// (POST kiosk/kuehler-alarm/schauen).
+class OffenerAlarm {
+  const OffenerAlarm({
+    required this.schluessel,
+    required this.text,
+    this.seit,
+    this.schaut,
+    this.schautSeit,
+    this.vorOrt = false,
+  });
+
+  factory OffenerAlarm.ausJson(Map<dynamic, dynamic> j) {
+    final s = j['schaut'];
+    final name = s is Map ? '${s['name'] ?? ''}'.trim() : '';
+    return OffenerAlarm(
+      schluessel: '${j['schluessel'] ?? ''}',
+      // "FWV Schopf: " bzw. "FWV Schopf, noch immer: " weglassen.
+      text: '${j['text'] ?? ''}'.replaceFirst(RegExp(r'^FWV Schopf[^:]*: '), ''),
+      seit: j['seit'] == null ? null : DateTime.tryParse('${j['seit']}')?.toLocal(),
+      schaut: name.isEmpty ? null : name,
+      schautSeit: s is Map && s['zeit'] != null
+          ? DateTime.tryParse('${s['zeit']}')?.toLocal()
+          : null,
+      vorOrt: s is Map && s['vor_ort'] == true,
+    );
+  }
+
+  final String schluessel;
+  final String text;
+  final DateTime? seit;
+
+  /// Name dessen, der nachschaut; null: noch niemand.
+  final String? schaut;
+  final DateTime? schautSeit;
+
+  /// [schaut] hat den Sticker am Geraet gescannt.
+  final bool vorOrt;
 }

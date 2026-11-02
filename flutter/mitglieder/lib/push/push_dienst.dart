@@ -17,6 +17,12 @@
 //  - Andere Mitteilungen fuehren zum Anlass (`data.eventId`), ins Profil
 //    (`data.ziel`) oder zeigen sich ohne Ziel nochmals als Dialog
 //    ([PushZiel.ausDaten]). Titel und Text gehen dafuer mit ([mitText]).
+//  - Tiefkuehler-Alarm (`notificationType` kuehler_alarm, src/index.js
+//    sendAlarmPush): Die App meldet beim Token `alarm_knopf` und bekommt
+//    dann reine Daten-Pushes. Sie zeigt sie selbst - auch im Hintergrund
+//    ([pushImHintergrund]) - im lauten Kanal "fwv_alarm" mit dem Knopf
+//    «Ich gehe schauen». Der Knopf oeffnet die App ([KuehlerAlarmZiel]),
+//    die es dem Server meldet; die anderen erfahren es per Push und SMS.
 //  - Beim Abmelden wird das Token beim Backend abgemeldet
 //    (`DELETE members/me/fcm-token`) und auf dem Geraet verworfen — so kommt
 //    auch dann nichts mehr an, wenn das Abmelden beim Backend scheitert (das
@@ -68,6 +74,9 @@ sealed class PushZiel {
     final art = wert('notificationType');
     // "Im Schopf laeuft ..." - nur die App oeffnen.
     if (art == 'schopf_musik') return null;
+    if (art == 'kuehler_alarm') {
+      return KuehlerAlarmZiel(schluessel: wert('schluessel'), schauen: wert('aktion') == 'schauen');
+    }
     if (art != null && art.startsWith('vorstand_')) {
       return VorstandZiel(
         // Ohne Bereich (aeltere Backends): wenigstens der Reiter Vorstand.
@@ -149,6 +158,26 @@ final class ProfilZiel extends PushZiel {
   String toString() => 'ProfilZiel(beitraege: $beitraege, $titel)';
 }
 
+/// Tiefkuehler-Alarm: Reiter Schopf. Bei [schauen] (Knopf «Ich gehe
+/// schauen» in der Mitteilung) meldet die App es dem Server.
+final class KuehlerAlarmZiel extends PushZiel {
+  const KuehlerAlarmZiel({this.schluessel, this.schauen = false});
+
+  /// Der Fall, z.B. "kuehler:eis:warm".
+  final String? schluessel;
+  final bool schauen;
+
+  @override
+  bool operator ==(Object other) =>
+      other is KuehlerAlarmZiel && other.schluessel == schluessel && other.schauen == schauen;
+
+  @override
+  int get hashCode => Object.hash(schluessel, schauen);
+
+  @override
+  String toString() => 'KuehlerAlarmZiel($schluessel, schauen: $schauen)';
+}
+
 /// Ohne Ziel: die Mitteilung nach dem Oeffnen nochmals als Dialog, damit
 /// sie nicht verloren geht.
 final class MitteilungZiel extends PushZiel {
@@ -181,6 +210,83 @@ Map<String, Object?> mitText(Map<String, Object?> daten, {String? titel, String?
   if (titel != null && daten['title'] == null) 'title': titel,
   if (text != null && daten['body'] == null) 'body': text,
 };
+
+/// Lauter Kanal fuer den Tiefkuehler-Alarm.
+const alarmKanal = AndroidNotificationChannel(
+  'fwv_alarm',
+  'Tiefkühler-Alarm',
+  description: 'Tiefkühler im Roten Schopf zu warm, aus oder nicht erreichbar',
+  importance: Importance.max,
+);
+
+/// Kennung des Knopfs «Ich gehe schauen».
+const schauenAktion = 'schauen';
+
+/// Mitteilungs-Id je Fall: eine Erinnerung ersetzt die alte Mitteilung.
+int alarmMitteilungsId(String? schluessel) {
+  var h = 17;
+  for (final c in (schluessel ?? 'alarm').codeUnits) {
+    h = (h * 31 + c) & 0x3fffffff;
+  }
+  return h;
+}
+
+/// Zeigt einen Tiefkuehler-Alarm (Daten-Push) - aus der laufenden App und
+/// aus [pushImHintergrund]. Knopf nur, solange der Fall offen ist.
+Future<void> alarmZeigen(FlutterLocalNotificationsPlugin anzeige, Map<String, Object?> daten) {
+  final titel = '${daten['title'] ?? 'Tiefkühler-Alarm'}';
+  final text = '${daten['body'] ?? ''}';
+  final offen = daten['alarm'] == 'alarm' || daten['alarm'] == 'erinnerung';
+  return anzeige.show(
+    id: alarmMitteilungsId('${daten['schluessel']}'),
+    title: titel,
+    body: text,
+    payload: jsonEncode(daten),
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        alarmKanal.id,
+        alarmKanal.name,
+        channelDescription: alarmKanal.description,
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: 'ic_benachrichtigung',
+        styleInformation: BigTextStyleInformation(text),
+        actions: [
+          if (offen)
+            const AndroidNotificationAction(
+              schauenAktion,
+              'Ich gehe schauen',
+              // Oeffnet die App: dort ist die Anmeldung fuer den Aufruf.
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Push, waehrend die App nicht laeuft (eigener Isolat). Nur Tiefkuehler-
+/// Alarme: alle anderen Pushes haben `notification` und zeigt Android selbst.
+@pragma('vm:entry-point')
+Future<void> pushImHintergrund(RemoteMessage n) async {
+  if (n.data['notificationType'] != 'kuehler_alarm') return;
+  final anzeige = FlutterLocalNotificationsPlugin();
+  await anzeige.initialize(
+    settings: const InitializationSettings(
+      android: AndroidInitializationSettings('ic_benachrichtigung'),
+    ),
+  );
+  await anzeige
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(alarmKanal);
+  await alarmZeigen(anzeige, n.data);
+}
+
+/// Daten der angetippten Mitteilung; mit dem Knopf «Ich gehe schauen»
+/// zusaetzlich `aktion`.
+Map<String, Object?> mitAktion(Map<String, Object?> daten, String? aktion) =>
+    aktion == null || aktion.isEmpty ? daten : {...daten, 'aktion': aktion};
 
 /// Ob dieses Geraet Mitteilungen anzeigen darf.
 enum PushErlaubnis { erlaubt, abgelehnt, nichtGefragt, nichtVerfuegbar }
@@ -304,12 +410,15 @@ class FirebasePush implements PushDienst {
         ),
         // Angetippt, waehrend die App lief (selbst gezeigt, siehe
         // _imVordergrund): die Daten stecken im payload.
-        onDidReceiveNotificationResponse: (antwort) => _angetipptPayload(antwort.payload),
+        onDidReceiveNotificationResponse: (antwort) =>
+            _angetipptPayload(antwort.payload, aktion: antwort.actionId),
       );
       final android = _anzeige
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await android?.createNotificationChannel(kanal);
       await android?.createNotificationChannel(vorstandKanal);
+      await android?.createNotificationChannel(alarmKanal);
+      if (Platform.isAndroid) FirebaseMessaging.onBackgroundMessage(pushImHintergrund);
       // iOS zeigt Nachrichten im Vordergrund selbst an, wenn man es sagt.
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -330,7 +439,8 @@ class FirebasePush implements PushDienst {
       } else if (Platform.isAndroid) {
         final details = await _anzeige.getNotificationAppLaunchDetails();
         if (details?.didNotificationLaunchApp ?? false) {
-          _angetipptPayload(details!.notificationResponse?.payload);
+          final antwort = details!.notificationResponse;
+          _angetipptPayload(antwort?.payload, aktion: antwort?.actionId);
         }
       }
     } on Object catch (e) {
@@ -355,6 +465,15 @@ class FirebasePush implements PushDienst {
     // "Im Schopf laeuft ..." zeigt Android selbst als Mini-Player oben
     // (android/.../schopf/SchopfPlayer.kt) - hier nichts tun.
     if (n.data['notificationType'] == 'schopf_musik') return;
+    if (n.data['notificationType'] == 'kuehler_alarm') {
+      unawaited(
+        alarmZeigen(
+          _anzeige,
+          mitText(n.data, titel: n.notification?.title, text: n.notification?.body),
+        ),
+      );
+      return;
+    }
     final titel = n.notification?.title ?? n.data['title'] ?? 'FWV Raura';
     final text = n.notification?.body ?? n.data['body'] ?? '';
     final k = istVorstandMitteilung(n.data) ? vorstandKanal : kanal;
@@ -391,11 +510,11 @@ class FirebasePush implements PushDienst {
     }
   }
 
-  void _angetipptPayload(String? payload) {
+  void _angetipptPayload(String? payload, {String? aktion}) {
     if (payload == null || payload.isEmpty) return;
     try {
       final daten = jsonDecode(payload);
-      if (daten is Map) _angetippt(daten.cast<String, Object?>());
+      if (daten is Map) _angetippt(mitAktion(daten.cast<String, Object?>(), aktion));
     } on FormatException {
       // Aeltere Mitteilungen ohne Daten: nur die App oeffnen.
     }
@@ -498,7 +617,11 @@ class PushAnmeldung {
         token: t,
         geraeteId: await geraeteId(),
         plattform: push.plattform,
-        geraet: await geraet?.call() ?? const {},
+        geraet: {
+          ...await geraet?.call() ?? const {},
+          // Tiefkuehler-Alarm als Daten-Push mit Knopf ([alarmZeigen]).
+          if (push.plattform == 'android') 'alarm_knopf': true,
+        },
       );
       _angemeldet = t;
     } on Object catch (e) {

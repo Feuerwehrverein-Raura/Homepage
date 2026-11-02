@@ -36,6 +36,7 @@ class RoterSchopfScreen extends StatefulWidget {
     this.musik,
     this.bildschirm,
     this.alarmSchalten = false,
+    this.qrScannen,
   });
 
   final RoterSchopfZugang zugang;
@@ -49,6 +50,10 @@ class RoterSchopfScreen extends StatefulWidget {
   /// SMS-Alarm der Tiefkuehler scharf stellen und entschaerfen (Gruppe
   /// Roter Schopf, Vorstand, admin - nicht mit blossem Schicht-Zugang).
   final bool alarmSchalten;
+
+  /// Kamera fuer den Vor-Ort-Sticker am Tiefkuehler: liefert den Inhalt des
+  /// QR-Codes (null: abgebrochen). Ohne: kein Knopf "Vor Ort".
+  final Future<String?> Function()? qrScannen;
 
   /// Zeile oben, z.B. "Fuer deine Schicht Bar bis 01:00" (Zugang nur wegen
   /// der Schicht).
@@ -214,7 +219,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
         if (z.hauptmessung != null) ...[const _Kopf('Strom'), _StromKarte(z.hauptmessung!)],
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
-          if (widget.alarmSchalten) _AlarmKarte(zugang: widget.zugang),
+          if (widget.alarmSchalten) _AlarmKarte(zugang: widget.zugang, qrScannen: widget.qrScannen),
           for (final k in z.kuehlung) _KuehlerKarte(k),
         ],
         if (z.thermostate.isNotEmpty) ...[
@@ -464,9 +469,10 @@ class _StromKarte extends StatelessWidget {
 /// SMS-Alarm: scharf oder entschaerft. Entschaerfen immer mit Dauer, damit
 /// niemand das Wiedereinschalten vergisst (etwa nach dem Abtauen).
 class _AlarmKarte extends StatefulWidget {
-  const _AlarmKarte({required this.zugang});
+  const _AlarmKarte({required this.zugang, this.qrScannen});
 
   final RoterSchopfZugang zugang;
+  final Future<String?> Function()? qrScannen;
 
   @override
   State<_AlarmKarte> createState() => _AlarmKarteState();
@@ -540,6 +546,32 @@ class _AlarmKarteState extends State<_AlarmKarte> {
     }
   }
 
+  /// Mit [vorOrt]: zuerst den Sticker am Geraet scannen.
+  Future<void> _schauen(OffenerAlarm f, {bool vorOrt = false}) async {
+    String? sticker;
+    if (vorOrt) {
+      sticker = await widget.qrScannen?.call();
+      if (sticker == null || !mounted) return;
+    }
+    setState(() => _schaltet = true);
+    try {
+      final a = await widget.zugang.kuehlerAlarmSchauen(f.schluessel, sticker);
+      if (mounted) setState(() => _alarm = a);
+      if (mounted) {
+        meldung(
+          context,
+          vorOrt
+              ? 'Vor Ort bestätigt – nächste Erinnerung erst in 12 Stunden'
+              : 'Die anderen wissen jetzt, dass du schauen gehst',
+        );
+      }
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _schaltet = false);
+    }
+  }
+
   static String _zeit(DateTime t) {
     final heute = DateTime.now();
     final uhr = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -565,7 +597,7 @@ class _AlarmKarteState extends State<_AlarmKarte> {
         : a.bis == null
         ? 'SMS-Alarm entschärft'
         : 'SMS-Alarm entschärft bis ${_zeit(a.bis!)}';
-    return Card(
+    final schalter = Card(
       key: const Key('kuehler-alarm'),
       color: a.scharf || !a.aktiv ? null : farben.errorContainer,
       child: SwitchListTile(
@@ -584,6 +616,67 @@ class _AlarmKarteState extends State<_AlarmKarte> {
         value: a.scharf,
         onChanged: _schaltet || !a.aktiv ? null : _umschalten,
       ),
+    );
+    if (a.offen.isEmpty) return schalter;
+    return Column(
+      children: [
+        for (final f in a.offen)
+          Card(
+            key: Key('alarm-offen-${f.schluessel}'),
+            color: farben.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: farben.onErrorContainer),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          f.text,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(color: farben.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    f.schaut == null
+                        ? 'Noch niemand schaut nach'
+                        : '${f.schaut} ${f.vorOrt ? 'war vor Ort' : 'schaut nach'}${f.schautSeit == null ? '' : ' (seit ${_zeit(f.schautSeit!)})'}',
+                    style: TextStyle(color: farben.onErrorContainer),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (!f.vorOrt)
+                        OutlinedButton.icon(
+                          key: Key('schauen-${f.schluessel}'),
+                          onPressed: _schaltet ? null : () => _schauen(f),
+                          icon: const Icon(Icons.directions_walk),
+                          label: Text(f.schaut == null ? 'Ich gehe schauen' : 'Ich gehe auch'),
+                        ),
+                      if (widget.qrScannen != null)
+                        FilledButton.icon(
+                          key: Key('vor-ort-${f.schluessel}'),
+                          onPressed: _schaltet ? null : () => _schauen(f, vorOrt: true),
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: const Text('Vor Ort: Sticker scannen'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        schalter,
+      ],
     );
   }
 }

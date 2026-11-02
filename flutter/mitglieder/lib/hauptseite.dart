@@ -18,10 +18,12 @@
 // Eine angetippte Push-Mitteilung ([Dienste.pushZiel], [PushZiel]) fuehrt
 // hierher: Vorstand-Mitteilungen in den Reiter Vorstand, Anlass-Mitteilungen
 // in den Reiter Anlaesse mit der Detailseite, Profil/Beitraege in den Reiter
-// Profil; ohne Ziel zeigt ein Dialog die Mitteilung nochmals.
+// Profil, Tiefkuehler-Alarme in den Reiter Schopf («Ich gehe schauen» meldet
+// es dem Server); ohne Ziel zeigt ein Dialog die Mitteilung nochmals.
 
 import 'dart:async';
 
+import 'package:fwv_anlass/fwv_anlass.dart' show fehlerText;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen, hatRoterSchopfZugang;
 import 'package:fwv_vorstand/fwv_vorstand.dart' show istVorstand;
@@ -142,6 +144,7 @@ class _HauptseiteState extends State<Hauptseite> {
     AnlassZiel() => Reiter.anlaesse,
     ProfilZiel() => _externerOrganisator ? null : Reiter.profil,
     MitteilungZiel() => null,
+    KuehlerAlarmZiel() => widget.dienste.roterSchopfSichtbar ? Reiter.roterSchopf : null,
   };
 
   /// Mitteilung angetippt. Vorstand: zum Reiter Vorstand (den Bereich waehlt
@@ -174,8 +177,24 @@ class _HauptseiteState extends State<Hauptseite> {
         }
       case MitteilungZiel(:final titel, :final text):
         unawaited(_mitteilungZeigen(titel, text));
+      case KuehlerAlarmZiel(:final schluessel, :final schauen):
+        if (schauen) unawaited(_schauenMelden(schluessel));
       case VorstandZiel():
         break;
+    }
+  }
+
+  /// Knopf «Ich gehe schauen» in der Mitteilung: dem Server melden (die
+  /// anderen bekommen Push und SMS).
+  Future<void> _schauenMelden(String? schluessel) async {
+    final bote = ScaffoldMessenger.maybeOf(context);
+    try {
+      await widget.dienste.roterSchopf.kuehlerAlarmSchauen(schluessel);
+      bote?.showSnackBar(
+        const SnackBar(content: Text('Die anderen wissen jetzt, dass du schauen gehst')),
+      );
+    } on Object catch (e) {
+      bote?.showSnackBar(SnackBar(content: Text('Nicht gemeldet: ${fehlerText(e)}')));
     }
   }
 
@@ -221,10 +240,10 @@ class _HauptseiteState extends State<Hauptseite> {
     Reiter.roterSchopf => RoterSchopfTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
     Reiter.musik => MusikScreen(
-        zugang: widget.dienste.musik,
-        player: widget.dienste.musikPlayer,
-        ergaenzen: hatRoterSchopfZugang(widget.dienste.sitzung.sitzung),
-      ),
+      zugang: widget.dienste.musik,
+      player: widget.dienste.musikPlayer,
+      ergaenzen: hatRoterSchopfZugang(widget.dienste.sitzung.sitzung),
+    ),
     Reiter.gruppen => GruppenScreen(zugang: GruppenZugang(widget.dienste.sitzung.api)),
     Reiter.einstellungen => EinstellungenTab(
       dienste: widget.dienste,

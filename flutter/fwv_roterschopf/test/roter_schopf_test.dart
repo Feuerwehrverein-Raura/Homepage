@@ -47,6 +47,30 @@ class _Zugang extends RoterSchopfZugang {
       geaendert: DateTime.now(),
     );
   }
+
+  final geschaut = <String?>[];
+
+  final gescannt = <String?>[];
+
+  @override
+  Future<KuehlerAlarm> kuehlerAlarmSchauen([String? schluessel, String? sticker]) async {
+    geschaut.add(schluessel);
+    gescannt.add(sticker);
+    return alarm = KuehlerAlarm.ausJson({
+      'scharf': true,
+      'offen': [
+        {
+          'schluessel': schluessel,
+          'text': 'FWV Schopf: Eis zu warm',
+          'schaut': {
+            'name': 'Stefan Müller',
+            'zeit': DateTime.now().toIso8601String(),
+            'vor_ort': sticker != null,
+          },
+        },
+      ],
+    });
+  }
 }
 
 void main() {
@@ -81,14 +105,18 @@ void main() {
     expect(trv.fehler, ['not_calibrated']);
   });
 
-  Future<_Zugang> zeigen(WidgetTester tester, {bool alarm = false}) async {
+  Future<_Zugang> zeigen(WidgetTester tester, {bool alarm = false, String? scan}) async {
     final zugang = _Zugang(vertrag);
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
-        home: RoterSchopfScreen(zugang: zugang, alarmSchalten: alarm),
+        home: RoterSchopfScreen(
+          zugang: zugang,
+          alarmSchalten: alarm,
+          qrScannen: scan == null ? null : () async => scan,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -211,5 +239,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(z.alarmGesetzt.last, (false, null));
     expect(find.text('SMS-Alarm entschärft'), findsOneWidget);
+  });
+
+  testWidgets('Offener Alarm: wer nachschaut, Knopf "Ich gehe schauen"', (tester) async {
+    final z = await zeigen(tester, alarm: true);
+    z.alarm = KuehlerAlarm.ausJson({
+      'scharf': true,
+      'offen': [
+        {
+          'schluessel': 'kuehler:eis:warm',
+          'text': 'FWV Schopf, noch immer: Eis zu warm: -9 C',
+          'seit': '2026-11-02T13:00:00Z',
+        },
+      ],
+    });
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    expect(find.text('Eis zu warm: -9 C'), findsOneWidget);
+    expect(find.text('Noch niemand schaut nach'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('schauen-kuehler:eis:warm')));
+    await tester.pumpAndSettle();
+    expect(z.geschaut, ['kuehler:eis:warm']);
+    expect(find.textContaining('Stefan Müller schaut nach (seit'), findsOneWidget);
+    expect(find.text('Ich gehe auch'), findsOneWidget);
+    expect(find.text('Vor Ort: Sticker scannen'), findsNothing, reason: 'ohne Kamera kein Knopf');
+  });
+
+  testWidgets('Vor Ort: Sticker scannen geht mit dem Inhalt an den Server', (tester) async {
+    final z = await zeigen(
+      tester,
+      alarm: true,
+      scan: 'fwv-vor-ort:kuehler:eis:0123456789abcdef0123',
+    );
+    z.alarm = KuehlerAlarm.ausJson({
+      'scharf': true,
+      'offen': [
+        {'schluessel': 'kuehler:eis:warm', 'text': 'FWV Schopf: Eis zu warm'},
+      ],
+    });
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('vor-ort-kuehler:eis:warm')));
+    await tester.pumpAndSettle();
+    expect(z.gescannt, ['fwv-vor-ort:kuehler:eis:0123456789abcdef0123']);
+    expect(find.textContaining('Stefan Müller war vor Ort (seit'), findsOneWidget);
+    expect(find.text('Ich gehe auch'), findsNothing);
   });
 }

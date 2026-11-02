@@ -41,6 +41,27 @@ class _KeineAltdaten implements AltdatenQuelle {
 
 void main() {
   group('PushZiel.ausDaten', () {
+    test('Tiefkuehler-Alarm: Reiter Schopf, mit Knopf "Ich gehe schauen"', () {
+      expect(
+        PushZiel.ausDaten({'notificationType': 'kuehler_alarm', 'schluessel': 'kuehler:eis:warm'}),
+        const KuehlerAlarmZiel(schluessel: 'kuehler:eis:warm'),
+      );
+      expect(
+        PushZiel.ausDaten(
+          mitAktion({
+            'notificationType': 'kuehler_alarm',
+            'schluessel': 'kuehler:eis:warm',
+          }, schauenAktion),
+        ),
+        const KuehlerAlarmZiel(schluessel: 'kuehler:eis:warm', schauen: true),
+      );
+      expect(alarmMitteilungsId('kuehler:eis:warm'), alarmMitteilungsId('kuehler:eis:warm'));
+      expect(
+        alarmMitteilungsId('kuehler:eis:warm'),
+        isNot(alarmMitteilungsId('kuehler:landi:warm')),
+      );
+    });
+
     test('Anlass-Mitteilungen fuehren zum Anlass', () {
       for (final art in ['event_update', 'shift_reminder']) {
         expect(

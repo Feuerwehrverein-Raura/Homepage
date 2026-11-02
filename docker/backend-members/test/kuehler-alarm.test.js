@@ -118,3 +118,50 @@ test('Push-Titel je Meldung: Alarm, Erinnerung, Entwarnung', () => {
     assert.equal(pushTitel('erinnerung'), 'Tiefkühler-Alarm (Erinnerung)');
     assert.equal(pushTitel('entwarnung'), 'Tiefkühler: Entwarnung');
 });
+
+test('Vor Ort: Erinnerung erst 12 h danach; nur schauen gehen laesst die 4 h', () => {
+    const { mitSchauer, schauenText } = require('../src/kuehler-alarm');
+    const u = uhr();
+    const w = kuehlerAlarm({ jetzt: u.jetzt });
+    const warm = [{ ...EIS, temperatur: -9 }, LANDI];
+    w.pruefen(warm);
+    u.weiter(15 * MIN);
+    assert.equal(w.pruefen(warm)[0].art, 'alarm');
+    u.weiter(4 * 60 * MIN);
+    assert.equal(w.pruefen(warm)[0].art, 'erinnerung', 'ohne vor Ort: nach 4 h');
+    u.weiter(30 * MIN);
+    const vorOrt = new Map([['kuehler:eis:warm', u.jetzt()]]);
+    u.weiter(4 * 60 * MIN);
+    assert.deepEqual(w.pruefen(warm, vorOrt), [], 'jemand war vor Ort: keine Erinnerung nach 4 h');
+    u.weiter(8 * 60 * MIN - MIN);
+    assert.deepEqual(w.pruefen(warm, vorOrt), []);
+    u.weiter(MIN);
+    assert.equal(w.pruefen(warm, vorOrt)[0].art, 'erinnerung', '12 h nach vor Ort wieder');
+
+    assert.equal(mitSchauer('FWV Schopf, noch immer: X', { name: 'Hans Muster', zeit: '2026-11-02T13:05:00Z' }),
+        'FWV Schopf, noch immer: X - Hans Muster schaut nach (seit 14:05)');
+    assert.equal(mitSchauer('X', { name: 'Hans Muster', zeit: '2026-11-02T13:05:00Z', vor_ort: true }),
+        'X - Hans Muster war vor Ort (seit 14:05)');
+    assert.equal(mitSchauer('T', null), 'T');
+    assert.equal(schauenText('Hans Muster', 'FWV Schopf: Tiefkühlschrank Eis zu warm: -9 C (Grenze -12 C), seit 15 min'),
+        'FWV Schopf: Hans Muster geht schauen (Tiefkühlschrank Eis zu warm: -9 C (Grenze -12 C), seit 15 min)');
+    assert.equal(schauenText('Hans Muster', 'FWV Schopf: Eis zu warm', true), 'FWV Schopf: Hans Muster ist vor Ort (Eis zu warm)');
+});
+
+test('Vor-Ort-Sticker: nur echte Codes, nur fuer das betroffene Geraet', () => {
+    const { stickerInhalt, stickerPruefen, stickerPasst } = require('../src/kuehler-alarm');
+    const g = 'a'.repeat(48);
+    const eis = stickerInhalt(g, 'kuehler:eis');
+    assert.match(eis, /^fwv-vor-ort:kuehler:eis:[0-9a-f]{20}$/);
+    assert.equal(stickerPruefen(g, eis), 'kuehler:eis');
+    assert.equal(stickerPruefen(g, ` ${eis}\n`), 'kuehler:eis');
+    assert.equal(stickerPruefen('b'.repeat(48), eis), null, 'anderes Geheimnis');
+    assert.equal(stickerPruefen(g, eis.replace('kuehler:eis', 'kuehler:landi')), null, 'Code eines anderen Geraets');
+    assert.equal(stickerPruefen(g, 'fwv-vor-ort:kuehler:eis:00000000000000000000'), null);
+    assert.equal(stickerPruefen(g, 'https://example.com'), null);
+    assert.equal(stickerPruefen(null, eis), null);
+    assert.equal(stickerPasst('kuehler:eis', 'kuehler:eis:warm'), true);
+    assert.equal(stickerPasst('kuehler:eis', 'kuehler:eisberg:warm'), false);
+    assert.equal(stickerPasst('kuehler:eis', 'kuehler:landi:aus'), false);
+    assert.equal(stickerPasst('kuehler:landi', 'schopf:weg'), true);
+});

@@ -7,6 +7,7 @@
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../anmeldung/qr_scanner_screen.dart';
 import '../dienste.dart';
 import '../einstellungen/bildschirm.dart';
 
@@ -27,6 +28,10 @@ class RoterSchopfTab extends StatelessWidget {
       bildschirm: () => bildschirmOeffnen(context, dienste),
       // SMS-Alarm der Tiefkuehler schalten: nur mit Gruppe, nicht per Schicht.
       alarmSchalten: hatRoterSchopfZugang(dienste.sitzung.sitzung),
+      // "Ich bin vor Ort": QR-Sticker am Tiefkuehler mit der App scannen.
+      qrScannen: () =>
+          Navigator.of(context)
+              .push<String>(MaterialPageRoute(builder: (_) => const QrScannerScreen())),
     ),
   );
 }

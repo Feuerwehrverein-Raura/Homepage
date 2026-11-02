@@ -13,7 +13,7 @@
 //            (alle weg: EINE SMS "Schopf nicht erreichbar")
 //
 // Je Fall eine SMS; haelt er an, alle 4 Stunden eine Erinnerung; ist er
-// vorbei, eine Entwarnung. 0 W bei eingeschaltetem Relais ist KEIN Fall:
+// vorbei, eine Entwarnung. Ist jemand vor Ort, ruht die Erinnerung 12 h. 0 W bei eingeschaltetem Relais ist KEIN Fall:
 // Der Kompressor taktet.
 //
 // Verschickt wird nicht von hier: Die SMS kommen in eine Warteschlange, die
@@ -25,6 +25,10 @@
 const MINUTE = 60 * 1000;
 const SCHWELLE_MS = { warm: 15 * MINUTE, aus: 10 * MINUTE, fuehler: 15 * MINUTE, weg: 30 * MINUTE };
 const ERINNERUNG_MS = 4 * 60 * MINUTE;
+// "Ich gehe schauen" aendert nichts an den 4 h (die Erinnerung nennt nur
+// den Namen). Erst wer "Ich bin vor Ort" bestaetigt, verschiebt die naechste
+// Erinnerung auf 12 h danach (Stefan, 02.11.2026).
+const VOR_ORT_MS = 12 * 60 * MINUTE;
 
 function zahl(t) {
     return typeof t === 'number' ? `${Math.round(t * 10) / 10}`.replace('.', ',') : '?';
@@ -69,6 +73,7 @@ function dauer(ms) {
 /**
  * Der Waechter. pruefen(kuehlung) gibt die Meldungen zurueck, die jetzt
  * hinausgehen sollen: [{ art: 'alarm'|'erinnerung'|'entwarnung', schluessel, text }].
+ * [vorOrt]: Schluessel -> Zeit (ms), seit der jemand vor Ort bestaetigt hat.
  * [gemeldet]: Faelle, die vor einem Neustart schon gemeldet wurden
  * (Schluessel -> Zeit), damit nach dem Neustart nicht nochmals eine SMS kommt.
  */
@@ -78,7 +83,7 @@ function kuehlerAlarm({ jetzt = Date.now, gemeldet = new Map() } = {}) {
         stand.set(schluessel, { seit: zeit, gemeldet: zeit, fall: null });
     }
 
-    function pruefen(kuehlung) {
+    function pruefen(kuehlung, vorOrt = new Map()) {
         const t = jetzt();
         const offen = faelle(kuehlung);
         const meldungen = [];
@@ -91,7 +96,8 @@ function kuehlerAlarm({ jetzt = Date.now, gemeldet = new Map() } = {}) {
                     s.gemeldet = t;
                     meldungen.push({ art: 'alarm', schluessel, text: `FWV Schopf: ${fall.text}, seit ${dauer(t - s.seit)}` });
                 }
-            } else if (t - s.gemeldet >= ERINNERUNG_MS) {
+            } else if (t - s.gemeldet >= ERINNERUNG_MS
+                       && !(t - (vorOrt.get(schluessel) ?? -Infinity) < VOR_ORT_MS)) {
                 s.gemeldet = t;
                 meldungen.push({ art: 'erinnerung', schluessel, text: `FWV Schopf, noch immer: ${fall.text} (seit ${dauer(t - s.seit)})` });
             }
@@ -150,6 +156,46 @@ function alarmEmpfaenger(mitglieder) {
     return [...nummern].map(([nummer, name]) => ({ nummer, name }));
 }
 
+// Sticker am Geraet: "Ich bin vor Ort" nur mit dem gescannten Code des
+// betroffenen Tiefkuehlers - so schummelt niemand vom Sofa aus. Der Code ist
+// ein HMAC der Messstelle mit dem Geheimnis aus kiosk_alarm_einstellung.
+const STICKER_PRAEFIX = 'fwv-vor-ort:';
+
+function stickerCode(geheimnis, messstelle) {
+    return require('crypto').createHmac('sha256', geheimnis).update(messstelle).digest('hex').slice(0, 20);
+}
+
+/** Inhalt des QR-Codes: "fwv-vor-ort:kuehler:eis:<code>". */
+function stickerInhalt(geheimnis, messstelle) {
+    return `${STICKER_PRAEFIX}${messstelle}:${stickerCode(geheimnis, messstelle)}`;
+}
+
+/** Messstelle eines gescannten Stickers, oder null, wenn er nicht echt ist. */
+function stickerPruefen(geheimnis, inhalt) {
+    const m = /^fwv-vor-ort:(.+):([0-9a-f]{20})$/.exec(String(inhalt || '').trim());
+    if (!m || !geheimnis) return null;
+    const soll = Buffer.from(stickerCode(geheimnis, m[1]));
+    const ist = Buffer.from(m[2]);
+    return soll.length === ist.length && require('crypto').timingSafeEqual(soll, ist) ? m[1] : null;
+}
+
+/** Gehoert der Fall zu diesem Geraet? "Schopf nicht erreichbar" passt zu jedem. */
+function stickerPasst(messstelle, schluessel) {
+    return schluessel === 'schopf:weg' || String(schluessel).startsWith(`${messstelle}:`);
+}
+
+/** "Hans Muster geht schauen (...)" bzw. "... ist vor Ort (...)" - an alle anderen. */
+function schauenText(name, falltext, vorOrt = false) {
+    return `FWV Schopf: ${name || 'Jemand'} ${vorOrt ? 'ist vor Ort' : 'geht schauen'}${falltext ? ` (${falltext.replace(/^FWV Schopf[^:]*: /, '')})` : ''}`;
+}
+
+/** Erinnerung mit dem, der nachschaut: "... - Hans Muster schaut nach (seit 14:05)". */
+function mitSchauer(text, schauer) {
+    if (!schauer) return text;
+    const zeit = new Date(schauer.zeit).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' });
+    return `${text} - ${schauer.name} ${schauer.vor_ort ? 'war vor Ort' : 'schaut nach'} (seit ${zeit})`;
+}
+
 /** Titel des App-Pushs zur Meldung (der Text ist derselbe wie in der SMS). */
 function pushTitel(art) {
     if (art === 'entwarnung') return 'Tiefkühler: Entwarnung';
@@ -158,7 +204,7 @@ function pushTitel(art) {
 }
 
 module.exports = {
-    pushTitel,
+    VOR_ORT_MS, pushTitel, stickerInhalt, stickerPruefen, stickerPasst, schauenText, mitSchauer,
     faelle, kuehlerAlarm, smsNummer, alarmBenutzer, alarmEmpfaenger,
     SCHWELLE_MS, ERINNERUNG_MS, ALARM_GRUPPEN,
 };
