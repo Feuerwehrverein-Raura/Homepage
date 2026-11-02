@@ -7,8 +7,10 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-const _versionenUrl = 'https://www.fwv-raura.ch/download/versionen.json';
-const _apkUrl = 'https://www.fwv-raura.ch/download/';
+/// Ablage der APKs; fuer Tests umstellbar (--dart-define KASSE_DOWNLOAD=...).
+const downloadUrl = String.fromEnvironment('KASSE_DOWNLOAD', defaultValue: 'https://www.fwv-raura.ch/download');
+const _versionenUrl = '$downloadUrl/versionen.json';
+const _apkUrl = '$downloadUrl/';
 const _kanal = MethodChannel('ch.fwvraura.kasse/update');
 
 class NeueVersion {

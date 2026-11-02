@@ -66,12 +66,24 @@ curl -sI https://www.fwv-raura.ch/download/kasse.apk | grep -i content-type
 Kuechen-Schluessel signiert: Secrets `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`,
 Alias `kds`). versionCode = X*1000+Y*100+Z - die fruehere TWA-Huelle war
 kasse-v1.0 (Code 1000), deshalb installiert sich 2.x direkt darueber.
-Eine einzige App, laeuft im Single-App-Kiosk (Fully). Ab 2.3 aktualisiert
+Eine einzige App, lief bisher im Single-App-Kiosk (Fully). Ab 2.3 aktualisiert
 sie sich selbst: `lib/src/updater.dart` liest `/download/versionen.json`
 (Version + SHA-256), `MainActivity.kt` laedt, prueft und oeffnet den
 Installer (Banner, nur bei leerem Warenkorb). Die Datei
 `order.fwv-raura.ch/.well-known/assetlinks.json` stammt noch von der
 TWA-Huelle und schadet nicht.
+
+**Geraetesperre statt Fully (Kasse und Kueche, ab Nov. 2026):** Ist die App
+per adb Geraetebesitzer (`adb shell dpm set-device-owner
+ch.fwvraura.kasse/.KioskAdmin` bzw. `ch.fwvraura.kitchendisplay/.KioskAdmin`,
+kein Google-Konto auf dem Geraet, Fully vorher entfernen), sperrt sie das
+Tablet selbst (Lock Task, fester Startbildschirm, keine Statusleiste,
+startet nach Neustart/Update) und installiert Updates still: die Kasse bei
+leerem Warenkorb nach 3 min Ruhe, die Kueche ohne offene Bestellung.
+Verlassen/Aufheben mit Kiosk-Code (Standard 9876). Im Emulator testen:
+AVD `kueche-tablet7` (Android 7.1, 10 Zoll), Update-Adresse mit
+`--dart-define KASSE_DOWNLOAD` / `KUECHE_DOWNLOAD` auf einen lokalen
+`python3 -m http.server` umbiegen (adb reverse).
 
 ## Neue App aufnehmen
 

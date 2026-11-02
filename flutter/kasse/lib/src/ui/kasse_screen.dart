@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../kacheln.dart';
 import '../kasse_api.dart';
+import '../kiosk.dart';
 import '../protokoll.dart';
 import 'anmeldung.dart' show knopfRot;
 import '../updater.dart';
@@ -52,6 +53,12 @@ class _KasseScreenState extends State<KasseScreen> {
   bool _updateLaeuft = false;
   int _updateProzent = 0;
   bool _updateFehler = false;
+
+  /// Geraetesperre (src/kiosk.dart): Updates still und von selbst, wenn die
+  /// Kasse ruht - leerer Warenkorb und 3 min niemand getippt.
+  bool _still = false;
+  DateTime _letzteBedienung = DateTime.now();
+  DateTime? _letzterVersuch;
   bool get _tischeSichtbar =>
       (_anlass?.hatService ?? false) || _offeneTische > 0;
 
@@ -97,6 +104,8 @@ class _KasseScreenState extends State<KasseScreen> {
     eigeneVersion().then((v) => mounted ? setState(() => _version = v) : null);
     // wie die Kuechen-App: kurz nach dem Start, dann regelmaessig
     _takte.add(Timer(const Duration(seconds: 15), _updateSuchen));
+    sperre().then((s) => _still = s.besitzer);
+    _takte.add(Timer.periodic(const Duration(minutes: 1), (_) => _vonSelbstAktualisieren()));
     _takte.add(
       Timer.periodic(const Duration(minutes: 30), (_) => _updateSuchen()),
     );
@@ -205,6 +214,17 @@ class _KasseScreenState extends State<KasseScreen> {
     if (melden && u == null) {
       _meldung('Kassen-App ${_version ?? ''} ist aktuell');
     }
+  }
+
+  void _vonSelbstAktualisieren() {
+    final jetzt = DateTime.now();
+    if (!_still || _update == null || _updateLaeuft || _korb.isNotEmpty || _sendet) return;
+    if (jetzt.difference(_letzteBedienung) < const Duration(minutes: 3)) return;
+    // ein misslungener Versuch wiederholt sich hoechstens stuendlich
+    if (_letzterVersuch != null && jetzt.difference(_letzterVersuch!) < const Duration(hours: 1)) return;
+    _letzterVersuch = jetzt;
+    protokoll('update_von_selbst', meldung: _update!.version);
+    _updateInstallieren();
   }
 
   Future<void> _updateInstallieren() async {
@@ -594,7 +614,9 @@ class _KasseScreenState extends State<KasseScreen> {
     final breit = MediaQuery.sizeOf(context).width >= 900;
     // Zurueck-Taste schliesst die Kasse nicht (Warenkorb ginge verloren);
     // im Reiter Tische fuehrt sie zurueck zur Kasse.
-    return PopScope(
+    return Listener(
+      onPointerDown: (_) => _letzteBedienung = DateTime.now(),
+      child: PopScope(
       canPop: false,
       onPopInvokedWithResult: (hatGepoppt, _) {
         if (!hatGepoppt && _reiter != 0) setState(() => _reiter = 0);
@@ -695,6 +717,7 @@ class _KasseScreenState extends State<KasseScreen> {
             Expanded(child: _inhalt(breit)),
           ],
         ),
+      ),
       ),
     );
   }

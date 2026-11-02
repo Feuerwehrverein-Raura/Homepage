@@ -3,8 +3,10 @@
 // TWINT-QR, Kacheln (Reihenfolge, meistverkauft zuerst), Speichern, Abmelden.
 // Als Reiter in der Kasse eingebettet (kasse_screen.dart).
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../kasse_api.dart';
+import '../kiosk.dart';
 import '../protokoll.dart';
 import 'anmeldung.dart' show knopfRot;
 
@@ -35,6 +37,7 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
   bool _laedt = true;
   bool _speichert = false;
   bool? _barlicht;
+  ({bool besitzer, bool aktiv})? _sperre;
   Map<String, dynamic>? _anlass;
   List<Map<String, dynamic>> _anlaesse = [];
   final _kartenVon = TextEditingController(text: '1');
@@ -48,6 +51,7 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
   void initState() {
     super.initState();
     _laden();
+    sperre().then((s) => mounted ? setState(() => _sperre = s) : null);
   }
 
   @override
@@ -120,6 +124,103 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
   }
 
   // ---- Bausteine -------------------------------------------------------------
+  /// Kiosk-Code abfragen; falscher Code schliesst ohne Hinweis (wie die Kueche).
+  Future<bool> _codeStimmt() async {
+    final eingabe = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Kiosk-Code'),
+        content: TextField(
+          key: const Key('kiosk-code'),
+          controller: eingabe,
+          autofocus: true,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onSubmitted: (_) => Navigator.pop(c, true),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('OK')),
+        ],
+      ),
+    );
+    return ok == true && eingabe.text.trim() == await kioskCode();
+  }
+
+  Widget _geraetesperre() {
+    final besitzer = _sperre?.besitzer ?? false;
+    return _karte(
+      '🔒 Gerätesperre',
+      text: besitzer
+          ? 'Aktiv: nur die Kasse, keine Statusleiste, startet von selbst, Updates ohne Rückfrage, '
+              'sobald die Kasse 3 min ruht.'
+          : 'Nicht eingerichtet. Ersetzt Fully Kiosk – einmal per USB am Computer: '
+              'adb shell dpm set-device-owner ch.fwvraura.kasse/.KioskAdmin',
+      [
+        if (besitzer) ...[
+          OutlinedButton.icon(
+            icon: const Icon(Icons.logout),
+            label: const Text('Kasse verlassen (z. B. für WLAN)'),
+            onPressed: () async {
+              if (!await _codeStimmt()) return;
+              protokoll('kiosk_verlassen');
+              await kasseVerlassen();
+            },
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.pin),
+            label: const Text('Kiosk-Code ändern'),
+            onPressed: () async {
+              if (!await _codeStimmt() || !mounted) return;
+              final neu = TextEditingController();
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: const Text('Neuer Kiosk-Code (mindestens 4 Ziffern)'),
+                  content: TextField(
+                    controller: neu,
+                    autofocus: true,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Abbrechen')),
+                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Speichern')),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              if (neu.text.trim().length < 4) {
+                _meldung('Mindestens 4 Ziffern', fehler: true);
+                return;
+              }
+              await kioskCodeSetzen(neu.text);
+              _meldung('Kiosk-Code geändert');
+            },
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: knopfRot),
+            icon: const Icon(Icons.lock_open),
+            label: const Text('Gerätesperre aufheben'),
+            onPressed: () async {
+              if (!await _codeStimmt()) return;
+              protokoll('kiosk_aufgehoben');
+              await sperreAufheben();
+              final s = await sperre();
+              if (mounted) setState(() => _sperre = s);
+              _meldung('Gerätesperre aufgehoben – wieder einrichten nur per adb');
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _karte(String titel, List<Widget> inhalt, {String? text}) => Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: Padding(
@@ -188,6 +289,7 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
           const SizedBox(height: 12),
           OutlinedButton.icon(icon: const Icon(Icons.system_update), label: const Text('Auf Update prüfen'), onPressed: widget.updatePruefen),
         ]),
+        _geraetesperre(),
         _karte('🎫 Anmeldebon für ein Gerät', text: 'Druckt am Bar-Drucker einen QR-Bon, mit dem sich ein weiteres Gerät einmal als Kasse anmeldet (gilt eine Stunde).', [
           FilledButton.icon(
             icon: const Icon(Icons.print),
