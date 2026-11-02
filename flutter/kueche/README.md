@@ -37,7 +37,10 @@ Konto überspringen.
     adb install kueche.apk          # falls noch nicht installiert
     adb shell dpm set-device-owner ch.fwvraura.kitchendisplay/.KioskAdmin
 
-Verlassen: Logo 3 s halten, dann den Code eingeben und «App beenden» wählen
-(die Sperre gilt bis zum nächsten Start). Ganz aufheben geht über
+Updates installiert die App dann von selbst, aber nur ohne offene Bestellung.
+
+Verlassen (z. B. für WLAN): Logo 3 s halten, Code eingeben, «App beenden».
+Home und Statusleiste sind dann frei, bis das Tablet neu startet oder jemand
+die App öffnet. Ganz aufheben geht über
 Einstellungen › «Gerätesperre», danach ist es wieder eine gewöhnliche App.
 Solange die Sperre gilt, lässt sich die App nicht deinstallieren.

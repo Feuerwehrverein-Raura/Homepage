@@ -81,6 +81,9 @@ class Logo extends StatelessWidget {
       'assets/logo.png',
       width: groesse,
       height: groesse,
+      // 800 px auf 48 px: in Zielgroesse dekodieren, sonst wirkt es verwaschen
+      cacheWidth: (groesse * MediaQuery.devicePixelRatioOf(context)).round(),
+      filterQuality: FilterQuality.high,
       fit: BoxFit.cover,
       errorBuilder: (_, _, _) => Icon(Icons.restaurant, size: groesse * 0.7),
     ),

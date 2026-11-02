@@ -210,8 +210,9 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
 
   Widget _kopf(BuildContext context) {
     final verbunden = _s.verbunden;
+    // rot wie in der frueheren App
     return Container(
-      color: Farben.flaeche,
+      color: Farben.rot,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
@@ -226,7 +227,7 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            child: const Logo(),
+            child: const Logo(groesse: 54),
           ),
           const SizedBox(width: 12),
           Text(_s.station.text, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
@@ -241,7 +242,11 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
           Text(
             '${verbunden ? 'Verbunden' : 'Verbinde …'} · ${_s.vorOrtVerbunden ? 'Schopf' : 'Cloud'}',
             key: const Key('verbindung'),
-            style: TextStyle(color: verbunden ? Farben.akzent : Farben.warnung, fontSize: 16),
+            style: TextStyle(
+              color: verbunden ? Farben.akzent : Colors.white,
+              fontSize: 16,
+              fontWeight: verbunden ? FontWeight.normal : FontWeight.bold,
+            ),
           ),
           const SizedBox(width: 16),
           FilledButton.icon(
@@ -250,6 +255,8 @@ class _AnzeigeState extends State<Anzeige> with WidgetsBindingObserver {
             icon: const Icon(Icons.cleaning_services),
             label: const Text('Putzen'),
           ),
+          const SizedBox(width: 16),
+          Uhr(jetzt: widget.dienste.jetzt),
         ],
       ),
     );
@@ -398,26 +405,29 @@ class BestellKarte extends StatelessWidget {
       margin: const EdgeInsets.all(8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: dringend ? Farben.dringend : Farben.flaecheHoch, width: dringend ? 4 : 2),
+        // Feuerwehrrot wie die fruehere App; dringend dicker und mit rotem Kopf
+        side: BorderSide(color: Farben.rot, width: dringend ? 4 : 2),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
+          Container(
+            key: dringend ? const Key('dringend') : null,
+            color: dringend ? Farben.rot : null,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
                 Text(b.ort, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                 const Spacer(),
-                Icon(Icons.schedule, color: dringend ? Farben.dringend : Farben.textLeise),
+                Icon(Icons.schedule, color: dringend ? Colors.white : Farben.textLeise),
                 const SizedBox(width: 4),
                 Text(
                   '${b.minuten(jetzt)} min',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
-                    color: dringend ? Farben.dringend : Farben.textLeise,
+                    color: dringend ? Colors.white : Farben.textLeise,
                   ),
                 ),
               ],
@@ -508,6 +518,47 @@ class _Zeile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Uhrzeit oben rechts wie in der frueheren App; baut nur sich selbst jede Sekunde neu.
+class Uhr extends StatefulWidget {
+  const Uhr({super.key, required this.jetzt});
+
+  final DateTime Function() jetzt;
+
+  @override
+  State<Uhr> createState() => _UhrState();
+}
+
+class _UhrState extends State<Uhr> {
+  late final Timer _takt;
+
+  @override
+  void initState() {
+    super.initState();
+    _takt = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _takt.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.jetzt().toLocal();
+    String z(int n) => n.toString().padLeft(2, '0');
+    return Text(
+      '${z(t.hour)}:${z(t.minute)}:${z(t.second)}',
+      key: const Key('uhr'),
+      style: const TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        fontFeatures: [FontFeature.tabularFigures()],
       ),
     );
   }

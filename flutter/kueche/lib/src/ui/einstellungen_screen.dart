@@ -129,17 +129,22 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
             },
           ),
           kopf('Kiosk'),
-          SwitchListTile(
-            title: const Text('Als Startbildschirm verwenden'),
-            subtitle: const Text(
-              'Home-Taste führt zur Anzeige. Android fragt beim nächsten Druck auf «Home» einmal nach – «Immer» wählen.',
-            ),
-            value: e.alsStart,
-            onChanged: (an) async {
-              await e.alsStartSetzen(an);
-              await d.geraet.alsStartbildschirm(an);
-              setState(() {});
-            },
+          FutureBuilder(
+            future: d.geraet.sperre(),
+            builder: (context, s) => s.data?.besitzer ?? false
+                ? const SizedBox.shrink() // die Sperre legt den Startbildschirm fest
+                : SwitchListTile(
+                    title: const Text('Als Startbildschirm verwenden'),
+                    subtitle: const Text(
+                      'Home-Taste führt zur Anzeige. Android fragt beim nächsten Druck auf «Home» einmal nach – «Immer» wählen.',
+                    ),
+                    value: e.alsStart,
+                    onChanged: (an) async {
+                      await e.alsStartSetzen(an);
+                      await d.geraet.alsStartbildschirm(an);
+                      setState(() {});
+                    },
+                  ),
           ),
           FutureBuilder(
             future: d.geraet.sperre(),
@@ -184,7 +189,10 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
           ),
           ListTile(
             title: const Text('App beenden'),
-            subtitle: const Text('Kioskmodus verlassen (startet beim nächsten Geräte-Neustart wieder)'),
+            subtitle: const Text(
+              'Kioskmodus verlassen, z. B. für WLAN-Einstellungen. Startet beim nächsten Geräte-Neustart '
+              'oder beim Öffnen der App wieder gesperrt.',
+            ),
             onTap: d.geraet.beenden,
           ),
         ],

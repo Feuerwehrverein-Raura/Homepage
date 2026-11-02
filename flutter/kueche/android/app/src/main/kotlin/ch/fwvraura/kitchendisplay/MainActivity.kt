@@ -80,6 +80,23 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * «App beenden» unter Sperre: Home und Statusleiste bis zum naechsten Start
+     * freigeben (WLAN, Einstellungen). Sonst fuehrte Home sofort zurueck in die
+     * gesperrte Anzeige. Beim naechsten Start (Neustart, App oeffnen) sperrt
+     * onResume wieder.
+     */
+    private fun pausieren() {
+        try {
+            if (gesperrt()) stopLockTask()
+            dpm.clearPackagePersistentPreferredActivities(admin, packageName)
+            alsStartbildschirm(false)
+            dpm.setStatusBarDisabled(admin, false)
+        } catch (e: Exception) {
+            android.util.Log.w("Kiosk", "Pausieren: ${e.message}")
+        }
+    }
+
     /** Sperre loesen und die App wieder zur gewoehnlichen App machen (adb-Eintrag entfernt). */
     private fun sperreAufheben() {
         try {
@@ -122,7 +139,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "beenden" -> {
                     // ohne stopLockTask liesse sich die Aufgabe nicht verlassen
-                    if (gesperrt()) stopLockTask()
+                    if (besitzer()) pausieren() else if (gesperrt()) stopLockTask()
                     finishAffinity()
                     result.success(null)
                 }
