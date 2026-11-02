@@ -17,4 +17,5 @@ export 'src/musik/radio.dart';
 export 'src/musik/titelsuche.dart';
 export 'src/musik/zugang.dart';
 export 'src/ui/roter_schopf_screen.dart';
+export 'src/ui/verlauf_screen.dart';
 export 'src/zugang.dart';

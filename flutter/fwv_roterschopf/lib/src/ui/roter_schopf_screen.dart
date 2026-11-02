@@ -26,6 +26,7 @@ import '../modelle.dart';
 import '../musik/laptop.dart';
 import '../musik/zugang.dart';
 import '../zugang.dart';
+import 'verlauf_screen.dart';
 
 class RoterSchopfScreen extends StatefulWidget {
   const RoterSchopfScreen({
@@ -212,6 +213,16 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
     );
   }
 
+  /// Antippen einer Karte: Temperaturkurve ([VerlaufScreen]).
+  VoidCallback? _verlaufOeffner(String? messstelle, String name) => messstelle == null
+      ? null
+      : () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                VerlaufScreen(zugang: widget.zugang, messstelle: messstelle, name: name),
+          ),
+        );
+
   Widget _temperaturSeite(BuildContext context, RoterSchopfZustand z) {
     return ListView(
       padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
@@ -220,11 +231,13 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
           if (widget.alarmSchalten) _AlarmKarte(zugang: widget.zugang, qrScannen: widget.qrScannen),
-          for (final k in z.kuehlung) _KuehlerKarte(k),
+          for (final k in z.kuehlung)
+            _KuehlerKarte(k, verlauf: _verlaufOeffner(k.messstelle, k.name)),
         ],
         if (z.thermostate.isNotEmpty) ...[
           const _Kopf('Heizung'),
-          for (final t in z.thermostate) _ThermostatKarte(t),
+          for (final t in z.thermostate)
+            _ThermostatKarte(t, verlauf: _verlaufOeffner(t.messstelle, t.name)),
         ],
         if (z.kuehlung.isEmpty && z.thermostate.isEmpty)
           const Padding(
@@ -342,9 +355,10 @@ class _Stand extends StatelessWidget {
 String _grad(double t) => '${t.toStringAsFixed(1).replaceAll('.', ',')} °C';
 
 class _ThermostatKarte extends StatelessWidget {
-  const _ThermostatKarte(this.t);
+  const _ThermostatKarte(this.t, {this.verlauf});
 
   final Thermostat t;
+  final VoidCallback? verlauf;
 
   @override
   Widget build(BuildContext context) {
@@ -360,6 +374,7 @@ class _ThermostatKarte extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: ListTile(
+        onTap: verlauf,
         leading: const Icon(Icons.thermostat),
         title: Text(t.name),
         subtitle: Text(teile.join(' · ')),
@@ -682,9 +697,10 @@ class _AlarmKarteState extends State<_AlarmKarte> {
 }
 
 class _KuehlerKarte extends StatelessWidget {
-  const _KuehlerKarte(this.k);
+  const _KuehlerKarte(this.k, {this.verlauf});
 
   final Kuehler k;
+  final VoidCallback? verlauf;
 
   @override
   Widget build(BuildContext context) {
@@ -708,6 +724,7 @@ class _KuehlerKarte extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       color: warn ? farben.errorContainer : null,
       child: ListTile(
+        onTap: verlauf,
         leading: Icon(Icons.ac_unit, color: warn ? farben.onErrorContainer : null),
         title: Text(k.name, style: TextStyle(color: warn ? farben.onErrorContainer : null)),
         subtitle: Text(zeile, style: TextStyle(color: warn ? farben.onErrorContainer : null)),

@@ -42,6 +42,10 @@ abstract class RoterSchopfZugang {
   Future<KuehlerAlarm> kuehlerAlarmSetzen({required bool scharf, int? stunden}) =>
       throw UnsupportedError('Kein SMS-Alarm');
 
+  /// Verlauf einer Messstelle fuer die Kurven.
+  Future<Verlauf> verlauf(String messstelle, VerlaufZeitraum zeitraum) =>
+      throw UnsupportedError('Kein Verlauf');
+
   /// "Ich gehe schauen" zu einem offenen Fall (ohne [schluessel]: der erste);
   /// die anderen bekommen Push und SMS. Mit [sticker] (Inhalt des QR-Stickers
   /// am Geraet): "Ich bin vor Ort" - die naechste Erinnerung erst nach 12 h.
@@ -81,6 +85,14 @@ class ApiRoterSchopfZugang extends RoterSchopfZugang {
       KuehlerAlarm.ausJson(
         await api.put('kiosk/kuehler-alarm', daten: {'scharf': scharf, 'stunden': stunden}),
       );
+
+  @override
+  Future<Verlauf> verlauf(String messstelle, VerlaufZeitraum zeitraum) async => Verlauf.ausJson(
+    await api.get(
+      'kiosk/roter-schopf/verlauf',
+      abfrage: {'messstelle': messstelle, 'zeitraum': zeitraum.kennung},
+    ),
+  );
 
   @override
   Future<KuehlerAlarm> kuehlerAlarmSchauen([String? schluessel, String? sticker]) async {

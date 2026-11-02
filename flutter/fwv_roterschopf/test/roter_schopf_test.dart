@@ -52,6 +52,14 @@ class _Zugang extends RoterSchopfZugang {
 
   final gescannt = <String?>[];
 
+  final verlaeufe = <(String, VerlaufZeitraum)>[];
+
+  @override
+  Future<Verlauf> verlauf(String messstelle, VerlaufZeitraum zeitraum) async {
+    verlaeufe.add((messstelle, zeitraum));
+    return beispielVerlauf(messstelle);
+  }
+
   @override
   Future<KuehlerAlarm> kuehlerAlarmSchauen([String? schluessel, String? sticker]) async {
     geschaut.add(schluessel);
@@ -284,5 +292,49 @@ void main() {
     expect(z.gescannt, ['fwv-vor-ort:kuehler:eis:0123456789abcdef0123']);
     expect(find.textContaining('Stefan Müller war vor Ort (seit'), findsOneWidget);
     expect(find.text('Ich gehe auch'), findsNothing);
+  });
+
+  testWidgets('Tiefkuehler antippen: Temperaturkurve mit Zeitraeumen', (tester) async {
+    final z = await zeigen(tester);
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    final k = RoterSchopfZustand.ausJson(vertrag).kuehlung.first;
+    await tester.tap(find.text(k.name));
+    await tester.pumpAndSettle();
+    expect(z.verlaeufe.single, (k.messstelle, VerlaufZeitraum.tag));
+    expect(find.text('Tiefst'), findsOneWidget);
+    expect(find.text('-19,8 °C'), findsOneWidget, reason: 'Tiefstwert aus min');
+    expect(find.textContaining('Grenze -12,0 °C'), findsOneWidget);
+    expect(find.text('Strom aus'), findsOneWidget);
+    await tester.tap(find.text('7 Tage'));
+    await tester.pumpAndSettle();
+    expect(z.verlaeufe.last.$2, VerlaufZeitraum.woche);
+  });
+}
+
+/// 24 h Tiefkuehler: taktet zwischen -19,5 und -14 C, eine Stunde Luecke,
+/// eine halbe Stunde Strom aus.
+Verlauf beispielVerlauf(String messstelle) {
+  final bis = DateTime(2026, 11, 2, 14);
+  final von = bis.subtract(const Duration(hours: 24));
+  final temp = <Map<String, Object?>>[];
+  final an = <Map<String, Object?>>[];
+  for (var i = 0; i < 288; i++) {
+    final t = von.add(Duration(minutes: 5 * i));
+    if (i >= 100 && i < 112) continue; // Luecke
+    final aus = i >= 200 && i < 206;
+    final w = aus
+        ? -14.0 + (i - 200) * 0.3
+        : -16.75 + 2.75 * ((i % 24) < 12 ? (i % 12) / 12 : 1 - (i % 12) / 12) * 2 - 2.75;
+    temp.add({'t': t.toUtc().toIso8601String(), 'mittel': w, 'min': w - 0.3, 'max': w + 0.3});
+    an.add({'t': t.toUtc().toIso8601String(), 'mittel': aus ? 0 : 1});
+  }
+  return Verlauf.ausJson({
+    'messstelle': messstelle,
+    'raster_s': 300,
+    'von': von.toUtc().toIso8601String(),
+    'bis': bis.toUtc().toIso8601String(),
+    'grenze': -12,
+    'reihen': {'temperatur': temp, 'an': an},
   });
 }

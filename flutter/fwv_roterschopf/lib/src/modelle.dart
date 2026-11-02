@@ -167,10 +167,12 @@ class Kuehler {
     required this.zuWarm,
     required this.stromAn,
     required this.watt,
+    this.messstelle,
   });
 
   factory Kuehler.ausJson(Map<String, dynamic> j) => Kuehler(
     name: '${j['name']}',
+    messstelle: j['messstelle'] is String ? j['messstelle'] as String : null,
     erreichbar: j['erreichbar'] == true,
     temperatur: (j['temperatur'] as num?)?.toDouble(),
     grenze: (j['grenze'] as num?)?.toDouble(),
@@ -180,6 +182,9 @@ class Kuehler {
   );
 
   final String name;
+
+  /// "kuehler:eis" - fuer den Verlauf ([RoterSchopfZugang.verlauf]).
+  final String? messstelle;
   final bool erreichbar;
 
   /// Grad Celsius; null, wenn der Fuehler nichts liefert.
@@ -204,10 +209,12 @@ class Thermostat {
     required this.ventil,
     required this.batterie,
     required this.fehler,
+    this.messstelle,
   });
 
   factory Thermostat.ausJson(Map<String, dynamic> j) => Thermostat(
     name: '${j['name']}',
+    messstelle: j['messstelle'] is String ? j['messstelle'] as String : null,
     erreichbar: j['erreichbar'] == true,
     temperatur: (j['temperatur'] as num?)?.toDouble(),
     soll: (j['soll'] as num?)?.toDouble(),
@@ -217,6 +224,9 @@ class Thermostat {
   );
 
   final String name;
+
+  /// "heizung:..." - fuer den Verlauf.
+  final String? messstelle;
   final bool erreichbar;
 
   /// Gemessene Raumtemperatur am Heizkoerper (Grad Celsius).
@@ -353,4 +363,84 @@ class OffenerAlarm {
 
   /// [schaut] hat den Sticker am Geraet gescannt.
   final bool vorOrt;
+}
+
+/// Zeitraeume des Verlaufs (GET /kiosk/roter-schopf/verlauf, zeitraum).
+enum VerlaufZeitraum {
+  tag('24h', '24 h'),
+  woche('7d', '7 Tage'),
+  monat('30d', '30 Tage'),
+  jahr('1j', '1 Jahr');
+
+  const VerlaufZeitraum(this.kennung, this.text);
+
+  final String kennung;
+  final String text;
+}
+
+/// Ein Abschnitt einer Reihe; [mittel] null = Luecke (Geraet nicht erreichbar).
+class VerlaufPunkt {
+  const VerlaufPunkt(this.t, this.mittel, {this.min, this.max});
+
+  final DateTime t;
+  final double? mittel;
+  final double? min;
+  final double? max;
+}
+
+/// Verlauf einer Messstelle (api-members src/schopf-verlauf.js): Reihen je
+/// Groesse (temperatur, watt, an, soll, ventil, ...).
+class Verlauf {
+  const Verlauf({
+    required this.messstelle,
+    required this.von,
+    required this.bis,
+    required this.rasterS,
+    required this.reihen,
+    this.grenze,
+  });
+
+  factory Verlauf.ausJson(Object? roh) {
+    final j = roh is Map ? roh : const {};
+    double? zahl(Object? v) => v is num ? v.toDouble() : null;
+    DateTime zeit(Object? v) => DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
+    final reihen = <String, List<VerlaufPunkt>>{};
+    final r = j['reihen'];
+    if (r is Map) {
+      for (final MapEntry(:key, :value) in r.entries) {
+        if (value is! List) continue;
+        reihen['$key'] = [
+          for (final p in value)
+            if (p is Map)
+              VerlaufPunkt(
+                zeit(p['t']),
+                zahl(p['mittel']),
+                min: zahl(p['min']),
+                max: zahl(p['max']),
+              ),
+        ];
+      }
+    }
+    return Verlauf(
+      messstelle: '${j['messstelle'] ?? ''}',
+      von: zeit(j['von']),
+      bis: zeit(j['bis']),
+      rasterS: (j['raster_s'] as num?)?.toInt() ?? 300,
+      grenze: zahl(j['grenze']),
+      reihen: reihen,
+    );
+  }
+
+  final String messstelle;
+  final DateTime von;
+  final DateTime bis;
+
+  /// Abstand der Abschnitte in Sekunden; fehlt einer, ist das eine Luecke.
+  final int rasterS;
+
+  /// Ab hier "zu warm" (nur Tiefkuehler).
+  final double? grenze;
+  final Map<String, List<VerlaufPunkt>> reihen;
+
+  List<VerlaufPunkt> reihe(String groesse) => reihen[groesse] ?? const [];
 }
