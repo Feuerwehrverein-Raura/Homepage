@@ -111,3 +111,10 @@ test('Empfaenger: Vorstand und Roter Schopf, jede Nummer einmal, ohne Ausgetrete
         { nummer: '+41761112233', name: 'Max Tel' },
     ]);
 });
+
+test('Push-Titel je Meldung: Alarm, Erinnerung, Entwarnung', () => {
+    const { pushTitel } = require('../src/kuehler-alarm');
+    assert.equal(pushTitel('alarm'), 'Tiefkühler-Alarm');
+    assert.equal(pushTitel('erinnerung'), 'Tiefkühler-Alarm (Erinnerung)');
+    assert.equal(pushTitel('entwarnung'), 'Tiefkühler: Entwarnung');
+});

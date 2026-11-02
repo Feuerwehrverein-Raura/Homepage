@@ -150,7 +150,15 @@ function alarmEmpfaenger(mitglieder) {
     return [...nummern].map(([nummer, name]) => ({ nummer, name }));
 }
 
+/** Titel des App-Pushs zur Meldung (der Text ist derselbe wie in der SMS). */
+function pushTitel(art) {
+    if (art === 'entwarnung') return 'Tiefkühler: Entwarnung';
+    if (art === 'erinnerung') return 'Tiefkühler-Alarm (Erinnerung)';
+    return 'Tiefkühler-Alarm';
+}
+
 module.exports = {
+    pushTitel,
     faelle, kuehlerAlarm, smsNummer, alarmBenutzer, alarmEmpfaenger,
     SCHWELLE_MS, ERINNERUNG_MS, ALARM_GRUPPEN,
 };

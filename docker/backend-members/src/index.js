@@ -7740,7 +7740,7 @@ async function periodicAuthentikSync() {
 // Der Waechter legt SMS in kiosk_alarm_sms; der SMS-Gateway im PJC holt sie
 // jede Minute ab (GET /kiosk/alarm-sms, X-Alarm-Key) und meldet, ob sie
 // rausgingen. Scharf nur mit KUEHLER_ALARM=an.
-const { kuehlerAlarm, alarmBenutzer, alarmEmpfaenger } = require('./kuehler-alarm');
+const { kuehlerAlarm, alarmBenutzer, alarmEmpfaenger, pushTitel } = require('./kuehler-alarm');
 
 let alarmTabelleDa = false;
 async function alarmTabelle() {
@@ -7796,6 +7796,17 @@ async function kuehlerAlarmEmpfaenger() {
     return alarmEmpfaenger(r.rows);
 }
 
+/** Dieselben Leute als Mitglieder-Ids fuer den App-Push - auch wer keine
+ *  Handynummer hinterlegt hat. */
+async function kuehlerAlarmMitglieder() {
+    const pks = alarmBenutzer(await gruppenDienst.liste());
+    if (!pks.length) return [];
+    const r = await pool.query(
+        `SELECT id FROM members WHERE authentik_user_id::text = ANY($1::text[])
+            AND COALESCE(status, '') <> 'Ausgetreten'`, [pks.map(String)]);
+    return r.rows.map(m => m.id);
+}
+
 async function kuehlerAlarmStarten() {
     await alarmTabelle();
     // Was vor dem Neustart gemeldet und nicht entwarnt wurde, gilt als gemeldet.
@@ -7828,12 +7839,19 @@ async function kuehlerAlarmStarten() {
             const meldungen = waechter.pruefen(z.kuehlung);
             if (!meldungen.length) return;
             const empfaenger = await kuehlerAlarmEmpfaenger();
+            const pushAn = await kuehlerAlarmMitglieder().catch(() => []);
             for (const m of meldungen) {
-                logWarn('KUEHLER-ALARM', { art: m.art, schluessel: m.schluessel, text: m.text, empfaenger: empfaenger.length });
+                logWarn('KUEHLER-ALARM', { art: m.art, schluessel: m.schluessel, text: m.text, empfaenger: empfaenger.length, push: pushAn.length });
                 for (const e of empfaenger) {
                     await pool.query(
                         'INSERT INTO kiosk_alarm_sms (schluessel, art, nummer, name, text) VALUES ($1, $2, $3, $4, $5)',
                         [m.schluessel, m.art, e.nummer, e.name, m.text]);
+                }
+                // Zusaetzlich als Push in der App (gleiche Leute, gleicher Text).
+                // Antippen zeigt die Meldung; abschaltbar unter "Allgemein".
+                const titel = pushTitel(m.art);
+                for (const id of pushAn) {
+                    sendPushToMember(id, 'general', titel, m.text, { title: titel, body: m.text }).catch(() => {});
                 }
             }
         } catch (error) {
