@@ -1,7 +1,7 @@
 // Versand gegen api-dispatch (docker/backend-dispatch/src/index.js), alle
 // Routen nur fuer den Vorstand:
 //
-// - GET  templates                      Vorlagen
+// - GET/POST/PUT/DELETE templates       Vorlagen (verwalten)
 // - POST email/bulk                     E-Mails; layout 'standard' -> das
 //                                       Backend baut die HTML-Mail
 // - POST dispatch/brief                 Brief-HTML (+ PDF-Vorschau) fuer EIN
@@ -110,6 +110,31 @@ class VersandDienst {
   final ApiClient api;
 
   Future<List<Vorlage>> vorlagen() async => jsonListe(await api.get('templates'), Vorlage.ausJson);
+
+  /// Neu ([id] null) oder aendern. [text] wird als Text gespeichert (die
+  /// E-Mail baut daraus die HTML-Fassung, der Brief sein Layout).
+  Future<Vorlage> vorlageSpeichern({
+    String? id,
+    required String name,
+    required String typ,
+    required String betreff,
+    required String text,
+    Object? variablen,
+  }) async {
+    final daten = {
+      'name': name.trim(),
+      'type': typ,
+      'subject': betreff,
+      'body': text,
+      'variables': variablen,
+    };
+    final j = id == null
+        ? await api.post('templates', daten: daten)
+        : await api.put('templates/$id', daten: daten);
+    return Vorlage.ausJson(j is Map ? Map<String, dynamic>.from(j) : const {});
+  }
+
+  Future<void> vorlageLoeschen(String id) => api.delete('templates/$id');
 
   /// Gespeicherte Entwuerfe, neueste zuerst.
   Future<List<GespeicherterEntwurf>> entwuerfe() async =>

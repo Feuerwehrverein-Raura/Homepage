@@ -22,6 +22,7 @@ import '../../versand/versand_dienst.dart';
 import '../../zeit.dart';
 import 'empfaenger_auswahl.dart';
 import 'versand_bausteine.dart';
+import 'vorlagen_screen.dart';
 
 class VerfassenAnsicht extends StatefulWidget {
   const VerfassenAnsicht({super.key, required this.dienste, this.entwurf});
@@ -283,7 +284,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _inhaltKarte(context, daten.vorlagen),
+                _inhaltKarte(context, daten.vorlagen, neuLaden),
                 _vorschauUndSenden(context, plan, empfaenger, fortschritt),
               ],
             ),
@@ -457,7 +458,17 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     );
   }
 
-  Widget _inhaltKarte(BuildContext context, List<Vorlage> vorlagen) {
+  Future<void> _vorlagenVerwalten(Future<void> Function() neuLaden) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => VorlagenScreen(dienst: _dienst)));
+    if (mounted) await neuLaden();
+  }
+
+  Widget _inhaltKarte(
+    BuildContext context,
+    List<Vorlage> vorlagen,
+    Future<void> Function() neuLaden,
+  ) {
     final t = Theme.of(context);
     final unbekannt = unbekanntePlatzhalter('${_betreff.text}\n${_text.text}');
     return Karte(
@@ -482,6 +493,12 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
                       (_betreff.text.trim().isEmpty && _text.text.trim().isEmpty)
                   ? null
                   : _entwurfSpeichern,
+            ),
+            TextButton.icon(
+              key: const Key('versand-vorlagen'),
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('Vorlagen'),
+              onPressed: _sendet ? null : () => _vorlagenVerwalten(neuLaden),
             ),
           ],
         ),

@@ -233,15 +233,22 @@ class Vorlage {
     this.typ,
     this.betreff = '',
     this.text = '',
+    this.istHtml = false,
+    this.variablen,
   });
 
-  factory Vorlage.ausJson(Map<String, dynamic> j) => Vorlage(
-    id: '${j['id'] ?? ''}',
-    name: '${j['name'] ?? 'Vorlage'}',
-    typ: j['type'] is String ? j['type'] as String : null,
-    betreff: j['subject'] is String ? j['subject'] as String : '',
-    text: htmlZuText(j['body'] is String ? j['body'] as String : ''),
-  );
+  factory Vorlage.ausJson(Map<String, dynamic> j) {
+    final roh = j['body'] is String ? j['body'] as String : '';
+    return Vorlage(
+      id: '${j['id'] ?? ''}',
+      name: '${j['name'] ?? 'Vorlage'}',
+      typ: j['type'] is String ? j['type'] as String : null,
+      betreff: j['subject'] is String ? j['subject'] as String : '',
+      text: htmlZuText(roh),
+      istHtml: RegExp(r'<[a-zA-Z/!]').hasMatch(roh),
+      variablen: j['variables'],
+    );
+  }
 
   final String id;
   final String name;
@@ -252,7 +259,32 @@ class Vorlage {
 
   /// Als reiner Text (HTML-Vorlagen werden umgewandelt).
   final String text;
+
+  /// In der Datenbank als HTML gespeichert (alte Briefvorlagen) - speichert
+  /// die App sie, wird daraus Text.
+  final bool istHtml;
+
+  /// `variables` unveraendert, damit Speichern sie nicht loescht.
+  final Object? variablen;
+
+  /// Von api-members ueber den Namen benutzt (sendNotificationEmail in
+  /// docker/backend-members/src/index.js): nicht umbenennen, nicht loeschen.
+  bool get istSystem => systemVorlagen.contains(name);
 }
+
+/// Vorlagen, die api-members per Namen sucht.
+const systemVorlagen = {
+  'Datenänderung bestätigt',
+  'Willkommen neues Mitglied',
+  'Aufnahmeantrag angenommen',
+};
+
+/// Typen in dispatch_templates.
+const vorlagenTypen = <(String, String)>[
+  ('email', 'E-Mail'),
+  ('brief_ch', 'Brief (Fenster rechts)'),
+  ('brief_de', 'Brief (Fenster links)'),
+];
 
 /// Vorlagen-Text als reiner Text. In der Datenbank stehen teils HTML-Briefe,
 /// teils Text mit woertlichem "\n" (SQL ohne E'...').

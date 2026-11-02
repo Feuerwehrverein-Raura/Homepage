@@ -102,6 +102,26 @@ class Dispatch {
   /// member_id, deren Brief beim Senden scheitert.
   final briefFehler = <String>{};
 
+  /// dispatch_templates.
+  final vorlagen = <Map<String, dynamic>>[
+    {
+      'id': 't1',
+      'name': 'Event Einladung',
+      'type': 'email',
+      'subject': 'Einladung: {{event_title}}',
+      'body': r'Liebe/r {{anrede}} {{nachname}}\n\nWir laden ein.',
+    },
+    {
+      'id': 't2',
+      'name': 'GV',
+      'type': 'brief_ch',
+      'subject': 'Generalversammlung',
+      'body':
+          '<html><head><style>p{}</style></head><body><p>Hallo {{vorname}}</p>'
+          '<p>Bis bald&nbsp;&amp; gruss</p></body></html>',
+    },
+  ];
+
   /// Entwuerfe wie in nachricht_entwuerfe, neueste zuerst.
   final entwuerfe = <Map<String, dynamic>>[];
 
@@ -109,6 +129,21 @@ class Dispatch {
     final weg = '${a.method} ${a.url.path}';
     final q = a.url.queryParameters;
     final body = a.body.isEmpty ? const <String, dynamic>{} : jsonDecode(a.body) as Map;
+    if (a.url.path.startsWith('/templates') && a.method != 'GET') {
+      final id = a.url.pathSegments.length > 1 ? a.url.pathSegments[1] : null;
+      final v = {...body.cast<String, dynamic>(), 'id': id ?? 't${vorlagen.length + 1}'};
+      switch (a.method) {
+        case 'POST':
+          vorlagen.add(v);
+          return (201, v);
+        case 'PUT':
+          vorlagen[vorlagen.indexWhere((x) => x['id'] == id)] = v;
+          return v;
+        case 'DELETE':
+          vorlagen.removeWhere((x) => x['id'] == id);
+          return {'success': true, 'deleted': id};
+      }
+    }
     if (a.url.path.startsWith('/dispatch/entwuerfe')) {
       final id = a.url.pathSegments.length > 2 ? a.url.pathSegments[2] : null;
       final gespeichert = {
@@ -137,24 +172,7 @@ class Dispatch {
       case 'GET /members':
         return members;
       case 'GET /templates':
-        return [
-          {
-            'id': 't1',
-            'name': 'Event Einladung',
-            'type': 'email',
-            'subject': 'Einladung: {{event_title}}',
-            'body': r'Liebe/r {{anrede}} {{nachname}}\n\nWir laden ein.',
-          },
-          {
-            'id': 't2',
-            'name': 'GV',
-            'type': 'brief_ch',
-            'subject': 'Generalversammlung',
-            'body':
-                '<html><head><style>p{}</style></head><body><p>Hallo {{vorname}}</p>'
-                '<p>Bis bald&nbsp;&amp; gruss</p></body></html>',
-          },
-        ];
+        return vorlagen;
       case 'POST /email/bulk':
         final ids = (body['member_ids'] as List).cast<String>();
         return {
@@ -620,6 +638,62 @@ void main() {
       expect(d.posts('/email/bulk'), isNotEmpty);
       await tester.pumpAndSettle();
       expect(d.entwuerfe, isEmpty, reason: 'gesendet - Entwurf weg');
+    });
+
+    testWidgets('Vorlagen: neu, HTML-Vorlage als Text, System geschuetzt, loeschen', (
+      tester,
+    ) async {
+      d.vorlagen.add({
+        'id': 't9',
+        'name': 'Willkommen neues Mitglied',
+        'type': 'email',
+        'subject': 'Willkommen',
+        'body': 'Hallo {{vorname}}',
+        'variables': ['vorname'],
+      });
+      await oeffnen(tester);
+      await tippen(tester, find.byKey(const Key('versand-vorlagen')));
+      expect(find.text('GV'), findsOneWidget);
+      expect(find.textContaining('für Benachrichtigungen'), findsOneWidget);
+
+      // Neu
+      await tippen(tester, find.byKey(const Key('vorlage-neu')));
+      await tester.enterText(find.byKey(const Key('vorlage-name')), 'Helferaufruf');
+      await tester.enterText(find.byKey(const Key('vorlage-betreff')), 'Wir brauchen dich');
+      await tester.enterText(find.byKey(const Key('vorlage-text')), 'Liebe {{vorname}}');
+      await tippen(tester, find.byKey(const Key('vorlage-speichern')));
+      expect(d.vorlagen.last, containsPair('name', 'Helferaufruf'));
+      expect(d.vorlagen.last, containsPair('type', 'email'));
+      expect(find.text('Helferaufruf'), findsOneWidget, reason: 'Liste neu geladen');
+
+      // HTML-Brief: Warnung, wird Text
+      await tippen(tester, find.text('GV'));
+      expect(find.byKey(const Key('vorlage-html')), findsOneWidget);
+      await tippen(tester, find.byKey(const Key('vorlage-speichern')));
+      await tippen(tester, imDialog('Als Text speichern'));
+      final gv = d.vorlagen.firstWhere((v) => v['id'] == 't2');
+      expect(gv['body'], isNot(contains('<p>')));
+      expect(gv['body'], contains('Hallo {{vorname}}'));
+
+      // System: Name gesperrt, kein Loeschen, Variablen bleiben
+      await tippen(tester, find.text('Willkommen neues Mitglied'));
+      expect(find.byKey(const Key('vorlage-system')), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('vorlage-name'))).enabled, isFalse);
+      expect(find.byKey(const Key('vorlage-loeschen')), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('vorlage-text')),
+        'Herzlich willkommen {{vorname}}',
+      );
+      await tippen(tester, find.byKey(const Key('vorlage-speichern')));
+      final w = d.vorlagen.firstWhere((v) => v['id'] == 't9');
+      expect(w['name'], 'Willkommen neues Mitglied');
+      expect(w['variables'], ['vorname']);
+
+      // Loeschen
+      await tippen(tester, find.text('Helferaufruf'));
+      await tippen(tester, find.byKey(const Key('vorlage-loeschen')));
+      await tippen(tester, imDialog('Löschen'));
+      expect(d.vorlagen.any((v) => v['name'] == 'Helferaufruf'), isFalse);
     });
 
     testWidgets('Auto mit Briefen: Rueckfrage nennt Kosten, Staging schaltet sie ab', (
