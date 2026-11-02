@@ -167,8 +167,14 @@ Versandplan versandPlanen(List<VorstandMitglied> empfaenger, Versandart art) {
 String franken(double betrag) => 'CHF ${betrag.toStringAsFixed(2)}';
 
 /// Text der Rueckfrage vor dem Versand: Zahl pro Kanal, Kosten, Staging.
-String versandRueckfrage(Versandplan p, {required String betreff, required bool staging}) {
+String versandRueckfrage(
+  Versandplan p, {
+  required String betreff,
+  required bool staging,
+  List<String> anhaenge = const [],
+}) {
   final zeilen = <String>['«${betreff.trim().isEmpty ? '(ohne Betreff)' : betreff.trim()}»', ''];
+  if (anhaenge.isNotEmpty) zeilen.addAll(['Anhänge: ${anhaenge.join(', ')}', '']);
   if (p.email.isNotEmpty) zeilen.add('• ${anzahl(p.email.length, 'E-Mail', 'E-Mails')}');
   if (p.post.isNotEmpty) {
     zeilen.add(

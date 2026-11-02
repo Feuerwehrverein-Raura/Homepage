@@ -336,6 +336,7 @@ class Dienste {
     anhangVerkleinern: anhangVerkleinern,
     pdfWaehlen: pdfWaehlen,
     bildWaehlen: bildWaehlen,
+    anhangWaehlen: _anhangMitFilePicker,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.
@@ -511,6 +512,22 @@ Future<GewaehlteDatei?> _pdfMitFilePicker() async {
   final groesse = datei.lengthSync() ?? await datei.length();
   if (groesse != null && groesse > pdfHoechstGroesse) {
     throw const ApiFehler('Das PDF darf höchstens 10 MB gross sein.');
+  }
+  return (bytes: await datei.readAsBytes(), dateiname: datei.name);
+}
+
+/// Anhang einer Nachricht (Vorstand > Verfassen): PDF oder Bild wie in
+/// vorstand.html, hoechstens 10 MB.
+Future<GewaehlteDatei?> _anhangMitFilePicker() async {
+  final datei = await FilePicker.pickFile(
+    dialogTitle: 'Anhang wählen',
+    type: FileType.custom,
+    allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+  );
+  if (datei == null) return null;
+  final groesse = datei.lengthSync() ?? await datei.length();
+  if (groesse != null && groesse > pdfHoechstGroesse) {
+    throw const ApiFehler('Ein Anhang darf höchstens 10 MB gross sein.');
   }
   return (bytes: await datei.readAsBytes(), dateiname: datei.name);
 }

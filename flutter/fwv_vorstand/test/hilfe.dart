@@ -28,6 +28,12 @@ class FalschesBackend {
   /// Was der PDF-Waehler liefert (null = Abbruch).
   ({Uint8List bytes, String dateiname})? pdf;
 
+  /// Was «Datei anhängen» (Verfassen) liefert.
+  ({Uint8List bytes, String dateiname})? anhang = (
+    bytes: Uint8List.fromList(const [0xff, 0xd8, 0xff]),
+    dateiname: 'Plakat.jpg',
+  );
+
   late final api = ApiClient(
     http: MockClient((a) async {
       anfragen.add(a);
@@ -50,6 +56,7 @@ class FalschesBackend {
     },
     anhangVerkleinern: (roh) async => roh,
     pdfWaehlen: () async => pdf,
+    anhangWaehlen: () async => anhang,
   );
 
   late final dienste = VorstandDienste(

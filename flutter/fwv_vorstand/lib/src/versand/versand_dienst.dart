@@ -34,6 +34,31 @@ typedef Fortschritt = void Function(int fertig, int gesamt);
 /// Fehlgeschlagen: wer und warum.
 typedef Fehlschlag = ({String name, String grund});
 
+/// Eigener Anhang einer Nachricht (wie vorstand.html: PDF, JPG, PNG).
+class Anhang {
+  const Anhang(this.dateiname, this.bytes);
+
+  final String dateiname;
+  final Uint8List bytes;
+
+  bool get istPdf => dateiname.toLowerCase().endsWith('.pdf');
+
+  String get typ {
+    final n = dateiname.toLowerCase();
+    if (istPdf) return 'application/pdf';
+    if (n.endsWith('.png')) return 'image/png';
+    if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
+    return 'application/octet-stream';
+  }
+
+  /// Form fuer api-dispatch (email/bulk `attachments`, send-post `anhaenge`).
+  Map<String, Object> get json => {
+    'filename': dateiname,
+    'content': base64Encode(bytes),
+    'contentType': typ,
+  };
+}
+
 class VersandErgebnis {
   VersandErgebnis({required this.staging});
 
@@ -122,16 +147,21 @@ class VersandDienst {
   /// stehen im Ergebnis; ohne Verbindung bricht der Versand ab. Mit
   /// [anlassId] ist es eine Einladung: das Backend setzt sie ins
   /// Einladungs-Layout (einladung-layout.js, [text] ist die Einleitung) und
-  /// haengt das PDF des Anlasses an (anlass-pdf.js).
+  /// haengt das PDF des Anlasses an (anlass-pdf.js). [anhaenge] gehen mit
+  /// jeder E-Mail mit; an den Brief haengt das Backend nur die PDFs als
+  /// weitere Seiten (Bilder kaemen dort nicht an).
   Future<VersandErgebnis> senden(
     Versandplan plan, {
     required String betreff,
     required String text,
     required bool staging,
     String? anlassId,
+    List<Anhang> anhaenge = const [],
     Fortschritt? fortschritt,
   }) async {
     final ergebnis = VersandErgebnis(staging: staging);
+    final mailAnhaenge = [for (final a in anhaenge) a.json];
+    final briefAnhaenge = [for (final a in anhaenge.where((a) => a.istPdf)) a.json];
     final gesamt = plan.email.length + plan.post.length;
     var fertig = 0;
     fortschritt?.call(0, gesamt);
@@ -149,6 +179,7 @@ class VersandDienst {
             'event_id': ?anlassId,
             // Versandart E-Mail: auch an Mitglieder, die Post wuenschen.
             if (plan.art == Versandart.email) 'praeferenz_ignorieren': true,
+            if (mailAnhaenge.isNotEmpty) 'attachments': mailAnhaenge,
           },
         );
         final antwort = j is Map ? j : const {};
@@ -184,6 +215,7 @@ class VersandDienst {
             'staging': staging,
             'pdf_margin': ?brief.rand,
             'event_id': ?anlassId,
+            if (briefAnhaenge.isNotEmpty) 'anhaenge': briefAnhaenge,
           },
         );
         ergebnis.briefe++;

@@ -355,6 +355,32 @@ void main() {
       });
     });
 
+    test('Eigene Anhaenge: E-Mail bekommt alle, der Brief nur die PDFs', () async {
+      final plan = versandPlanen(mitglieder(), Versandart.auto);
+      final pdf = Anhang('Programm.pdf', Uint8List.fromList(utf8.encode('%PDF-1.4')));
+      final bild = Anhang('Plakat.JPG', Uint8List.fromList([0xff, 0xd8, 0xff]));
+      await d.backend.dienste.versand.senden(
+        plan,
+        betreff: 'a',
+        text: 'b',
+        staging: false,
+        anhaenge: [pdf, bild],
+      );
+      final mail = d.posts('/email/bulk').first['attachments'] as List;
+      expect([for (final a in mail) (a as Map)['filename']], ['Programm.pdf', 'Plakat.JPG']);
+      expect((mail[1] as Map)['contentType'], 'image/jpeg');
+      expect(base64Decode((mail[0] as Map)['content'] as String), utf8.encode('%PDF-1.4'));
+      final brief = d.posts('/dispatch/send-post').first['anhaenge'] as List;
+      expect([for (final a in brief) (a as Map)['filename']], ['Programm.pdf']);
+    });
+
+    test('Ohne Anhaenge keine leeren Felder', () async {
+      final plan = versandPlanen(mitglieder(), Versandart.auto);
+      await d.backend.dienste.versand.senden(plan, betreff: 'a', text: 'b', staging: false);
+      expect(d.posts('/email/bulk').any((m) => m.containsKey('attachments')), isFalse);
+      expect(d.posts('/dispatch/send-post').any((m) => m.containsKey('anhaenge')), isFalse);
+    });
+
     test('Ohne Anlass kein event_id', () async {
       final plan = versandPlanen(mitglieder(), Versandart.auto);
       await d.backend.dienste.versand.senden(plan, betreff: 'a', text: 'b', staging: false);

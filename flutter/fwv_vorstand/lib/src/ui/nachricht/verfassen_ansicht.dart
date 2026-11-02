@@ -5,8 +5,10 @@
 // Kosten, Ergebnis.
 //
 // Vorbild: vorstand-desktop (pages/dispatch, SendTab). Das Brief-HTML baut
-// das Backend (POST /dispatch/brief), nicht die App. Anhaenge, Entwuerfe und
-// zeitgesteuertes Senden gibt es hier bewusst nicht (in W nie fertig).
+// das Backend (POST /dispatch/brief), nicht die App. Eigene Anhaenge (PDF,
+// JPG, PNG) gehen mit jeder E-Mail mit, an Briefe haengt das Backend nur die
+// PDFs als weitere Seiten. Entwuerfe und zeitgesteuertes Senden gibt es hier
+// nicht.
 
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
@@ -45,6 +47,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
   var _vorschauLaedt = false;
   (int, int)? _fortschritt;
   VersandErgebnis? _ergebnis;
+  final _anhaenge = <Anhang>[];
 
   VersandDienst get _dienst => widget.dienste.versand;
 
@@ -148,7 +151,12 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     final ok = await nachfragen(
       context,
       titel: 'Nachricht senden?',
-      text: versandRueckfrage(plan, betreff: _betreff.text, staging: _staging),
+      text: versandRueckfrage(
+        plan,
+        betreff: _betreff.text,
+        staging: _staging,
+        anhaenge: [for (final a in _anhaenge) a.dateiname],
+      ),
       ja: mitPost && !_staging ? 'Senden und Briefe bezahlen' : 'Senden',
       gefaehrlich: mitPost && !_staging,
     );
@@ -163,6 +171,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
       text: _text.text,
       staging: mitPost && _staging,
       anlassId: widget.entwurf?.anlassId,
+      anhaenge: List.of(_anhaenge),
       fortschritt: (f, g) {
         if (mounted) setState(() => _fortschritt = (f, g));
       },
@@ -177,6 +186,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
         _betreff.clear();
         _text.clear();
         _vorlage = null;
+        _anhaenge.clear();
       }
     });
   }
@@ -327,6 +337,62 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     );
   }
 
+  Future<void> _anhangWaehlen(Future<GewaehlteDatei?> Function() waehlen) async {
+    try {
+      final d = await waehlen();
+      if (d == null || !mounted) return;
+      setState(() => _anhaenge.add(Anhang(d.dateiname, d.bytes)));
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    }
+  }
+
+  Widget _anhaengeTeil(BuildContext context) {
+    final waehlen = widget.dienste.umgebung.anhangWaehlen;
+    if (waehlen == null && _anhaenge.isEmpty) return const SizedBox.shrink();
+    final bilder = _anhaenge.any((a) => !a.istPdf);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final (i, a) in _anhaenge.indexed)
+              InputChip(
+                key: Key('versand-anhang-$i'),
+                avatar: Icon(
+                  a.istPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+                  size: 18,
+                ),
+                label: Text('${a.dateiname} (${(a.bytes.length / 1024).ceil()} KB)'),
+                deleteButtonTooltipMessage: 'Entfernen',
+                onDeleted: _sendet ? null : () => setState(() => _anhaenge.removeAt(i)),
+              ),
+            if (waehlen != null)
+              TextButton.icon(
+                key: const Key('versand-anhang-waehlen'),
+                icon: const Icon(Icons.attach_file),
+                label: const Text('Datei anhängen'),
+                onPressed: _sendet ? null : () => _anhangWaehlen(waehlen),
+              ),
+          ],
+        ),
+        if (bilder) ...[
+          const SizedBox(height: 4),
+          const Hinweis(
+            key: Key('versand-anhang-bilder'),
+            art: HinweisArt.neutral,
+            text:
+                'Bilder gehen nur mit der E-Mail mit. Briefe bekommen nur PDFs als weitere Seiten.',
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _inhaltKarte(BuildContext context, List<Vorlage> vorlagen) {
     final t = Theme.of(context);
     final unbekannt = unbekanntePlatzhalter('${_betreff.text}\n${_text.text}');
@@ -378,6 +444,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             helperMaxLines: 3,
           ),
         ),
+        _anhaengeTeil(context),
         if (widget.entwurf?.anlassId != null) ...[
           const SizedBox(height: 8),
           const Hinweis(

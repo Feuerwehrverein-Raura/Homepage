@@ -244,7 +244,12 @@ class VerwaltungsUmgebung {
     this.anhangVerkleinern = anhangBildVerkleinern,
     this.pdfWaehlen,
     this.bildWaehlen,
+    this.anhangWaehlen,
   });
+
+  /// Eigenen Anhang fuer eine Nachricht waehlen (PDF, JPG, PNG, bis 10 MB);
+  /// null bei Abbruch. Ohne diese Funktion fehlt «Datei anhängen».
+  final Future<GewaehlteDatei?> Function()? anhangWaehlen;
 
   /// Bild vom Geraet waehlen (TWINT-QR fuer die Kasse), unveraendert - ein
   /// verkleinerter QR liesse sich schlechter scannen. null bei Abbruch;

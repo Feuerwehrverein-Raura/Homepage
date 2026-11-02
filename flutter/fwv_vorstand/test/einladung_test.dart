@@ -65,6 +65,30 @@ void main() {
     expect(find.byKey(const Key('versand-anhang')), findsNothing);
   });
 
+  testWidgets('Verfassen: eigene Datei anhaengen und wieder entfernen', (tester) async {
+    final b = FalschesBackend(
+      (a) => switch (a.url.path) {
+        '/members' => <Object>[],
+        '/templates' => <Object>[],
+        _ => (404, {'error': 'unbekannt'}),
+      },
+    );
+    await zeigen(tester, VerfassenAnsicht(dienste: b.dienste));
+    await tester.ensureVisible(find.byKey(const Key('versand-anhang-waehlen')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('versand-anhang-waehlen')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Plakat.jpg'), findsOneWidget);
+    expect(
+      find.byKey(const Key('versand-anhang-bilder')),
+      findsOneWidget,
+      reason: 'Bild: nur per E-Mail',
+    );
+    await tester.tap(find.byTooltip('Entfernen'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Plakat.jpg'), findsNothing);
+  });
+
   test('Entwurf nennt den Anlass und sein PDF', () {
     final e = einladungsEntwurf(_anlass({'pdf_filename': 'Jass-Einladung 2026.pdf'}));
     expect(e.anlassId, 'e1');
