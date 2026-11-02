@@ -57,7 +57,7 @@ class _Zugang extends RoterSchopfZugang {
   @override
   Future<Verlauf> verlauf(String messstelle, VerlaufZeitraum zeitraum) async {
     verlaeufe.add((messstelle, zeitraum));
-    return beispielVerlauf(messstelle);
+    return messstelle == 'hauptmessung' ? beispielStrom() : beispielVerlauf(messstelle);
   }
 
   @override
@@ -305,10 +305,30 @@ void main() {
     expect(find.text('Tiefst'), findsOneWidget);
     expect(find.text('-19,8 °C'), findsOneWidget, reason: 'Tiefstwert aus min');
     expect(find.textContaining('Grenze -12,0 °C'), findsOneWidget);
-    expect(find.text('Strom aus'), findsOneWidget);
+    expect(find.text('Strom aus'), findsWidgets);
+    expect(
+      find.text('Leistung'),
+      findsOneWidget,
+      reason: 'Tiefkuehler: Leistung unter der Temperatur',
+    );
+    expect(find.text('Spitze'), findsOneWidget);
     await tester.tap(find.text('7 Tage'));
     await tester.pumpAndSettle();
     expect(z.verlaeufe.last.$2, VerlaufZeitraum.woche);
+  });
+
+  testWidgets('Strom antippen: Leistungskurve und Verbrauch', (tester) async {
+    final z = await zeigen(tester);
+    await tester.tap(find.text('Messwerte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Leistung jetzt'));
+    await tester.pumpAndSettle();
+    expect(z.verlaeufe.last.$1, 'hauptmessung');
+    expect(find.text('Strom im Lokal'), findsOneWidget);
+    expect(find.text('Grundlast'), findsOneWidget);
+    expect(find.text('4,2 kW'), findsOneWidget, reason: 'Spitze aus max');
+    await tester.scrollUntilVisible(find.text('Gesamt'), 200);
+    expect(find.text('Verbrauch'), findsOneWidget);
   });
 }
 
@@ -319,6 +339,7 @@ Verlauf beispielVerlauf(String messstelle) {
   final von = bis.subtract(const Duration(hours: 24));
   final temp = <Map<String, Object?>>[];
   final an = <Map<String, Object?>>[];
+  final watt = <Map<String, Object?>>[];
   for (var i = 0; i < 288; i++) {
     final t = von.add(Duration(minutes: 5 * i));
     if (i >= 100 && i < 112) continue; // Luecke
@@ -328,6 +349,13 @@ Verlauf beispielVerlauf(String messstelle) {
         : -16.75 + 2.75 * ((i % 24) < 12 ? (i % 12) / 12 : 1 - (i % 12) / 12) * 2 - 2.75;
     temp.add({'t': t.toUtc().toIso8601String(), 'mittel': w, 'min': w - 0.3, 'max': w + 0.3});
     an.add({'t': t.toUtc().toIso8601String(), 'mittel': aus ? 0 : 1});
+    final w2 = aus ? 0.0 : ((i % 24) < 10 ? 95.0 : 2.0);
+    watt.add({
+      't': t.toUtc().toIso8601String(),
+      'mittel': w2,
+      'min': w2 == 95 ? 80 : 0,
+      'max': w2 == 95 ? 140 : 3,
+    });
   }
   return Verlauf.ausJson({
     'messstelle': messstelle,
@@ -335,6 +363,29 @@ Verlauf beispielVerlauf(String messstelle) {
     'von': von.toUtc().toIso8601String(),
     'bis': bis.toUtc().toIso8601String(),
     'grenze': -12,
-    'reihen': {'temperatur': temp, 'an': an},
+    'reihen': {'temperatur': temp, 'an': an, 'watt': watt},
+  });
+}
+
+/// 7 Tage Hauptanschluss: Grundlast 250 W, Fr-So abends Betrieb bis 4,2 kW.
+Verlauf beispielStrom() {
+  final bis = DateTime(2026, 11, 2, 14);
+  final von = bis.subtract(const Duration(days: 7));
+  final leistung = <Map<String, Object?>>[];
+  final verbrauch = <Map<String, Object?>>[];
+  for (var i = 0; i < 336; i++) {
+    final t = von.add(Duration(minutes: 30 * i));
+    final abend = t.hour >= 18 && t.hour < 23 && t.weekday >= 5;
+    final w = abend ? 2500.0 + (t.hour - 18) * 300 : 250.0 + (t.hour >= 8 && t.hour < 17 ? 150 : 0);
+    final iso = t.toUtc().toIso8601String();
+    leistung.add({'t': iso, 'mittel': w, 'min': w * 0.7, 'max': abend ? 4200 : w * 1.6});
+    verbrauch.add({'t': iso, 'mittel': w / 2000, 'min': w / 2000, 'max': w / 2000});
+  }
+  return Verlauf.ausJson({
+    'messstelle': 'hauptmessung',
+    'raster_s': 1800,
+    'von': von.toUtc().toIso8601String(),
+    'bis': bis.toUtc().toIso8601String(),
+    'reihen': {'leistung_w': leistung, 'verbrauch_kwh': verbrauch},
   });
 }

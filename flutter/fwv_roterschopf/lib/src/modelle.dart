@@ -50,15 +50,19 @@ class Hauptmessung {
     this.leistungW,
     this.phasen = const [],
     this.zaehlerKwh,
+    this.messstelle = 'hauptmessung',
   });
 
   factory Hauptmessung.ausJson(Map<String, dynamic> j) => Hauptmessung(
+    messstelle: j['messstelle'] is String ? j['messstelle'] as String : 'hauptmessung',
     erreichbar: j['erreichbar'] == true,
     leistungW: _ganz(j['leistung_w']),
     phasen: _liste(j['phasen'], Phase.ausJson),
     zaehlerKwh: (j['zaehler_kwh'] as num?)?.toDouble(),
   );
 
+  /// Fuer den Verlauf (Leistung, Verbrauch).
+  final String messstelle;
   final bool erreichbar;
   final int? leistungW;
   final List<Phase> phasen;

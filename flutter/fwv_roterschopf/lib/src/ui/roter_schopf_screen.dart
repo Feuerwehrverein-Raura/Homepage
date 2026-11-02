@@ -214,12 +214,16 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
   }
 
   /// Antippen einer Karte: Temperaturkurve ([VerlaufScreen]).
-  VoidCallback? _verlaufOeffner(String? messstelle, String name) => messstelle == null
+  VoidCallback? _verlaufOeffner(
+    String? messstelle,
+    String name, {
+    VerlaufArt art = VerlaufArt.temperatur,
+  }) => messstelle == null
       ? null
       : () => Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) =>
-                VerlaufScreen(zugang: widget.zugang, messstelle: messstelle, name: name),
+                VerlaufScreen(zugang: widget.zugang, messstelle: messstelle, name: name, art: art),
           ),
         );
 
@@ -227,7 +231,17 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
     return ListView(
       padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
-        if (z.hauptmessung != null) ...[const _Kopf('Strom'), _StromKarte(z.hauptmessung!)],
+        if (z.hauptmessung != null) ...[
+          const _Kopf('Strom'),
+          _StromKarte(
+            z.hauptmessung!,
+            verlauf: _verlaufOeffner(
+              z.hauptmessung!.messstelle,
+              'Strom im Lokal',
+              art: VerlaufArt.strom,
+            ),
+          ),
+        ],
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
           if (widget.alarmSchalten) _AlarmKarte(zugang: widget.zugang, qrScannen: widget.qrScannen),
@@ -404,9 +418,10 @@ String _zahl(double v, int stellen) => v.toStringAsFixed(stellen).replaceAll('.'
 
 /// Hauptmessung: Leistung gross, darunter je Phase und der Zaehlerstand.
 class _StromKarte extends StatelessWidget {
-  const _StromKarte(this.m);
+  const _StromKarte(this.m, {this.verlauf});
 
   final Hauptmessung m;
+  final VoidCallback? verlauf;
 
   @override
   Widget build(BuildContext context) {
@@ -420,61 +435,65 @@ class _StromKarte extends StatelessWidget {
     }
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.bolt),
-                const SizedBox(width: 12),
-                const Expanded(child: Text('Leistung jetzt')),
-                Text(
-                  m.leistungW == null ? '—' : '${m.leistungW} W',
-                  style: text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: ziffern,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: verlauf,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bolt),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Leistung jetzt')),
+                  Text(
+                    m.leistungW == null ? '—' : '${m.leistungW} W',
+                    style: text.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: ziffern,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (final p in m.phasen)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 36, child: Text(p.name, style: text.labelLarge)),
+                      Expanded(
+                        child: Text(
+                          [
+                            if (p.spannungV != null) '${_zahl(p.spannungV!, 0)} V',
+                            if (p.stromA != null) '${_zahl(p.stromA!, 2)} A',
+                          ].join(' · '),
+                          style: text.bodySmall?.copyWith(fontFeatures: ziffern),
+                        ),
+                      ),
+                      Text(
+                        p.leistungW == null ? '—' : '${p.leistungW} W',
+                        style: text.bodyMedium?.copyWith(fontFeatures: ziffern),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final p in m.phasen)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
+              if (m.zaehlerKwh != null) ...[
+                const Divider(height: 20),
+                Row(
                   children: [
-                    SizedBox(width: 36, child: Text(p.name, style: text.labelLarge)),
-                    Expanded(
-                      child: Text(
-                        [
-                          if (p.spannungV != null) '${_zahl(p.spannungV!, 0)} V',
-                          if (p.stromA != null) '${_zahl(p.stromA!, 2)} A',
-                        ].join(' · '),
-                        style: text.bodySmall?.copyWith(fontFeatures: ziffern),
-                      ),
-                    ),
+                    const Expanded(child: Text('Zählerstand')),
                     Text(
-                      p.leistungW == null ? '—' : '${p.leistungW} W',
+                      '${_zahl(m.zaehlerKwh!, 1)} kWh',
                       style: text.bodyMedium?.copyWith(fontFeatures: ziffern),
                     ),
                   ],
                 ),
-              ),
-            if (m.zaehlerKwh != null) ...[
-              const Divider(height: 20),
-              Row(
-                children: [
-                  const Expanded(child: Text('Zählerstand')),
-                  Text(
-                    '${_zahl(m.zaehlerKwh!, 1)} kWh',
-                    style: text.bodyMedium?.copyWith(fontFeatures: ziffern),
-                  ),
-                ],
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
