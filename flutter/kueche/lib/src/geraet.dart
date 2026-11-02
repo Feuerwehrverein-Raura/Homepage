@@ -38,6 +38,15 @@ class Geraet {
 
   Future<void> beenden() => _rufen('beenden');
 
+  /// Geraetesperre (KioskAdmin.kt): ist die App Geraetebesitzer, ist die Sperre aktiv?
+  Future<({bool besitzer, bool aktiv})> sperre() async {
+    final m = await _rufen<Map>('sperre') ?? const {};
+    return (besitzer: m['besitzer'] == true, aktiv: m['aktiv'] == true);
+  }
+
+  /// Sperre loesen und Geraetebesitz abgeben - danach eine gewoehnliche App.
+  Future<void> sperreAufheben() => _rufen('sperreAufheben');
+
   Future<bool> darfInstallieren() async => await _rufen<bool>('darfInstallieren') ?? false;
 
   Future<void> erlaubnisOeffnen() => _rufen('erlaubnisOeffnen');

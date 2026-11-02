@@ -44,6 +44,28 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
     );
   }
 
+  Future<void> _sperreAufheben() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gerätesperre aufheben?'),
+        content: const Text(
+          'Das Tablet ist danach wieder frei bedienbar. Wieder einrichten geht nur per adb am Computer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Aufheben')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final d = widget.dienste;
+    await d.geraet.sperreAufheben();
+    await d.geraet.alsStartbildschirm(d.einstellungen.alsStart);
+    setState(() {});
+    _meldung('Gerätesperre aufgehoben');
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = widget.dienste;
@@ -117,6 +139,21 @@ class _EinstellungenScreenState extends State<EinstellungenScreen> {
               await e.alsStartSetzen(an);
               await d.geraet.alsStartbildschirm(an);
               setState(() {});
+            },
+          ),
+          FutureBuilder(
+            future: d.geraet.sperre(),
+            builder: (context, s) {
+              final besitzer = s.data?.besitzer ?? false;
+              return ListTile(
+                title: const Text('Gerätesperre'),
+                subtitle: Text(
+                  besitzer
+                      ? 'Aktiv: nur diese App, keine Statusleiste, Updates ohne Rückfrage. Antippen zum Aufheben.'
+                      : 'Nicht eingerichtet – per adb: dpm set-device-owner ch.fwvraura.kitchendisplay/.KioskAdmin',
+                ),
+                onTap: besitzer ? _sperreAufheben : null,
+              );
             },
           ),
           ListTile(

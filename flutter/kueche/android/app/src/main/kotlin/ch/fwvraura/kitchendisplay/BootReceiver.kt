@@ -3,6 +3,7 @@ package ch.fwvraura.kitchendisplay
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.util.Log
 
 /**
@@ -11,8 +12,17 @@ import android.util.Log
  * Auf Android 7 darf ein Empfaenger Aktivitaeten direkt starten.
  */
 class BootReceiver : BroadcastReceiver() {
+    companion object {
+        /** Rueckmeldung der stillen Installation (MainActivity.stillInstallieren) */
+        const val INSTALLIERT = "ch.fwvraura.kitchendisplay.INSTALLIERT"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
+            INSTALLIERT -> {
+                val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)
+                Log.i("BootReceiver", "Update: $status ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}")
+            }
             Intent.ACTION_BOOT_COMPLETED,
             "android.intent.action.QUICKBOOT_POWERON",
             Intent.ACTION_MY_PACKAGE_REPLACED -> {

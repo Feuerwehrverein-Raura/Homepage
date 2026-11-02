@@ -21,3 +21,23 @@ Ausgangs-Code der alten App (`lib/src/geraet.dart`, `Einstellungen.laden`).
 Release: Tag `kds-vX.Y` (Workflow `build-android-kds.yml`, Skill
 `fwv-app-downloads`). Testen im Emulator wie die Kasse (Skill
 `fwv-kasse-testen`) mit `--dart-define=KUECHE_CLOUD=… KUECHE_LOKAL=…`.
+
+## Gerätesperre (wie Fully Kiosk)
+
+Ohne Zusatz-App: Ist die Küche **Gerätebesitzer**, sperrt sie das Tablet auf
+die Anzeige (Lock Task). Dann gibt es keine Statusleiste, kein Home und keine
+Übersicht, keine Displaysperre, und der Bildschirm bleibt am Strom an. Die
+App ist fest der Startbildschirm und installiert Updates ohne Rückfrage.
+
+Einrichten einmal pro Tablet, per USB am Computer. Auf dem Gerät darf
+**kein Konto** angemeldet sein (Einstellungen › Konten: Google-Konto
+entfernen). Notfalls das Tablet zurücksetzen und die Einrichtung ohne
+Konto überspringen.
+
+    adb install kueche.apk          # falls noch nicht installiert
+    adb shell dpm set-device-owner ch.fwvraura.kitchendisplay/.KioskAdmin
+
+Verlassen: Logo 3 s halten, dann den Code eingeben und «App beenden» wählen
+(die Sperre gilt bis zum nächsten Start). Ganz aufheben geht über
+Einstellungen › «Gerätesperre», danach ist es wieder eine gewöhnliche App.
+Solange die Sperre gilt, lässt sich die App nicht deinstallieren.
