@@ -128,11 +128,14 @@ function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
 /** Brief im Versandprotokoll festhalten (send-post, send-pdf-post schrieben
  *  bisher nichts - Verlauf und Pingen-Liste blieben leer). Staging-Briefe
  *  sind im Betreff markiert. Fehler hier brechen den Versand nicht ab. */
-async function briefProtokollieren(pool, { memberId, recipient, subject, letterId, staging, eventId }) {
+async function briefProtokollieren(pool, { memberId, recipient, subject, letterId, staging, eventId,
+    status = 'sent', fehler = null }) {
     try {
+        // status 'failed' + fehler: Pingen hat den Brief abgelehnt (brief-versand.js).
         await pool.query(
-            `INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id, sent_at)
-             VALUES ('pingen', $1, $2, $3, 'sent', $4, $5, NOW())`,
+            `INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id,
+                                       error_message, sent_at)
+             VALUES ('pingen', $1, $2, $3, $6, $4, $5, $7, CASE WHEN $6 = 'sent' THEN NOW() END)`,
             [
                 memberId && UUID.test(String(memberId)) ? memberId : null,
                 JSON.stringify({
@@ -143,7 +146,9 @@ async function briefProtokollieren(pool, { memberId, recipient, subject, letterI
                 }),
                 `${staging ? '[Staging] ' : ''}${subject || 'Brief'}`.slice(0, 300),
                 letterId || null,
-                eventId && UUID.test(String(eventId)) ? eventId : null
+                eventId && UUID.test(String(eventId)) ? eventId : null,
+                status,
+                fehler ? String(fehler).slice(0, 500) : null
             ]
         );
     } catch (error) {

@@ -5,20 +5,14 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
-const { authenticateAny, requireRole, requireApiKey } = require('./auth-middleware');
+const { authenticateAny, requireRole } = require('./auth-middleware');
 const puppeteer = require('puppeteer');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
-const fontkit = require('@pdf-lib/fontkit');
-const { SwissQRBill, SwissQRCode } = require('swissqrbill/pdf');
-const { generate } = require('@pdfme/generator');
-const { text, image, barcodes } = require('@pdfme/schemas');
 const crypto = require('crypto');
 const nachrichtLayout = require('./nachricht-layout');
 const { anlassPdf, mitAnlassPdf, seitenAnhaengen } = require('./anlass-pdf');
 const einladungLayout = require('./einladung-layout');
+const briefKern = require('./brief-versand');
 const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen, einladungInhalt, emailVorschau } = require('./nachricht-routen');
 
 // ============================================
@@ -51,7 +45,6 @@ setInterval(() => {
         if (now > entry.resetAt) contactRateLimit.delete(ip);
     }
 }, 30 * 60 * 1000);
-const { BLANK_PDF } = require('@pdfme/common');
 
 // DEUTSCH: Express-App, Port, Service-Name und PostgreSQL-Verbindungspool initialisieren
 const app = express();
@@ -112,24 +105,6 @@ function getPingenOrgId(staging = false) {
     return process.env.PINGEN_ORGANISATION_ID;
 }
 
-// DEUTSCH: Trennt Strasse und Hausnummer fuer die Pingen-API
-// z.B. "Musterstrasse 12" -> { street: "Musterstrasse", number: "12" }
-// z.B. "Hauptstr. 5a" -> { street: "Hauptstr.", number: "5a" }
-function parseStreetAndNumber(fullStreet) {
-    if (!fullStreet) return { street: '', number: '' };
-
-    // Regex to match street name followed by house number at the end
-    // Supports: "Musterstrasse 12", "Hauptstr. 5a", "Am Waldrand 123b"
-    const match = fullStreet.match(/^(.+?)\s+(\d+\s*[a-zA-Z]?)$/);
-    if (match) {
-        return {
-            street: match[1].trim(),
-            number: match[2].trim()
-        };
-    }
-    // If no number found, return full street as street name
-    return { street: fullStreet.trim(), number: '' };
-}
 
 // Absender-Adresse für Pingen
 // Hinweis: pobox und number müssen mindestens 1 Zeichen haben (minLength: 1 laut API)
@@ -143,26 +118,7 @@ const SENDER_ADDRESS = {
     country: 'CH'
 };
 
-// Helper: Pingen meta_data Adresse erstellen (entfernt leere Felder)
-function buildPingenAddress(address) {
-    const result = {};
-    // Nur nicht-leere Felder hinzufügen (API erwartet minLength: 1 für alle Felder)
-    if (address.name) result.name = address.name;
-    if (address.street) result.street = address.street;
-    if (address.number) result.number = address.number;
-    if (address.pobox) result.pobox = address.pobox;
-    if (address.zip) result.zip = address.zip;
-    if (address.city) result.city = address.city;
-    if (address.country) result.country = address.country;
-    return result;
-}
 
-// Helper: Adresse als formatierten String für Deckblatt erstellen
-// Format: "Name\nStrasse Nummer\nPLZ Ort"
-function formatAddressForCoverPage(name, street, number, zip, city) {
-    const streetLine = number ? `${street} ${number}` : street;
-    return `${name}\n${streetLine}\n${zip} ${city}`;
-}
 
 // DEUTSCH: Kostenmeldung an den Kassier fuer jeden Pingen-Brief - ueber die
 // Sammelmail (sammelmail.js, taeglich 18:00), damit er bei vielen Briefen eine
@@ -191,389 +147,15 @@ async function sendPingenCostNotification(recipientName, letterId, isStaging = f
     }
 }
 
-// DEUTSCH: Sendet eine Sammel-Kostenbenachrichtigung an den Kassier nach Massenversand
-async function sendPingenBulkCostNotification(count, successList, isStaging = false) {
-    try {
-        const kassierResult = await pool.query(
-            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' LIMIT 1"
-        );
 
-        if (kassierResult.rows.length === 0) {
-            logWarn('Kassier not found for Pingen bulk cost notification');
-            return;
-        }
 
-        const kassier = kassierResult.rows[0];
-        const estimatedCostPerLetter = 1.00; // CHF
-        const totalEstimatedCost = (count * estimatedCostPerLetter).toFixed(2);
-        const environment = isStaging ? ' (STAGING/TEST)' : '';
 
-        const recipientList = successList.map(s => `- ${s.name}`).join('\n');
-        const recipientListHtml = successList.map(s => `<li>${s.name}</li>`).join('');
 
-        await transporter.sendMail({
-            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-            to: kassier.email,
-            subject: `Pingen Massenversand${environment}: ${count} Briefe`,
-            text: `Hallo ${kassier.vorname},\n\nEin Massenversand wurde über Pingen durchgeführt:\n\nAnzahl Briefe: ${count}\nGeschätzte Kosten: ca. CHF ${totalEstimatedCost}\n\nEmpfänger:\n${recipientList}\n\nDie genauen Kosten findest du im Pingen Dashboard.\n\nFeuerwehrverein Raura`,
-            html: `<p>Hallo ${kassier.vorname},</p><p>Ein Massenversand wurde über Pingen durchgeführt:</p><ul><li><strong>Anzahl Briefe:</strong> ${count}</li><li><strong>Geschätzte Kosten:</strong> ca. CHF ${totalEstimatedCost}</li></ul><p><strong>Empfänger:</strong></p><ul>${recipientListHtml}</ul><p>Die genauen Kosten findest du im <a href="https://app.pingen.com">Pingen Dashboard</a>.</p><p>Feuerwehrverein Raura</p>`
-        });
 
-        logInfo('Pingen bulk cost notification sent to Kassier', { count, totalEstimatedCost });
-    } catch (error) {
-        logError('Failed to send Pingen bulk cost notification', { error: error.message });
-    }
-}
 
-// DEUTSCH: Cache fuer die heruntergeladene Schriftart (Inter) - wird nur einmal geladen
-let cachedFontBytes = null;
 
-// DEUTSCH: Laedt die Inter-Schriftart fuer PDF-Einbettung (von Google Fonts, OFL-Lizenz)
-// Wird lokal in /tmp gecacht fuer Neustarts
-async function getEmbeddableFont() {
-    if (cachedFontBytes) {
-        return cachedFontBytes;
-    }
 
-    const fontPath = path.join('/tmp', 'Inter-Regular.ttf');
 
-    // Prüfen ob Font bereits lokal gecached
-    if (fs.existsSync(fontPath)) {
-        cachedFontBytes = fs.readFileSync(fontPath);
-        return cachedFontBytes;
-    }
-
-    // Font von Google Fonts herunterladen (Inter Regular)
-    // Direct link to TTF file from Google Fonts
-    const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf';
-
-    try {
-        console.log('Downloading Inter font for PDF embedding...');
-        const response = await axios.get(fontUrl, { responseType: 'arraybuffer' });
-        cachedFontBytes = Buffer.from(response.data);
-
-        // Lokal cachen für nächsten Neustart
-        fs.writeFileSync(fontPath, cachedFontBytes);
-        console.log('Inter font downloaded and cached');
-
-        return cachedFontBytes;
-    } catch (error) {
-        console.error('Could not download Inter font, falling back to Helvetica:', error.message);
-        return null;
-    }
-}
-
-// DEUTSCH: Erkennt das Land anhand der Postleitzahl in der Adresse
-// CH = 4-stellige PLZ, DE = 5-stellige PLZ (fuer korrekte Adressfenster-Position)
-function detectCountryFromAddress(address) {
-    // Suche nach PLZ-Muster
-    // Schweiz: 4-stellige PLZ (z.B. "8000 Zürich" oder "CH-8000 Zürich")
-    // Deutschland: 5-stellige PLZ (z.B. "80331 München" oder "DE-80331 München")
-
-    // Explizite Länderkennung
-    if (/\bCH[-\s]?\d{4}\b/i.test(address)) return 'CH';
-    if (/\bDE[-\s]?\d{5}\b/i.test(address)) return 'DE';
-    if (/\bD[-\s]?\d{5}\b/i.test(address)) return 'DE';
-
-    // PLZ-Länge als Fallback
-    const plzMatch = address.match(/\b(\d{4,5})\s+\w/);
-    if (plzMatch) {
-        const plz = plzMatch[1];
-        if (plz.length === 4) return 'CH';
-        if (plz.length === 5) return 'DE';
-    }
-
-    // Default: Schweiz
-    return 'CH';
-}
-
-// DEUTSCH: Schreibt Absender- und Empfaengeradresse direkt ins PDF
-// CH: Adressfenster rechts (Schweizer Briefstandard), DE: Adressfenster links (DIN 5008)
-async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null) {
-    console.log('[addAddressToPdf] Starting PDF address embedding...');
-    console.log(`[addAddressToPdf] Input PDF size: ${pdfBuffer.length} bytes`);
-    console.log(`[addAddressToPdf] Recipient address: ${recipientAddress}`);
-
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
-
-    // fontkit registrieren für Custom Fonts
-    pdfDoc.registerFontkit(fontkit);
-
-    const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
-    const { width, height } = firstPage.getSize();
-
-    // Versuche eingebettete Schriftart zu laden, sonst Fallback auf Helvetica
-    let font;
-    const fontBytes = await getEmbeddableFont();
-    if (fontBytes) {
-        try {
-            font = await pdfDoc.embedFont(fontBytes);
-            console.log('Using embedded Inter font');
-        } catch (fontErr) {
-            console.error('Could not embed Inter font:', fontErr.message);
-            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        }
-    } else {
-        font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    }
-
-    const fontSize = 10;
-    const lineHeight = 14;
-
-    // Land erkennen und Position bestimmen
-    // A4: 595 x 842 points, 1mm = 2.835 points
-    const country = detectCountryFromAddress(recipientAddress);
-    let addressX, addressY;
-
-    if (country === 'DE') {
-        // Deutsches Briefformat: Adressfenster LINKS (DIN Standard)
-        // DIN 5008: Adressfenster bei ~45mm von oben, aber Textbaseline tiefer
-        // damit der weiße Hintergrund nicht den Header überdeckt
-        addressX = 57; // ~20mm von links
-        addressY = height - 213; // ~75mm von oben (75 * 2.835 = 213)
-        console.log('Detected German address - using LEFT window position');
-    } else {
-        // Schweizer Briefformat: Adressfenster RECHTS
-        // Pingen Spezifikation:
-        //   Adressbereich: X=118mm, Y=60mm, W=85.5mm, H=25.5mm (60-85.5mm von oben)
-        //   Frankierbereich: X=116mm, Y=40mm, W=89.5mm, H=47.5mm (40-87.5mm von oben)
-        // Position bei ~70mm von oben = Mitte des Adressfelds
-        addressX = 335; // 118mm von links
-        addressY = height - 198; // ~70mm von oben (70 * 2.835 = 198)
-        console.log('Detected Swiss address - using RIGHT window position');
-    }
-
-    // Weißen Hintergrund für Adressbereich zeichnen (damit bestehender Inhalt nicht durchscheint)
-    const bgPadding = 10;
-    const bgWidth = 200;
-    const bgHeight = 90;
-    firstPage.drawRectangle({
-        x: addressX - bgPadding,
-        y: addressY - bgHeight + 20,
-        width: bgWidth,
-        height: bgHeight,
-        color: rgb(1, 1, 1), // Weiß
-    });
-    console.log(`[addAddressToPdf] Drew white background at X=${addressX - bgPadding}, Y=${addressY - bgHeight + 20}, W=${bgWidth}, H=${bgHeight}`);
-
-    // Absender (klein, oberhalb der Empfängeradresse)
-    if (senderAddress) {
-        const senderFontSize = 7;
-        firstPage.drawText(senderAddress, {
-            x: addressX,
-            y: addressY + 20,
-            size: senderFontSize,
-            font: font,
-            color: rgb(0.3, 0.3, 0.3)
-        });
-        // Trennlinie
-        firstPage.drawLine({
-            start: { x: addressX, y: addressY + 15 },
-            end: { x: addressX + 180, y: addressY + 15 },
-            thickness: 0.5,
-            color: rgb(0.7, 0.7, 0.7)
-        });
-    }
-
-    // Empfängeradresse (mehrzeilig)
-    const addressLines = recipientAddress.split('\n');
-    console.log(`[addAddressToPdf] Drawing ${addressLines.length} address lines at X=${addressX}, Y=${addressY}`);
-    addressLines.forEach((line, index) => {
-        console.log(`[addAddressToPdf] Line ${index}: "${line}"`);
-        firstPage.drawText(line, {
-            x: addressX,
-            y: addressY - (index * lineHeight),
-            size: fontSize,
-            font: font,
-            color: rgb(0, 0, 0)
-        });
-    });
-
-    const savedPdf = await pdfDoc.save();
-    console.log(`[addAddressToPdf] PDF saved. Output size: ${savedPdf.length} bytes`);
-    return { pdfBytes: savedPdf, country };
-}
-
-// DEUTSCH: Wartet bis Pingen die initiale Brief-Verarbeitung abgeschlossen hat (max. 10 Versuche)
-// Polling alle 2 Sek. bis Status nicht mehr "validating" ist
-async function waitForLetterProcessing(letterId, token, staging = false) {
-    const PINGEN_API = getPingenApi(staging);
-    const maxAttempts = 10;
-    const delayMs = 2000;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            const response = await axios.get(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-
-            const status = response.data.data?.attributes?.status;
-            console.log(`Letter ${letterId} processing check ${attempt}/${maxAttempts}: status=${status}`);
-
-            // Sobald nicht mehr "validating", ist die initiale Verarbeitung fertig
-            if (status && status !== 'validating') {
-                return { ready: true, status };
-            }
-
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-        } catch (error) {
-            console.error(`Error checking letter ${letterId} processing:`, error.response?.data || error.message);
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-        }
-    }
-
-    return { ready: false, status: 'timeout' };
-}
-
-// DEUTSCH: Wartet bis der Brief bei Pingen validiert ist (max. 30 Sek., 10 Versuche a 3 Sek.)
-// Gibt Erfolg zurueck bei "valid" oder "action_required" (manuelle Aktion noetig)
-async function waitForLetterValidation(letterId, token, staging = false) {
-    const PINGEN_API = getPingenApi(staging);
-    const maxAttempts = 10;
-    const delayMs = 3000;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            const response = await axios.get(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-
-            const letterData = response.data.data?.attributes;
-            const status = letterData?.status;
-            console.log(`Letter ${letterId} validation check ${attempt}/${maxAttempts}: status=${status}`);
-
-            if (status === 'valid') {
-                return { success: true, status };
-            }
-
-            if (status === 'action_required') {
-                // Log full letter data to understand why it requires action
-                console.log(`Letter ${letterId} requires action. Details:`, JSON.stringify({
-                    status: letterData?.status,
-                    paper_types: letterData?.paper_types,
-                    fonts: letterData?.fonts,
-                    file_pages: letterData?.file_pages,
-                    address_position: letterData?.address_position,
-                    print_mode: letterData?.print_mode
-                }, null, 2));
-                // Brief NICHT löschen - als Erfolg behandeln, braucht nur manuelle Aktion in Pingen
-                return { success: true, status, needsManualAction: true };
-            }
-
-            if (status === 'invalid') {
-                return { success: false, status, reason: 'Letter is invalid' };
-            }
-
-            // Status ist noch 'validating' oder ähnlich - weiter warten
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-        } catch (error) {
-            console.error(`Error checking letter ${letterId} status:`, error.response?.data || error.message);
-            if (attempt < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
-        }
-    }
-
-    return { success: false, status: 'timeout', reason: 'Validation timeout' };
-}
-
-// DEUTSCH: Prueft den endgueltigen Brief-Status bei Pingen nach dem Versand
-// Briefe mit "action_required" bleiben in Pingen fuer manuelle Bearbeitung
-async function checkAndDeleteIfActionRequired(letterId, token, staging = false) {
-    const PINGEN_API = getPingenApi(staging);
-
-    // Kurz warten bis Pingen das PDF verarbeitet hat
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    try {
-        // Brief-Status abrufen
-        const statusResponse = await axios.get(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        const letterStatus = statusResponse.data.data?.attributes?.status;
-        console.log(`Letter ${letterId} final status: ${letterStatus}`);
-
-        // Brief NICHT löschen - auch bei action_required bleibt er in Pingen
-        // für manuelle Bearbeitung
-        if (letterStatus === 'action_required') {
-            console.log(`Letter ${letterId} requires manual action in Pingen - NOT deleting`);
-            return { success: true, status: letterStatus, needsManualAction: true };
-        }
-
-        return { success: true, status: letterStatus };
-    } catch (error) {
-        console.error(`Error checking letter status for ${letterId}:`, error.response?.data || error.message);
-        return { success: true, warning: 'Could not verify letter status' };
-    }
-}
-
-// DEUTSCH: Nextcloud-Konfiguration fuer Datei-Upload via WebDAV (z.B. Arbeitsplaene speichern)
-const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
-const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER;
-const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD;
-const NEXTCLOUD_FOLDER = process.env.NEXTCLOUD_FOLDER || '/FWV-Dokumente';
-
-// DEUTSCH: Laedt eine Datei per WebDAV in die Nextcloud hoch (erstellt Ordner falls noetig)
-async function uploadToNextcloud(filename, buffer, subfolder = '') {
-    if (!NEXTCLOUD_URL || !NEXTCLOUD_USER) {
-        console.log('Nextcloud nicht konfiguriert, Datei wird nicht hochgeladen');
-        return null;
-    }
-
-    try {
-        const path = `${NEXTCLOUD_FOLDER}${subfolder}/${filename}`;
-        const url = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USER}${path}`;
-
-        // Ordner erstellen falls nicht vorhanden
-        const folderPath = `${NEXTCLOUD_FOLDER}${subfolder}`;
-        await axios({
-            method: 'MKCOL',
-            url: `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USER}${folderPath}`,
-            auth: { username: NEXTCLOUD_USER, password: NEXTCLOUD_PASSWORD }
-        }).catch(() => {}); // Ignorieren falls Ordner existiert
-
-        // Datei hochladen
-        await axios({
-            method: 'PUT',
-            url,
-            data: buffer,
-            auth: { username: NEXTCLOUD_USER, password: NEXTCLOUD_PASSWORD },
-            headers: { 'Content-Type': 'application/octet-stream' }
-        });
-
-        console.log(`Datei hochgeladen: ${path}`);
-        return `${NEXTCLOUD_URL}/apps/files/?dir=${encodeURIComponent(folderPath)}&openfile=${encodeURIComponent(filename)}`;
-    } catch (error) {
-        console.error('Nextcloud Upload Fehler:', error.message);
-        return null;
-    }
-}
 
 // DEUTSCH: CORS-Konfiguration - erlaubt alle fwv-raura.ch Subdomains und localhost fuer Entwicklung
 app.use(cors({
@@ -921,421 +503,12 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
 // DEUTSCH: Intelligenter Versand - waehlt automatisch E-Mail oder Brief (CH/DE) pro Mitglied
 // ============================================
 
-// DEUTSCH: Automatischer Versand an mehrere Mitglieder - waehlt Kanal basierend auf Zustellpraeferenz
-// E-Mail wenn zustellung_email=true, sonst Brief via Pingen (CH oder DE je nach PLZ)
-app.post('/dispatch/smart', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    console.log('[SMART DISPATCH] Starting smart dispatch...');
-    try {
-        const { template_group, member_ids, variables = {}, staging = false } = req.body;
-
-        if (!template_group) {
-            return res.status(400).json({ error: 'template_group is required' });
-        }
-
-        // Load all template variants
-        const templatesResult = await pool.query(
-            `SELECT * FROM dispatch_templates WHERE name IN ($1, $2, $3)`,
-            [`${template_group}_email`, `${template_group}_brief_ch`, `${template_group}_brief_de`]
-        );
-        const templates = {};
-        templatesResult.rows.forEach(t => {
-            if (t.name.endsWith('_email')) templates.email = t;
-            else if (t.name.endsWith('_brief_ch')) templates.brief_ch = t;
-            else if (t.name.endsWith('_brief_de')) templates.brief_de = t;
-        });
-
-        console.log('[SMART DISPATCH] Found templates:', Object.keys(templates));
-
-        // Get members (Authorization-Header vom Request weiterreichen)
-        const membersResponse = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
-            params: { ids: member_ids.join(',') },
-            headers: { Authorization: req.headers.authorization || '' }
-        });
-        const members = membersResponse.data;
-        console.log('[SMART DISPATCH] Processing', members.length, 'members');
-
-        const results = { email: [], brief_ch: [], brief_de: [], skipped: [] };
-
-        for (const member of members) {
-            const mergedVars = {
-                anrede: member.anrede,
-                vorname: member.vorname,
-                nachname: member.nachname,
-                strasse: member.strasse,
-                plz: member.plz,
-                ort: member.ort,
-                email: member.email,
-                ...variables
-            };
-
-            // Determine delivery method
-            const hasEmail = member.email && member.zustellung_email;
-            const hasPost = member.zustellung_post && member.strasse && member.plz && member.ort;
-
-            // Detect country from PLZ (4 digits = CH, 5 digits = DE)
-            const isDE = member.plz && member.plz.toString().length === 5;
-            const country = isDE ? 'DE' : 'CH';
-
-            try {
-                if (hasEmail && templates.email) {
-                    // Send email (Authorization-Header weiterreichen)
-                    await axios.post(`http://localhost:${PORT}/email/send`, {
-                        to: member.versand_email || member.email,
-                        template_id: templates.email.id,
-                        variables: mergedVars,
-                        member_id: member.id
-                    }, {
-                        headers: { Authorization: req.headers.authorization || '' }
-                    });
-                    results.email.push({ member_id: member.id, name: `${member.vorname} ${member.nachname}` });
-                } else if (hasPost) {
-                    // Send letter
-                    const template = country === 'DE' ? templates.brief_de : templates.brief_ch;
-                    if (template) {
-                        // Replace variables in template body (HTML-escaped)
-                        let html = template.body;
-                        Object.keys(mergedVars).forEach(key => {
-                            const safeValue = String(mergedVars[key] || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                            html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), safeValue);
-                        });
-
-                        await axios.post(`http://localhost:${PORT}/pingen/send`, {
-                            html,
-                            recipient: {
-                                name: `${member.vorname} ${member.nachname}`,
-                                street: member.strasse,
-                                zip: member.plz,
-                                city: member.ort,
-                                country
-                            },
-                            member_id: member.id,
-                            staging,
-                            template_id: template.id
-                        }, {
-                            headers: { Authorization: req.headers.authorization || '' }
-                        });
-                        results[country === 'DE' ? 'brief_de' : 'brief_ch'].push({
-                            member_id: member.id,
-                            name: `${member.vorname} ${member.nachname}`
-                        });
-                    } else {
-                        results.skipped.push({
-                            member_id: member.id,
-                            name: `${member.vorname} ${member.nachname}`,
-                            reason: `Kein Template für ${country}`
-                        });
-                    }
-                } else {
-                    results.skipped.push({
-                        member_id: member.id,
-                        name: `${member.vorname} ${member.nachname}`,
-                        reason: 'Keine gültige Zustellmethode'
-                    });
-                }
-            } catch (err) {
-                console.error('[SMART DISPATCH] Error for member', member.id, err.message);
-                results.skipped.push({
-                    member_id: member.id,
-                    name: `${member.vorname} ${member.nachname}`,
-                    reason: err.message
-                });
-            }
-        }
-
-        console.log('[SMART DISPATCH] Complete:', {
-            email: results.email.length,
-            brief_ch: results.brief_ch.length,
-            brief_de: results.brief_de.length,
-            skipped: results.skipped.length
-        });
-
-        res.json({
-            success: true,
-            summary: {
-                email: results.email.length,
-                brief_ch: results.brief_ch.length,
-                brief_de: results.brief_de.length,
-                skipped: results.skipped.length
-            },
-            details: results
-        });
-    } catch (error) {
-        console.error('[SMART DISPATCH] ERROR:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // ============================================
 // PINGEN (Post)
 // DEUTSCH: Physischer Briefversand ueber Pingen-API (PDF hochladen, drucken, versenden)
 // ============================================
 
-// DEUTSCH: Einzelnen Brief via Pingen versenden - HTML wird zu PDF konvertiert, Adresse eingebettet
-// Ablauf: HTML->PDF (Puppeteer) -> Adresse einbetten -> Upload -> Brief erstellen -> Versand
-app.post('/pingen/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    try {
-        const { html, recipient, member_id, event_id, staging = false, use_cover_page = false, template_id } = req.body;
-        const PINGEN_API = getPingenApi(staging);
-
-        // Check if template has _no_auto_address flag
-        let skipAutoAddress = use_cover_page;
-        if (template_id && !skipAutoAddress) {
-            const templateResult = await pool.query('SELECT variables FROM dispatch_templates WHERE id = $1', [template_id]);
-            if (templateResult.rows.length > 0 && templateResult.rows[0].variables) {
-                skipAutoAddress = templateResult.rows[0].variables.includes('_no_auto_address');
-                if (skipAutoAddress) {
-                    console.log('[PINGEN] Template has _no_auto_address flag - skipping auto address embed');
-                }
-            }
-        }
-
-        // Convert HTML to PDF
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-        const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
-        const originalPdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-        await browser.close();
-
-        // Parse address
-        const parsedAddress = parseStreetAndNumber(recipient.street);
-        const recipientAddressStr = formatAddressForCoverPage(
-            recipient.name,
-            parsedAddress.street,
-            parsedAddress.number || recipient.number,
-            recipient.zip,
-            recipient.city
-        );
-
-        // PDF buffer: embed address or use original depending on skipAutoAddress option
-        let pdfBuffer;
-        let detectedCountry = recipient.country || 'CH';
-        console.log(`[PINGEN] skipAutoAddress=${skipAutoAddress}, recipient address:\n${recipientAddressStr}`);
-        if (skipAutoAddress) {
-            // Use original PDF, cover page will be created by Pingen
-            console.log('[PINGEN] Using cover page approach - NOT embedding address');
-            pdfBuffer = originalPdfBuffer;
-        } else {
-            // Embed address directly in PDF
-            console.log('[PINGEN] Embedding address directly in PDF');
-            const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-            const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
-            pdfBuffer = Buffer.from(result.pdfBytes);
-            detectedCountry = result.country;
-            console.log(`[PINGEN] Address embedded. Country=${detectedCountry}, PDF size: ${pdfBuffer.length} bytes`);
-        }
-
-        // Get Pingen token
-        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-            grant_type: 'client_credentials',
-            client_id: process.env.PINGEN_CLIENT_ID,
-            client_secret: process.env.PINGEN_CLIENT_SECRET
-        });
-
-        const token = tokenResponse.data.access_token;
-
-        // Step 1: Get file upload URL
-        const uploadUrlResponse = await axios.get(
-            `${PINGEN_API}/file-upload`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        const fileUrl = uploadUrlResponse.data.data.attributes.url;
-        const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
-
-        // Step 2: Upload PDF to the pre-signed URL
-        await axios.put(fileUrl, pdfBuffer, {
-            headers: {
-                'Content-Type': 'application/pdf'
-            }
-        });
-
-        // Step 3: Create letter with file reference
-        // auto_send depends on whether we use cover page or embedded address
-        // Build letter attributes - don't specify address_position when using cover page
-        // This prevents Pingen from immediately marking as action_required due to missing address
-        const letterAttributes = {
-            file_original_name: 'brief.pdf',
-            file_url: fileUrl,
-            file_url_signature: fileUrlSignature,
-            auto_send: !skipAutoAddress,  // auto_send wenn Adresse im PDF, sonst manuell
-            delivery_product: 'cheap',
-            print_mode: 'simplex',
-            print_spectrum: 'grayscale',
-            meta_data: {
-                recipient: buildPingenAddress({
-                    name: recipient.name,
-                    street: parsedAddress.street,
-                    number: parsedAddress.number || recipient.number,
-                    zip: recipient.zip,
-                    city: recipient.city,
-                    country: recipient.country || 'CH'
-                }),
-                sender: buildPingenAddress(SENDER_ADDRESS)
-            }
-        };
-
-        // Only specify address_position when NOT skipping auto address (address already in PDF)
-        if (!skipAutoAddress) {
-            // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
-            letterAttributes.address_position = detectedCountry === 'DE' ? 'left' : 'right';
-        }
-
-        const uploadResponse = await axios.post(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-            {
-                data: {
-                    type: 'letters',
-                    attributes: letterAttributes
-                }
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        const letterId = uploadResponse.data.data?.id;
-
-        // Step 4: Handle based on skipAutoAddress option
-        if (skipAutoAddress) {
-            // Small delay to let Pingen process the upload, then create cover page immediately
-            // Don't wait for full processing - that would result in action_required status
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Create cover page with recipient address (retry up to 3 times)
-            let coverPageCreated = false;
-            for (let attempt = 1; attempt <= 3 && !coverPageCreated; attempt++) {
-                try {
-                    await axios.patch(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-                        {
-                            data: {
-                                type: 'letters',
-                                id: letterId,
-                                attributes: {
-                                    address: recipientAddressStr,
-                                    country: recipient.country || 'CH'
-                                }
-                            }
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/vnd.api+json'
-                            }
-                        }
-                    );
-                    coverPageCreated = true;
-                    console.log(`Cover page created for letter ${letterId} on attempt ${attempt}`);
-                } catch (coverErr) {
-                    console.log(`Cover page attempt ${attempt}/3 failed for letter ${letterId}:`, coverErr.response?.data?.errors?.[0]?.title || coverErr.message);
-                    if (attempt < 3) {
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                    }
-                }
-            }
-
-            if (!coverPageCreated) {
-                // If cover page creation failed, delete the letter and return error
-                try {
-                    await axios.delete(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                    );
-                } catch (delErr) { /* ignore */ }
-                return res.status(400).json({
-                    error: 'Deckblatt konnte nicht erstellt werden - Brief wurde gelöscht'
-                });
-            }
-
-            // Wait for letter validation AFTER cover page is created
-            const validationResult = await waitForLetterValidation(letterId, token, staging);
-            if (!validationResult.success) {
-                try {
-                    await axios.delete(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                    );
-                } catch (delErr) { /* ignore */ }
-                return res.status(400).json({
-                    error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                });
-            }
-
-            // Send the letter
-            await axios.patch(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
-                {
-                    data: {
-                        type: 'letters',
-                        id: letterId,
-                        attributes: {
-                            delivery_product: 'cheap',
-                            print_mode: 'simplex',
-                            print_spectrum: 'grayscale'
-                        }
-                    }
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-        } else {
-            // Address is embedded in PDF, just wait for validation
-            const validationResult = await waitForLetterValidation(letterId, token, staging);
-            if (!validationResult.success) {
-                try {
-                    await axios.delete(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                    );
-                } catch (delErr) { /* ignore */ }
-                return res.status(400).json({
-                    error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                });
-            }
-        }
-
-        // Step 5: Check status and delete if action required
-        const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
-
-        if (statusCheck.deleted) {
-            return res.status(400).json({
-                success: false,
-                error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
-            });
-        }
-
-        // Log
-        await pool.query(`
-            INSERT INTO dispatch_log (type, member_id, recipient_address, status, external_id, event_id, sent_at)
-            VALUES ('pingen', $1, $2, 'sent', $3, $4, NOW())
-        `, [member_id, JSON.stringify(recipient), letterId, event_id]);
-
-        // Send cost notification to Kassier
-        sendPingenCostNotification(recipient.name, letterId, staging).catch(err => {
-            logError('Failed to send Pingen cost notification', { error: err.message });
-        });
-
-        res.json({ success: true, letterId });
-    } catch (error) {
-        console.error('Pingen error:', error.response?.data || error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // ============================================
 // KONTAKTFORMULAR (ersetzt n8n)
@@ -1730,141 +903,7 @@ app.get('/member-registrations/:id', authenticateAny, requireRole('vorstand', 'a
     }
 });
 
-// DEUTSCH: Mitgliedschaftsantrag genehmigen - erstellt Mitglied in DB und sendet Willkommens-E-Mail
-app.post('/member-registrations/:id/approve', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { processed_by = 'vorstand' } = req.body;
 
-        // Registrierung abrufen
-        const regResult = await pool.query(
-            `SELECT * FROM member_registrations WHERE id = $1 AND status = 'pending'`,
-            [id]
-        );
-
-        if (regResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Registrierung nicht gefunden oder bereits bearbeitet' });
-        }
-
-        const reg = regResult.rows[0];
-
-        // Mitglied erstellen
-        const memberResult = await pool.query(`
-            INSERT INTO members
-            (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
-             status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum,
-             anrede, geschlecht, geburtstag, adresszusatz)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied',
-                    CASE WHEN $9 = 'Ja (aktiv)' THEN 'feuerwehr_raurica' ELSE 'keine' END,
-                    $10, $11, NOW(),
-                    $12, $13, $14, $15)
-            RETURNING id
-        `, [
-            reg.vorname,
-            reg.nachname,
-            reg.strasse,
-            reg.plz,
-            reg.ort,
-            reg.telefon,
-            reg.mobile,
-            reg.email,
-            reg.feuerwehr_status,
-            reg.korrespondenz_methode === 'email',
-            reg.korrespondenz_methode === 'post',
-            reg.anrede || null,
-            reg.geschlecht || null,
-            reg.geburtstag || null,
-            reg.korrespondenz_adresse || null
-        ]);
-
-        const memberId = memberResult.rows[0].id;
-
-        // Registrierung aktualisieren
-        await pool.query(`
-            UPDATE member_registrations
-            SET status = 'approved', member_id = $1, processed_at = NOW(), processed_by = $2
-            WHERE id = $3
-        `, [memberId, processed_by, id]);
-
-        // Bestätigungs-E-Mail senden
-        await transporter.sendMail({
-            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-            to: reg.email,
-            subject: 'Willkommen beim Feuerwehrverein Raura!',
-            text: `
-Liebe/r ${reg.vorname} ${reg.nachname},
-
-Herzlich willkommen beim Feuerwehrverein Raura!
-
-Ihr Mitgliedschaftsantrag wurde genehmigt. Wir freuen uns, Sie als neues Mitglied begrüssen zu dürfen.
-
-Für Fragen stehen wir Ihnen gerne zur Verfügung.
-
-Mit freundlichen Grüssen
-Feuerwehrverein Raura
-            `.trim()
-        });
-
-        res.json({ success: true, memberId });
-    } catch (error) {
-        console.error('Error approving registration:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// DEUTSCH: Mitgliedschaftsantrag ablehnen - setzt Status auf 'rejected' und sendet Ablehnungs-E-Mail
-app.post('/member-registrations/:id/reject', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { processed_by = 'vorstand', reason = '' } = req.body;
-
-        // Registrierung abrufen
-        const regResult = await pool.query(
-            `SELECT * FROM member_registrations WHERE id = $1 AND status = 'pending'`,
-            [id]
-        );
-
-        if (regResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Registrierung nicht gefunden oder bereits bearbeitet' });
-        }
-
-        const reg = regResult.rows[0];
-
-        // Registrierung aktualisieren
-        await pool.query(`
-            UPDATE member_registrations
-            SET status = 'rejected', processed_at = NOW(), processed_by = $1
-            WHERE id = $2
-        `, [processed_by, id]);
-
-        // Ablehnungs-E-Mail senden (optional)
-        if (reg.email) {
-            await transporter.sendMail({
-                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-                to: reg.email,
-                subject: 'Ihr Mitgliedschaftsantrag beim Feuerwehrverein Raura',
-                text: `
-Liebe/r ${reg.vorname} ${reg.nachname},
-
-Vielen Dank für Ihr Interesse am Feuerwehrverein Raura.
-
-Leider können wir Ihren Mitgliedschaftsantrag zum jetzigen Zeitpunkt nicht annehmen.
-${reason ? `Grund: ${reason}` : ''}
-
-Für Rückfragen stehen wir Ihnen gerne zur Verfügung.
-
-Mit freundlichen Grüssen
-Feuerwehrverein Raura
-                `.trim()
-            });
-        }
-
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error rejecting registration:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // ============================================
 // NEWSLETTER (ersetzt n8n)
@@ -2423,186 +1462,33 @@ app.get('/pingen/post-members', authenticateAny, requireRole('vorstand', 'admin'
 // Jedes PDF bekommt die individuelle Empfaengeradresse eingebettet
 app.post('/pingen/send-bulk-pdf', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
-        const PINGEN_API = getPingenApi(staging);
-
-        if (!pdf_base64) {
-            return res.status(400).json({ error: 'PDF-Datei erforderlich' });
-        }
-
-        // Mitglieder laden
-        let members;
-        if (member_ids && member_ids.length > 0) {
-            // Spezifische Mitglieder
-            const result = await pool.query(`
-                SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort
-                FROM members
-                WHERE id = ANY($1)
-                  AND strasse IS NOT NULL AND strasse != ''
-                  AND plz IS NOT NULL AND plz != ''
-                  AND ort IS NOT NULL AND ort != ''
-            `, [member_ids]);
-            members = result.rows;
-        } else {
-            // Alle mit Post-Zustellung
-            const result = await pool.query(`
-                SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort
-                FROM members
-                WHERE zustellung_post = true
-                  AND strasse IS NOT NULL AND strasse != ''
-                  AND plz IS NOT NULL AND plz != ''
-                  AND ort IS NOT NULL AND ort != ''
-            `);
-            members = result.rows;
-        }
-
+        // Ein PDF an mehrere Mitglieder, je mit Deckblatt (Adresse im richtigen
+        // Fenster) ueber den Versandkern - vorher wurde die Adresse mit pdf-lib
+        // auf die erste Seite gedruckt und nichts geprueft.
+        const { pdf_base64, subject, member_ids, staging = false } = req.body || {};
+        if (!pdf_base64) return res.status(400).json({ error: 'PDF-Datei erforderlich' });
+        const adresse = `strasse IS NOT NULL AND strasse != '' AND plz IS NOT NULL AND plz != '' AND ort IS NOT NULL AND ort != ''`;
+        const members = (member_ids && member_ids.length > 0
+            ? await pool.query(`SELECT id, vorname, nachname FROM members WHERE id = ANY($1) AND ${adresse}`, [member_ids])
+            : await pool.query(`SELECT id, vorname, nachname FROM members WHERE zustellung_post = true AND ${adresse}`)).rows;
         if (members.length === 0) {
             return res.status(400).json({ error: 'Keine Empfänger mit gültiger Adresse gefunden' });
         }
-
-        // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-            grant_type: 'client_credentials',
-            client_id: process.env.PINGEN_CLIENT_ID,
-            client_secret: process.env.PINGEN_CLIENT_SECRET
-        });
-        const token = tokenResponse.data.access_token;
-
-        // An jeden Empfänger senden (parallel in Batches von 5)
+        // Je 5 parallel: die App schickt Pakete zu 5 und bricht nach 30 s ab,
+        // die Pruefung bei Pingen dauert pro Brief einige Sekunden.
         const results = { success: [], failed: [] };
-        const filename = subject ? `${subject.replace(/[^a-zA-Z0-9äöüÄÖÜ]/g, '_')}.pdf` : 'Rundschreiben.pdf';
-        const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
-
-        // Helper function to process a single member
-        const processMember = async (member) => {
-            try {
-                // Step 1: Get file upload URL
-                const uploadUrlResponse = await axios.get(
-                    `${PINGEN_API}/file-upload`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'Content-Type': 'application/vnd.api+json'
-                        }
-                    }
-                );
-
-                const fileUrl = uploadUrlResponse.data.data.attributes.url;
-                const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
-
-                // Step 2: Prepare PDF (embed address or use original depending on use_cover_page)
-                const parsedAddress = parseStreetAndNumber(member.strasse);
-                const recipientAddress = formatAddressForCoverPage(
-                    `${member.vorname} ${member.nachname}`,
-                    parsedAddress.street,
-                    parsedAddress.number,
-                    member.plz,
-                    member.ort
-                );
-
-                let pdfToUpload;
-                let detectedCountry = 'CH'; // Default
-                if (use_cover_page) {
-                    pdfToUpload = originalPdfBuffer;
-                    detectedCountry = detectCountryFromAddress(recipientAddress);
-                } else {
-                    const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-                    const result = await addAddressToPdf(originalPdfBuffer, recipientAddress, senderAddressLine);
-                    pdfToUpload = Buffer.from(result.pdfBytes);
-                    detectedCountry = result.country;
+        for (let i = 0; i < members.length; i += 5) {
+            await Promise.all(members.slice(i, i + 5).map(async (m) => {
+                const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
+                try {
+                    const r = await pdfBriefAnMitglied({ memberId: m.id, subject, pdfBase64: pdf_base64, staging });
+                    results.success.push({ name, letterId: r.letterId });
+                } catch (error) {
+                    results.failed.push({ name, error: error.message });
                 }
-
-                // Step 3: Upload PDF to the pre-signed URL
-                await axios.put(fileUrl, pdfToUpload, {
-                    headers: { 'Content-Type': 'application/pdf' }
-                });
-
-                // Step 4: Create letter with file reference
-                const uploadResponse = await axios.post(
-                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-                    {
-                        data: {
-                            type: 'letters',
-                            attributes: {
-                                file_original_name: filename,
-                                file_url: fileUrl,
-                                file_url_signature: fileUrlSignature,
-                                address_position: detectedCountry === 'DE' ? 'left' : 'right',
-                                auto_send: !use_cover_page,
-                                delivery_product: 'cheap',
-                                print_mode: 'simplex',
-                                print_spectrum: 'grayscale',
-                                meta_data: {
-                                    recipient: buildPingenAddress({
-                                        name: `${member.vorname} ${member.nachname}`,
-                                        street: parsedAddress.street,
-                                        number: parsedAddress.number,
-                                        zip: member.plz,
-                                        city: member.ort,
-                                        country: detectedCountry
-                                    }),
-                                    sender: buildPingenAddress(SENDER_ADDRESS)
-                                }
-                            }
-                        }
-                    },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'Content-Type': 'application/vnd.api+json'
-                        }
-                    }
-                );
-
-                const letterId = uploadResponse.data.data?.id;
-                console.log(`Letter ${letterId} uploaded for ${member.vorname} ${member.nachname}`);
-
-                // Log speichern (don't wait for validation - too slow for bulk)
-                await pool.query(`
-                    INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, sent_at)
-                    VALUES ('pingen', $1, $2, $3, 'sent', $4, NOW())
-                `, [
-                    member.id,
-                    JSON.stringify({
-                        name: `${member.vorname} ${member.nachname}`,
-                        street: member.strasse,
-                        zip: member.plz,
-                        city: member.ort
-                    }),
-                    subject || 'Rundschreiben',
-                    letterId
-                ]);
-
-                return { success: true, name: `${member.vorname} ${member.nachname}`, letterId };
-            } catch (err) {
-                console.error(`Pingen send error for ${member.vorname} ${member.nachname}:`, err.response?.data || err.message);
-                return { success: false, name: `${member.vorname} ${member.nachname}`, error: err.response?.data?.errors?.[0]?.detail || err.message };
-            }
-        };
-
-        // Process members in parallel batches of 5
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < members.length; i += BATCH_SIZE) {
-            const batch = members.slice(i, i + BATCH_SIZE);
-            const batchResults = await Promise.all(batch.map(processMember));
-
-            for (const result of batchResults) {
-                if (result.success) {
-                    results.success.push({ name: result.name, letterId: result.letterId });
-                } else {
-                    results.failed.push({ name: result.name, error: result.error });
-                }
-            }
-            console.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(members.length / BATCH_SIZE)}`);
+            }));
         }
-
-        // Send summary notification to Kassier for bulk send
-        if (results.success.length > 0) {
-            sendPingenBulkCostNotification(results.success.length, results.success, staging).catch(err => {
-                logError('Failed to send Pingen bulk cost notification', { error: err.message });
-            });
-        }
-
+        logInfo('Bulk PDF via Pingen', { total: members.length, ok: results.success.length, failed: results.failed.length });
         res.json({
             totalRecipients: members.length,
             successCount: results.success.length,
@@ -2638,54 +1524,19 @@ app.post('/pingen/send-manual', authenticateAny, requireRole('vorstand', 'admin'
             return res.status(400).json({ error: 'Mitglied hat keine vollständige Adresse' });
         }
 
-        // HTML für Brief generieren
-        const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; }
-        .header { margin-bottom: 40px; }
-        .address { margin-bottom: 40px; }
-        .content { margin-top: 20px; }
-        .signature { margin-top: 40px; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <strong>Feuerwehrverein Raura</strong><br>
-        4303 Kaiseraugst
-    </div>
-
-    <div class="address">
-        ${member.vorname} ${member.nachname}<br>
-        ${member.strasse}<br>
-        ${member.adresszusatz ? member.adresszusatz + '<br>' : ''}
-        ${member.plz} ${member.ort}
-    </div>
-
-    <div class="date">
-        Kaiseraugst, ${new Date().toLocaleDateString('de-CH')}
-    </div>
-
-    <div class="subject" style="margin-top: 30px; font-weight: bold;">
-        ${subject}
-    </div>
-
-    <div class="content">
-        <p>Guten Tag ${member.vorname} ${member.nachname}</p>
-        ${body.split('\n').map(p => `<p>${p}</p>`).join('')}
-    </div>
-
-    <div class="signature">
-        Mit freundlichen Grüssen<br><br>
-        Feuerwehrverein Raura
-    </div>
-</body>
-</html>`;
-
-        // An Pingen senden
-        const pingenResult = await sendToPingen(html, member, member_id, event_id, staging, use_cover_page);
+        // Brief im Vereinslayout (Fenster CH rechts / DE links, Text escaped)
+        // ueber den Versandkern; das PDF des Anlasses kommt hier nicht mit.
+        const html = nachrichtLayout.briefHtml({
+            betreff: subject,
+            text: `Guten Tag ${member.vorname || ''} ${member.nachname || ''}\n\n${body || ''}`,
+            mitglied: member,
+            absender: await absenderLaden(pool)
+        });
+        const brief = await briefVersenden({
+            html, rand: nachrichtLayout.BRIEF_RAND, recipient: nachrichtLayout.empfaenger(member),
+            memberId: member_id, subject, staging, eventId: event_id, anlassPdfMit: false
+        });
+        const pingenResult = { letterId: brief.letterId };
 
         res.json({
             success: true,
@@ -2694,251 +1545,33 @@ app.post('/pingen/send-manual', authenticateAny, requireRole('vorstand', 'admin'
             staging
         });
     } catch (error) {
-        console.error('Manual Pingen send error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Manual Pingen send error:', error.message);
+        res.status(error.status || 500).json({ error: error.message });
     }
 });
 
 // DEUTSCH: Arbeitsplan-PDF per Post an ein einzelnes Mitglied via Pingen versenden
 app.post('/pingen/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
-        const PINGEN_API = getPingenApi(staging);
-
-        // Mitglied-Adresse laden
-        const memberResult = await pool.query(
-            'SELECT * FROM members WHERE id = $1',
-            [member_id]
-        );
-
-        if (memberResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
-        }
-
-        const member = memberResult.rows[0];
-
-        if (!member.strasse || !member.plz || !member.ort) {
-            return res.status(400).json({ error: 'Mitglied hat keine vollständige Adresse' });
-        }
-
-        // Event-Titel laden
-        let eventTitle = 'Arbeitsplan';
+        // Arbeitsplan per Post (api-events checkAndSendArbeitsplan und
+        // Erinnerung): Deckblatt im Vereinslayout mit Adresse im richtigen
+        // Fenster, dahinter der Arbeitsplan - ueber den Versandkern. Vorher
+        // wurde die Adresse mit pdf-lib auf die erste Seite gedruckt.
+        const { event_id, member_id, pdf_base64, staging = false } = req.body || {};
+        if (!member_id || !pdf_base64) return res.status(400).json({ error: 'member_id und pdf_base64 erforderlich' });
+        let titel = 'Arbeitsplan';
         if (event_id) {
-            const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [event_id]);
-            if (eventResult.rows.length > 0) {
-                eventTitle = `Arbeitsplan ${eventResult.rows[0].title}`;
-            }
+            const ev = await pool.query('SELECT title FROM events WHERE id = $1', [event_id]);
+            if (ev.rows.length > 0) titel = `Arbeitsplan ${ev.rows[0].title}`;
         }
-
-        // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-            grant_type: 'client_credentials',
-            client_id: process.env.PINGEN_CLIENT_ID,
-            client_secret: process.env.PINGEN_CLIENT_SECRET
+        const r = await pdfBriefAnMitglied({
+            memberId: member_id, subject: titel, pdfBase64: pdf_base64, staging, eventId: event_id,
+            hinweis: `Beiliegend erhalten Sie den ${titel} mit Ihren Einsätzen. Vielen Dank fürs Mithelfen!`
         });
-
-        const token = tokenResponse.data.access_token;
-
-        // Step 1: Get file upload URL
-        const uploadUrlResponse = await axios.get(
-            `${PINGEN_API}/file-upload`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        const fileUrl = uploadUrlResponse.data.data.attributes.url;
-        const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
-
-        // Step 2: Prepare PDF (embed address or use original depending on use_cover_page)
-        const parsedAddress = parseStreetAndNumber(member.strasse);
-        const recipientAddressStr = formatAddressForCoverPage(
-            `${member.vorname} ${member.nachname}`,
-            parsedAddress.street,
-            parsedAddress.number,
-            member.plz,
-            member.ort
-        );
-
-        const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
-        let pdfBuffer;
-        let detectedCountry = 'CH'; // Default
-        if (use_cover_page) {
-            pdfBuffer = originalPdfBuffer;
-            detectedCountry = detectCountryFromAddress(recipientAddressStr);
-        } else {
-            const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-            const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
-            pdfBuffer = Buffer.from(result.pdfBytes);
-            detectedCountry = result.country;
-        }
-
-        // Step 3: Upload PDF to the pre-signed URL
-        await axios.put(fileUrl, pdfBuffer, {
-            headers: {
-                'Content-Type': 'application/pdf'
-            }
-        });
-
-        // Step 4: Create letter with file reference
-        // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
-        const uploadResponse = await axios.post(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-            {
-                data: {
-                    type: 'letters',
-                    attributes: {
-                        file_original_name: `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-                        file_url: fileUrl,
-                        file_url_signature: fileUrlSignature,
-                        address_position: detectedCountry === 'DE' ? 'left' : 'right',
-                        auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF
-                        delivery_product: 'cheap',
-                        print_mode: 'simplex',
-                        print_spectrum: 'grayscale',
-                        meta_data: {
-                            recipient: buildPingenAddress({
-                                name: `${member.vorname} ${member.nachname}`,
-                                street: parsedAddress.street,
-                                number: parsedAddress.number,
-                                zip: member.plz,
-                                city: member.ort,
-                                country: detectedCountry
-                            }),
-                            sender: buildPingenAddress(SENDER_ADDRESS)
-                        }
-                    }
-                }
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        const letterId = uploadResponse.data.data?.id;
-
-        // Step 5: Handle based on use_cover_page option
-        if (use_cover_page) {
-            // Wait for initial processing before creating cover page
-            const processingResult = await waitForLetterProcessing(letterId, token, staging);
-            if (!processingResult.ready) {
-                return res.status(400).json({ error: 'Brief-Verarbeitung Timeout' });
-            }
-
-            // Create cover page with recipient address
-            await axios.patch(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-                {
-                    data: {
-                        type: 'letters',
-                        id: letterId,
-                        attributes: {
-                            address: recipientAddressStr,
-                            country: 'CH'
-                        }
-                    }
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-
-            // Wait for letter validation AFTER cover page is created
-            const validationResult = await waitForLetterValidation(letterId, token, staging);
-            if (!validationResult.success) {
-                try {
-                    await axios.delete(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                    );
-                } catch (delErr) { /* ignore */ }
-                return res.status(400).json({
-                    error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                });
-            }
-
-            // Send the letter
-            await axios.patch(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
-                {
-                    data: {
-                        type: 'letters',
-                        id: letterId,
-                        attributes: {
-                            delivery_product: 'cheap',
-                            print_mode: 'simplex',
-                            print_spectrum: 'grayscale'
-                        }
-                    }
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-        } else {
-            // Address is embedded in PDF, just wait for validation
-            const validationResult = await waitForLetterValidation(letterId, token, staging);
-            if (!validationResult.success) {
-                try {
-                    await axios.delete(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                    );
-                } catch (delErr) { /* ignore */ }
-                return res.status(400).json({
-                    error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                });
-            }
-        }
-
-        // Step 6: Check status and delete if action required
-        const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
-
-        if (statusCheck.deleted) {
-            return res.status(400).json({
-                success: false,
-                error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
-            });
-        }
-
-        // Log
-        await pool.query(`
-            INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id, sent_at)
-            VALUES ('pingen', $1, $2, $3, 'sent', $4, $5, NOW())
-        `, [
-            member_id,
-            JSON.stringify({
-                name: `${member.vorname} ${member.nachname}`,
-                street: member.strasse,
-                zip: member.plz,
-                city: member.ort
-            }),
-            eventTitle,
-            letterId,
-            event_id
-        ]);
-
-        if (!staging) sendPingenCostNotification(`${member.vorname} ${member.nachname}`, letterId, false, eventTitle).catch(() => {});
-        res.json({
-            success: true,
-            letterId,
-            recipient: `${member.vorname} ${member.nachname}`
-        });
+        res.json({ success: true, letterId: r.letterId, recipient: r.name });
     } catch (error) {
         console.error('Arbeitsplan Pingen error:', error.response?.data || error.message);
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: error.message });
     }
 });
 
@@ -3160,216 +1793,6 @@ app.delete('/pingen/webhooks/:id', authenticateAny, requireRole('vorstand', 'adm
     }
 });
 
-// DEUTSCH: Hilfsfunktion fuer den kompletten Pingen-Versandprozess
-// HTML -> PDF -> Adresse einbetten -> Upload -> Brief erstellen -> Validieren -> Versenden -> Loggen
-async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = false) {
-    const PINGEN_API = getPingenApi(staging);
-
-    // Convert HTML to PDF
-    const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const originalPdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-    await browser.close();
-
-    // Parse address
-    const parsedAddress = parseStreetAndNumber(member.strasse);
-    const recipientAddressStr = formatAddressForCoverPage(
-        `${member.vorname} ${member.nachname}`,
-        parsedAddress.street,
-        parsedAddress.number,
-        member.plz,
-        member.ort
-    );
-
-    // PDF buffer: embed address or use original depending on useCoverPage option
-    let pdfBuffer;
-    let detectedCountry = 'CH'; // Default
-    if (useCoverPage) {
-        pdfBuffer = originalPdfBuffer;
-        detectedCountry = detectCountryFromAddress(recipientAddressStr);
-    } else {
-        const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-        const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
-        pdfBuffer = Buffer.from(result.pdfBytes);
-        detectedCountry = result.country;
-    }
-
-    // Get Pingen token
-    const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-        grant_type: 'client_credentials',
-        client_id: process.env.PINGEN_CLIENT_ID,
-        client_secret: process.env.PINGEN_CLIENT_SECRET
-    });
-
-    const token = tokenResponse.data.access_token;
-
-    // Step 1: Get file upload URL
-    const uploadUrlResponse = await axios.get(
-        `${PINGEN_API}/file-upload`,
-        {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/vnd.api+json'
-            }
-        }
-    );
-
-    const fileUrl = uploadUrlResponse.data.data.attributes.url;
-    const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
-
-    // Step 2: Upload PDF to the pre-signed URL
-    await axios.put(fileUrl, pdfBuffer, {
-        headers: {
-            'Content-Type': 'application/pdf'
-        }
-    });
-
-    // Step 3: Create letter with file reference
-    // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
-    const uploadResponse = await axios.post(
-        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-        {
-            data: {
-                type: 'letters',
-                attributes: {
-                    file_original_name: 'brief.pdf',
-                    file_url: fileUrl,
-                    file_url_signature: fileUrlSignature,
-                    address_position: detectedCountry === 'DE' ? 'left' : 'right',
-                    auto_send: !useCoverPage,  // auto_send wenn Adresse im PDF
-                    delivery_product: 'cheap',
-                    print_mode: 'simplex',
-                    print_spectrum: 'grayscale',
-                    meta_data: {
-                        recipient: buildPingenAddress({
-                            name: `${member.vorname} ${member.nachname}`,
-                            street: parsedAddress.street,
-                            number: parsedAddress.number,
-                            zip: member.plz,
-                            city: member.ort,
-                            country: detectedCountry
-                        }),
-                        sender: buildPingenAddress(SENDER_ADDRESS)
-                    }
-                }
-            }
-        },
-        {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/vnd.api+json'
-            }
-        }
-    );
-
-    const letterId = uploadResponse.data.data?.id;
-
-    // Step 4: Handle based on useCoverPage option
-    if (useCoverPage) {
-        // Wait for initial processing before creating cover page
-        const processingResult = await waitForLetterProcessing(letterId, token, staging);
-        if (!processingResult.ready) {
-            throw new Error('Brief-Verarbeitung Timeout');
-        }
-
-        // Create cover page with recipient address
-        await axios.patch(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-            {
-                data: {
-                    type: 'letters',
-                    id: letterId,
-                    attributes: {
-                        address: recipientAddressStr,
-                        country: 'CH'
-                    }
-                }
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-
-        // Wait for letter validation AFTER cover page is created
-        const validationResult = await waitForLetterValidation(letterId, token, staging);
-        if (!validationResult.success) {
-            try {
-                await axios.delete(
-                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                );
-            } catch (delErr) { /* ignore */ }
-            throw new Error(`Brief-Validierung fehlgeschlagen: ${validationResult.reason}`);
-        }
-
-        // Send the letter
-        await axios.patch(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
-            {
-                data: {
-                    type: 'letters',
-                    id: letterId,
-                    attributes: {
-                        delivery_product: 'cheap',
-                        print_mode: 'simplex',
-                        print_spectrum: 'grayscale'
-                    }
-                }
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/vnd.api+json'
-                }
-            }
-        );
-    } else {
-        // Address is embedded in PDF, just wait for validation
-        const validationResult = await waitForLetterValidation(letterId, token, staging);
-        if (!validationResult.success) {
-            try {
-                await axios.delete(
-                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                );
-            } catch (delErr) { /* ignore */ }
-            throw new Error(`Brief-Validierung fehlgeschlagen: ${validationResult.reason}`);
-        }
-    }
-
-    // Step 5: Check status and delete if action required
-    const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
-
-    if (statusCheck.deleted) {
-        throw new Error('Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht');
-    }
-
-    // Log
-    await pool.query(`
-        INSERT INTO dispatch_log (type, member_id, recipient_address, status, external_id, event_id, sent_at)
-        VALUES ('pingen', $1, $2, 'sent', $3, $4, NOW())
-    `, [
-        memberId,
-        JSON.stringify({
-            name: `${member.vorname} ${member.nachname}`,
-            street: member.strasse,
-            zip: member.plz,
-            city: member.ort
-        }),
-        letterId,
-        eventId
-    ]);
-    if (!staging) sendPingenCostNotification(`${member.vorname} ${member.nachname}`, letterId, false).catch(() => {});
-
-    return { letterId };
-}
 
 // ============================================
 // PDF TEMPLATES API (pdfme)
@@ -3603,482 +2026,140 @@ app.put('/organisation-settings/:key', authenticateAny, requireRole('vorstand', 
 // ============================================
 
 // DEUTSCH: Standard-Layout fuer Mitgliederbeitrags-Rechnungen (Positionen in PDF-Points)
-// Wird nur noch fuer den alten Einzel-/invoices/generate-qr Endpoint verwendet
-const defaultMitgliederbeitragLayout = {
-    absender: { x: 400, y: 50, size: 10, lineHeight: 12 },
-    empfaenger: { x: 70, y: 150, size: 11, lineHeight: 15 },
-    titel: { x: 70, y: 240, size: 14 },
-    rechnungsnummer: { x: 70, y: 270, size: 10 },
-    datum: { x: 70, y: 285, size: 10 },
-    text: { x: 70, y: 320, size: 11, lineHeight: 20 },
-    betrag: { x: 400, y: 380, size: 14 },
-    footer: { x: 150, y: 320, size: 8, fromBottom: true },
-    rechnungstext: [
-        'Wir erlauben uns, Ihnen den Mitgliederbeitrag in Rechnung zu stellen.',
-        'Bitte überweisen Sie den Betrag innert 30 Tagen.'
-    ]
-};
 
 // Helper to convert mm to points (for template positions)
 const mmToPoints = (mm) => mm * 2.83465;
 
-// DEUTSCH: QR-Rechnung fuer ein Mitglied generieren (PDF mit Schweizer QR-Einzahlungsschein)
-// Laedt Layout aus PDF-Template, Kontodaten aus Org-Settings, Mitglied aus DB
-app.post('/invoices/generate-qr', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    try {
-        const {
-            member_id,
-            amount,
-            year,
-            description,
-            template_slug,
-            custom_text,
-            preview = false
-        } = req.body;
-
-        if (!member_id || !amount) {
-            return res.status(400).json({ error: 'member_id und amount sind erforderlich' });
-        }
-
-        // Get member data
-        const memberResult = await pool.query(
-            'SELECT * FROM members WHERE id = $1',
-            [member_id]
-        );
-
-        if (memberResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
-        }
-
-        const member = memberResult.rows[0];
-
-        // Try to fetch template settings (by slug or default for category)
-        let layoutSettings = { ...defaultMitgliederbeitragLayout };
-        try {
-            let templateQuery;
-            if (template_slug) {
-                templateQuery = await pool.query(
-                    "SELECT template_schema FROM pdf_templates WHERE slug = $1 AND is_active = true",
-                    [template_slug]
-                );
-            } else {
-                templateQuery = await pool.query(
-                    "SELECT template_schema FROM pdf_templates WHERE category = 'mitgliederbeitrag' AND is_active = true ORDER BY is_default DESC, updated_at DESC LIMIT 1"
-                );
-            }
-            if (templateQuery.rows.length > 0) {
-                const templateSchema = templateQuery.rows[0].template_schema;
-                // Extract positions from pdfme schema and convert to points
-                if (templateSchema && templateSchema.schemas && templateSchema.schemas[0]) {
-                    const schema = templateSchema.schemas[0];
-                    // Map pdfme field positions to layoutSettings
-                    if (schema.absender_name) {
-                        layoutSettings.absender = {
-                            x: mmToPoints(schema.absender_name.position?.x || 118),
-                            y: mmToPoints(schema.absender_name.position?.y || 15),
-                            size: schema.absender_name.fontSize || 10,
-                            lineHeight: 12
-                        };
-                    }
-                    if (schema.empfaenger) {
-                        layoutSettings.empfaenger = {
-                            x: mmToPoints(schema.empfaenger.position?.x || 25),
-                            y: mmToPoints(schema.empfaenger.position?.y || 50),
-                            size: schema.empfaenger.fontSize || 11,
-                            lineHeight: 15
-                        };
-                    }
-                    if (schema.titel) {
-                        layoutSettings.titel = {
-                            x: mmToPoints(schema.titel.position?.x || 25),
-                            y: mmToPoints(schema.titel.position?.y || 85),
-                            size: schema.titel.fontSize || 14
-                        };
-                    }
-                    if (schema.betrag) {
-                        layoutSettings.betrag = {
-                            x: mmToPoints(schema.betrag.position?.x || 118),
-                            y: mmToPoints(schema.betrag.position?.y || 158),
-                            size: schema.betrag.fontSize || 14
-                        };
-                    }
-                }
-                // Custom text from template layoutSettings
-                if (templateSchema.layoutSettings?.rechnungstext) {
-                    layoutSettings.rechnungstext = templateSchema.layoutSettings.rechnungstext;
-                }
-            }
-        } catch (err) {
-            console.log('No mitgliederbeitrag template found, using defaults');
-        }
-
-        // Get organisation settings for creditor info
-        const settingsResult = await pool.query(
-            "SELECT key, value, value_json FROM organisation_settings WHERE key IN ('organisation_name', 'organisation_address', 'iban', 'qr_iban')"
-        );
-
-        const settings = {};
-        settingsResult.rows.forEach(row => {
-            settings[row.key] = row.value_json || row.value;
-        });
-
-        // Default organisation info if not configured
-        const creditor = {
-            name: settings.organisation_name || 'Feuerwehrverein Raura',
-            address: settings.organisation_address?.street || 'Musterstrasse 1',
-            zip: settings.organisation_address?.zip || '6017',
-            city: settings.organisation_address?.city || 'Ruswil',
-            country: 'CH',
-            account: settings.qr_iban || settings.iban || 'CH93 0076 2011 6238 5295 7'
-        };
-
-        // Debtor (member)
-        const debtor = {
-            name: `${member.vorname} ${member.nachname}`,
-            address: member.strasse || '',
-            zip: member.plz || '',
-            city: member.ort || '',
-            country: 'CH'
-        };
-
-        // Generate reference number (simplified)
-        const invoiceYear = year || new Date().getFullYear();
-        const refNumber = `RF${invoiceYear}${String(member.id).slice(-6).padStart(6, '0')}`;
-
-        // QR-Bill data
-        const qrData = {
-            currency: 'CHF',
-            amount: parseFloat(amount),
-            creditor: creditor,
-            debtor: debtor,
-            reference: refNumber,
-            message: description || `Mitgliederbeitrag ${invoiceYear}`
-        };
-
-        // Create PDF with QR-Bill
-        const pdfDoc = await PDFDocument.create();
-        pdfDoc.registerFontkit(fontkit);
-
-        // Add a page
-        const page = pdfDoc.addPage([595.28, 841.89]); // A4
-        const { width, height } = page.getSize();
-        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-        // Layout positions (use template settings or defaults)
-        const L = layoutSettings;
-
-        // Header (Absender oben rechts)
-        page.drawText(creditor.name, {
-            x: L.absender.x, y: height - L.absender.y, size: L.absender.size, font: helvetica
-        });
-        page.drawText(`${creditor.address}`, {
-            x: L.absender.x, y: height - L.absender.y - L.absender.lineHeight, size: L.absender.size, font: helvetica
-        });
-        page.drawText(`${creditor.zip} ${creditor.city}`, {
-            x: L.absender.x, y: height - L.absender.y - L.absender.lineHeight * 2, size: L.absender.size, font: helvetica
-        });
-
-        // Empfänger
-        page.drawText(debtor.name, {
-            x: L.empfaenger.x, y: height - L.empfaenger.y, size: L.empfaenger.size, font: helvetica
-        });
-        if (debtor.address) {
-            page.drawText(debtor.address, {
-                x: L.empfaenger.x, y: height - L.empfaenger.y - L.empfaenger.lineHeight, size: L.empfaenger.size, font: helvetica
-            });
-        }
-        page.drawText(`${debtor.zip} ${debtor.city}`, {
-            x: L.empfaenger.x, y: height - L.empfaenger.y - L.empfaenger.lineHeight * 2, size: L.empfaenger.size, font: helvetica
-        });
-
-        // Titel
-        const title = description || `Mitgliederbeitrag ${invoiceYear}`;
-        page.drawText(title, {
-            x: L.titel.x, y: height - L.titel.y, size: L.titel.size, font: helveticaBold
-        });
-
-        // Rechnungsinfo
-        const today = new Date().toLocaleDateString('de-CH');
-        page.drawText(`Rechnungsnummer: ${refNumber}`, {
-            x: L.rechnungsnummer.x, y: height - L.rechnungsnummer.y, size: L.rechnungsnummer.size, font: helvetica
-        });
-        page.drawText(`Datum: ${today}`, {
-            x: L.datum.x, y: height - L.datum.y, size: L.datum.size, font: helvetica
-        });
-
-        // Text (custom_text überschreibt Template-Text)
-        const textLines = custom_text ? custom_text.split('\n') : L.rechnungstext;
-        textLines.forEach((line, i) => {
-            page.drawText(line, {
-                x: L.text.x, y: height - L.text.y - (i * L.text.lineHeight), size: L.text.size, font: helvetica
-            });
-        });
-
-        // Betrag
-        page.drawText(`Betrag: CHF ${parseFloat(amount).toFixed(2)}`, {
-            x: L.betrag.x, y: height - L.betrag.y, size: L.betrag.size, font: helveticaBold
-        });
-
-        // Footer (oberhalb des QR-Bill Bereichs, ca. 320pt vom unteren Rand)
-        page.drawText(`${creditor.name} | www.fwv-raura.ch | info@fwv-raura.ch`, {
-            x: 150, y: 320, size: 8, font: helvetica, color: rgb(0.4, 0.4, 0.4)
-        });
-
-        // Add Swiss QR-Bill at the bottom
-        const qrBill = new SwissQRBill({
-            currency: qrData.currency,
-            amount: qrData.amount,
-            creditor: {
-                name: creditor.name,
-                address: creditor.address,
-                zip: parseInt(creditor.zip),
-                city: creditor.city,
-                country: creditor.country,
-                account: creditor.account.replace(/\s/g, '')
-            },
-            debtor: {
-                name: debtor.name,
-                address: debtor.address,
-                zip: parseInt(debtor.zip) || 0,
-                city: debtor.city,
-                country: debtor.country
-            },
-            reference: qrData.reference,
-            message: qrData.message
-        });
-
-        // Attach QR-Bill to the PDF
-        await qrBill.attachTo(pdfDoc);
-
-        // Save PDF
-        const pdfBytes = await pdfDoc.save();
-
-        if (preview) {
-            // Return PDF for preview
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `inline; filename="Rechnung_${refNumber}.pdf"`);
-            res.send(Buffer.from(pdfBytes));
-        } else {
-            // Store invoice record and return info
-            logInfo('QR-Invoice generated', {
-                member_id,
-                amount,
-                reference: refNumber,
-                template_used: template_slug || 'default'
-            });
-
-            res.json({
-                success: true,
-                reference: refNumber,
-                amount: parseFloat(amount),
-                member: {
-                    name: debtor.name,
-                    address: `${debtor.address}, ${debtor.zip} ${debtor.city}`
-                },
-                pdf_base64: Buffer.from(pdfBytes).toString('base64')
-            });
-        }
-
-    } catch (error) {
-        logError('Failed to generate QR invoice', { error: error.message, stack: error.stack });
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // DEUTSCH: Massen-Rechnungsgenerierung fuer alle Mitglieder (optional nach Status filtern)
 // DEUTSCH: Sendet Mitgliedsbeitrags-Brief als fertig-formatiertes HTML via Pingen
 // Das HTML enthaelt bereits den Empfaenger im Adressfenster (Schweizer Standard X=118mm/Y=60mm)
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
-app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+// --- Versandkern Brief (brief-versand.js) -----------------------------------
+
+// HTML -> PDF wie bisher send-post: A4, Seitenzahl unten rechts.
+async function briefPdfRendern(html, rand) {
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     try {
-        const { html, recipient, member_id, subject, staging = false, pdf_margin, event_id, anhaenge } = req.body;
-
-        if (!html || !recipient) {
-            return res.status(400).json({ error: 'html und recipient erforderlich' });
-        }
-        // Optionaler Seitenrand pro Brieftyp (z.B. Event-Einladung: 15mm oben fuer sichere
-        // Folgeseiten). Default wie bisher, damit andere Brieftypen unveraendert bleiben.
-        const letterMargin = (pdf_margin && typeof pdf_margin === 'object')
-            ? pdf_margin
-            : { top: '0', right: '0', bottom: '20mm', left: '0' };
-        // Diagnose: sehen, ob das Frontend pdf_margin mitschickt (Cache-/Layout-Debug).
-        logInfo('send-post pdf_margin', { has: !!pdf_margin, top: letterMargin.top, recipient: recipient?.name });
-
-        const PINGEN_API = getPingenApi(staging);
-
-        // HTML via Puppeteer zu PDF konvertieren (1:1 Umwandlung des HTML-Layouts)
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
         const page = await browser.newPage();
         await page.setContent(html, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({
+        return await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: letterMargin,
+            margin: rand,
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
             footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
         });
+    } finally {
         await browser.close();
-        // Einladung zu einem Anlass: sein PDF (und beigelegte PDFs) als weitere Seiten.
-        const briefPdf = await seitenAnhaengen(pdfBuffer, mitAnlassPdf(anhaenge, await anlassPdf(pool, event_id)));
+    }
+}
 
-        // Pingen-Token holen
-        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-            grant_type: 'client_credentials',
-            client_id: process.env.PINGEN_CLIENT_ID,
-            client_secret: process.env.PINGEN_CLIENT_SECRET
+// Brief bei Pingen anlegen und - mit pruefen - deren Pruefung abwarten
+// (bis ~15 s). Gibt { letterId, status, grund } zurueck; status
+// 'action_required' heisst abgelehnt (grund aus den Pingen-Ereignissen).
+async function pingenBriefAnlegen({ pdf, dateiname, links, staging = false, pruefen = true }) {
+    const API = getPingenApi(staging);
+    const token = (await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+        grant_type: 'client_credentials',
+        client_id: process.env.PINGEN_CLIENT_ID,
+        client_secret: process.env.PINGEN_CLIENT_SECRET
+    })).data.access_token;
+    const H = { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } };
+    const upload = (await axios.get(`${API}/file-upload`, H)).data.data.attributes;
+    await axios.put(upload.url, pdf, { headers: { 'Content-Type': 'application/pdf' } });
+    const org = getPingenOrgId(staging);
+    const brief = await axios.post(`${API}/organisations/${org}/letters`, {
+        data: {
+            type: 'letters',
+            attributes: {
+                file_original_name: dateiname,
+                file_url: upload.url,
+                file_url_signature: upload.url_signature,
+                auto_send: true,
+                delivery_product: 'cheap',
+                print_mode: 'simplex',
+                print_spectrum: 'grayscale',
+                // DE: Fenster links (DIN 5008); CH: rechts. KEIN country-Attribut -
+                // die Pingen-API lehnt es beim Anlegen ab (400); das Land liest
+                // Pingen aus der Adresse im PDF.
+                address_position: links ? 'left' : 'right'
+            }
+        }
+    }, H);
+    const letterId = brief.data.data?.id;
+    let status = brief.data.data?.attributes?.status;
+    for (let i = 0; pruefen && i < 6 && briefKern.PRUEFUNG_LAEUFT.includes(status); i++) {
+        await new Promise(r => setTimeout(r, 2500));
+        status = (await axios.get(`${API}/organisations/${org}/letters/${letterId}`, H)).data.data?.attributes?.status;
+    }
+    let grund = null;
+    if (status === 'action_required') {
+        const ereignisse = (await axios.get(`${API}/organisations/${org}/letters/${letterId}/events?language=de-CH`, H)
+            .catch(() => ({ data: { data: [] } }))).data.data || [];
+        grund = ereignisse.map(e => [e.attributes?.name, ...(e.attributes?.data || [])].filter(Boolean).join(' '))
+            .filter(Boolean).slice(-1)[0] || 'Pruefung fehlgeschlagen';
+    }
+    return { letterId, status, grund };
+}
+
+const briefVersenden = briefKern.briefVersand({
+    rendern: briefPdfRendern,
+    pingen: pingenBriefAnlegen,
+    protokollieren: (eintrag) => briefProtokollieren(pool, eintrag),
+    kostenMelden: (name, letterId, betreff) => sendPingenCostNotification(name, letterId, false, betreff),
+    anlassPdfLaden: (eventId) => anlassPdf(pool, eventId),
+    log: logInfo
+});
+
+// DEUTSCH: Fertiges Brief-HTML (Adresse im Fenster) an Pingen - Versandkern.
+// Optional pdf_margin, event_id (PDF des Anlasses) und anhaenge (PDFs) als
+// weitere Seiten. 422 mit Grund, wenn Pingen den Brief ablehnt.
+app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { html, recipient, member_id, subject, staging = false, pdf_margin, event_id, anhaenge } = req.body;
+        const r = await briefVersenden({
+            html, rand: pdf_margin, recipient, memberId: member_id, subject, staging, eventId: event_id, anhaenge
         });
-        const token = tokenResponse.data.access_token;
-
-        // File-Upload URL holen
-        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
-        });
-        const fileUrl = uploadUrlRes.data.data.attributes.url;
-        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
-
-        // PDF hochladen
-        await axios.put(fileUrl, briefPdf, { headers: { 'Content-Type': 'application/pdf' } });
-
-        // Brief bei Pingen erstellen - Adresse ist bereits im HTML/PDF, daher nur address_position setzen
-        const letterRes = await axios.post(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-            {
-                data: {
-                    type: 'letters',
-                    attributes: {
-                        file_original_name: `${(subject || 'Brief').replace(/[^a-zA-Z0-9äöüÄÖÜ]/g, '_')}_${recipient.name.replace(/\s+/g, '_')}.pdf`,
-                        file_url: fileUrl,
-                        file_url_signature: fileUrlSignature,
-                        auto_send: true,
-                        delivery_product: 'cheap',
-                        print_mode: 'simplex',
-                        print_spectrum: 'grayscale',
-                        // DE: Fenster links (DIN 5008); CH: rechts.
-                        // KEIN country-Attribut hier — die Pingen-API kennt es beim
-                        // Brief-Erstellen nicht und quittiert es mit 400
-                        // "invalid_body_structure". Das Zielland liest Pingen aus der
-                        // Adresse im PDF. (Fehler stammte aus 7b79cde, 05.07.2026,
-                        // und hat seither jeden Brief ueber diesen Weg blockiert.)
-                        address_position: recipient?.country === 'DE' ? 'left' : 'right'
-                    }
-                }
-            },
-            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-        );
-
-        logInfo('Letter sent via Pingen (HTML)', { member_id, name: recipient.name, subject });
-        await briefProtokollieren(pool, {
-            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging, eventId: event_id
-        });
-        if (!staging) sendPingenCostNotification(recipient.name, letterRes.data.data?.id, false, subject).catch(() => {});
-        res.json({ success: true, letter_id: letterRes.data.data?.id });
-
+        logInfo('Letter sent via Pingen (HTML)', { member_id, name: recipient?.name, subject, status: r.status });
+        res.json({ success: true, letter_id: r.letterId, status: r.status });
     } catch (error) {
         logError('Failed to send post letter', { error: error.message, details: error.response?.data });
-        res.status(500).json({ error: error.message });
+        res.status(error.status || 500).json({ error: error.message, letter_id: error.letterId });
     }
 });
 
-// DEUTSCH: PDF-Brief mit Deckblatt senden
-// Generiert ein Deckblatt aus dem HTML, konvertiert beides zu PDF,
-// fuegt Deckblatt + hochgeladenes PDF zusammen und sendet via Pingen
+// DEUTSCH: PDF per Post mit Deckblatt (Website "PDF-Brief", App "PDF per
+// Post"): Deckblatt im Vereinslayout mit Adresse im richtigen Fenster
+// (brief-versand.js deckblattHtml), dahinter das PDF - ueber den Versandkern.
+// { member_id, subject, pdf_base64, hinweis?, staging? }
+async function pdfBriefAnMitglied({ memberId, subject, pdfBase64, hinweis, staging = false, eventId = null }) {
+    const m = (await pool.query('SELECT * FROM members WHERE id::text = $1', [String(memberId)])).rows[0];
+    if (!m) throw Object.assign(new Error('Mitglied nicht gefunden'), { status: 404 });
+    if (!nachrichtLayout.hatPostadresse(m)) {
+        throw Object.assign(new Error(`${m.vorname} ${m.nachname}: keine vollständige Adresse`), { status: 400 });
+    }
+    const html = briefKern.deckblattHtml({ betreff: subject, hinweis, mitglied: m, absender: await absenderLaden(pool) });
+    const recipient = nachrichtLayout.empfaenger(m);
+    const r = await briefVersenden({
+        html, rand: nachrichtLayout.BRIEF_RAND, recipient, memberId: m.id, subject, staging,
+        eventId, anlassPdfMit: false,
+        anhaenge: [{ filename: 'beilage.pdf', content: pdfBase64, contentType: 'application/pdf' }]
+    });
+    return { ...r, name: recipient.name };
+}
+
 app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { cover_html, pdf_base64, recipient, member_id, subject, staging = false } = req.body;
-
-        if (!cover_html || !pdf_base64 || !recipient) {
-            return res.status(400).json({ error: 'cover_html, pdf_base64 und recipient erforderlich' });
-        }
-
-        const PINGEN_API = getPingenApi(staging);
-
-        // 1. Deckblatt HTML -> PDF
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-        const page = await browser.newPage();
-        await page.setContent(cover_html, { waitUntil: 'networkidle0' });
-        const coverPdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: { top: 0, right: 0, bottom: 0, left: 0 }
-        });
-        await browser.close();
-
-        // 2. PDFs zusammenfuegen (Deckblatt + Anhangs-PDF)
-        const { PDFDocument: PDFDoc } = require('pdf-lib');
-        const mergedPdf = await PDFDoc.create();
-
-        const coverDoc = await PDFDoc.load(coverPdf);
-        const coverPages = await mergedPdf.copyPages(coverDoc, coverDoc.getPageIndices());
-        coverPages.forEach(p => mergedPdf.addPage(p));
-
-        const attachBuffer = Buffer.from(pdf_base64, 'base64');
-        const attachDoc = await PDFDoc.load(attachBuffer);
-        const attachPages = await mergedPdf.copyPages(attachDoc, attachDoc.getPageIndices());
-        attachPages.forEach(p => mergedPdf.addPage(p));
-
-        const finalPdf = Buffer.from(await mergedPdf.save());
-
-        // 3. Via Pingen versenden
-        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-            grant_type: 'client_credentials',
-            client_id: process.env.PINGEN_CLIENT_ID,
-            client_secret: process.env.PINGEN_CLIENT_SECRET
-        });
-        const token = tokenResponse.data.access_token;
-
-        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
-        });
-        const fileUrl = uploadUrlRes.data.data.attributes.url;
-        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
-
-        await axios.put(fileUrl, finalPdf, { headers: { 'Content-Type': 'application/pdf' } });
-
-        const fileName = `PDF-Brief_${(subject || 'Dokument').replace(/[^a-zA-Z0-9]/g, '_')}_${recipient.name.replace(/\s+/g, '_')}.pdf`;
-        const letterRes = await axios.post(
-            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-            {
-                data: {
-                    type: 'letters',
-                    attributes: {
-                        file_original_name: fileName,
-                        file_url: fileUrl,
-                        file_url_signature: fileUrlSignature,
-                        auto_send: true,
-                        delivery_product: 'cheap',
-                        print_mode: 'simplex',
-                        print_spectrum: 'grayscale',
-                        // DE: Fenster links (DIN 5008); CH: rechts.
-                        // KEIN country-Attribut hier — die Pingen-API kennt es beim
-                        // Brief-Erstellen nicht und quittiert es mit 400
-                        // "invalid_body_structure". Das Zielland liest Pingen aus der
-                        // Adresse im PDF. (Fehler stammte aus 7b79cde, 05.07.2026,
-                        // und hat seither jeden Brief ueber diesen Weg blockiert.)
-                        address_position: recipient?.country === 'DE' ? 'left' : 'right'
-                    }
-                }
-            },
-            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-        );
-
-        logInfo('PDF-Brief sent via Pingen', { member_id, name: recipient.name, subject });
-        await briefProtokollieren(pool, {
-            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
-        });
-        if (!staging) sendPingenCostNotification(recipient.name, letterRes.data.data?.id, false, subject).catch(() => {});
-        res.json({ success: true, letter_id: letterRes.data.data?.id });
-
+        const { pdf_base64, member_id, subject, hinweis, staging = false } = req.body || {};
+        if (!pdf_base64 || !member_id) return res.status(400).json({ error: 'pdf_base64 und member_id erforderlich' });
+        const r = await pdfBriefAnMitglied({ memberId: member_id, subject, pdfBase64: pdf_base64, hinweis, staging });
+        logInfo('PDF-Brief sent via Pingen', { member_id, name: r.name, subject, status: r.status });
+        res.json({ success: true, letter_id: r.letterId, status: r.status });
     } catch (error) {
-        logError('Failed to send PDF-Brief', { error: error.message, details: error.response?.data });
-        res.status(500).json({ error: error.message });
+        logError('PDF-Brief failed', { error: error.message });
+        res.status(error.status || 500).json({ error: error.message });
     }
 });
 

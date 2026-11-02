@@ -7542,23 +7542,6 @@
             return URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
         }
 
-        // Ersetzt Platzhalter im Text mit den tatsächlichen Mitgliederdaten.
-        // DEUTSCH: alsHtml = true, wenn text HTML ist (Brief-/Mail-Body): dann
-        // werden die eingesetzten Mitgliederdaten maskiert. Fuer Betreff und
-        // Klartext bleibt es beim reinen Ersetzen.
-        function replacePlaceholders(text, member, alsHtml = false) {
-            if (!text) return '';
-            const w = v => alsHtml ? escapeHtml(v || '') : (v || '');
-            // Funktion statt String als Ersatz: sonst wuerden $& / $1 im Wert ausgewertet
-            return text
-                .replace(/\{\{anrede\}\}/g, () => w(member.anrede))
-                .replace(/\{\{vorname\}\}/g, () => w(member.vorname))
-                .replace(/\{\{nachname\}\}/g, () => w(member.nachname))
-                .replace(/\{\{strasse\}\}/g, () => w(member.strasse))
-                .replace(/\{\{plz\}\}/g, () => w(member.plz))
-                .replace(/\{\{ort\}\}/g, () => w(member.ort))
-                .replace(/\{\{email\}\}/g, () => w(member.email));
-        }
 
         // Speichert den aktuellen Dispatch-Entwurf im localStorage.
         async function saveDraft() {
@@ -7944,17 +7927,7 @@
                 for (let i = 0; i < postRecipients.length; i++) {
                     const member = postRecipients[i];
 
-                    // Deckblatt im offiziellen Layout generieren
-                    const coverHtml = generatePdfCoverHTML(subject, member);
-
-                    const recipient = {
-                        name: `${member.vorname} ${member.nachname}`,
-                        street: member.strasse,
-                        zip: member.plz,
-                        city: member.ort,
-                        country: 'CH'
-                    };
-
+                    // Deckblatt (Vereinslayout, Adresse im richtigen Fenster) baut der Server.
                     try {
                         const response = await fetch(`${API_BASE}/dispatch/send-pdf-post`, {
                             method: 'POST',
@@ -7963,9 +7936,7 @@
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                cover_html: coverHtml,
                                 pdf_base64: pdfBase64,
-                                recipient,
                                 member_id: member.id,
                                 subject
                             })
@@ -8571,12 +8542,6 @@
             };
         }
 
-        // Absenderzeile Aktuar (fuer allgemeine Briefe) - Fallback generisch
-        function getAktuarAbsenderLine() {
-            const a = getAktuar();
-            if (!a || !a.strasse) return 'Aktuar des Feuerwehrverein Raura';
-            return `${a.kurzName}, ${a.strasse}, ${a.plz} ${a.ort}`;
-        }
 
 
         // Wechselt zwischen Auto / Post / E-Mail Modus
@@ -8782,71 +8747,8 @@
             const plz = (member && member.plz ? String(member.plz) : '').trim();
             return /^de/i.test(plz) || /^\d{5}/.test(plz);
         }
-        function letterAddressLines(member) {
-            if (!member) return ['{{vorname}} {{nachname}}', '{{strasse}}', '{{plz}} {{ort}}'];
-            const name = `${member.vorname || ''} ${member.nachname || ''}`.trim();
-            const strasse = member.strasse || '';
-            const plzClean = String(member.plz || '').trim().replace(/^de[-\s]?/i, ''); // "DE-79618" -> "79618"
-            const plzOrt = `${plzClean} ${member.ort || ''}`.trim();
-            const lines = [name, strasse];
-            if (member.adresszusatz) lines.push(member.adresszusatz);
-            lines.push(plzOrt);
-            if (isGermanRecipient(member)) lines.push('Deutschland');
-            return lines;
-        }
-        function letterAddressBlockHtml(member) {
-            return letterAddressLines(member).map(l => `<div>${escapeHtml(l)}</div>`).join('\n        ');
-        }
 
 
-        // Deckblatt fuer PDF-Brief Modus: Logo, Adressfenster, Betreff, Hinweis auf Beilage
-        function generatePdfCoverHTML(subject, member) {
-            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
-            const strasse = member?.strasse || '{{strasse}}';
-            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
-<body>
-<div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000;">
-    <!-- Logo links -->
-    <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
-        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width: 35mm; height: auto; display: block;">
-    </div>
-    <!-- Titel rechts -->
-    <div style="position: absolute; top: 15mm; left: 118mm;">
-        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
-        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
-    </div>
-    <!-- Absenderzeile -->
-    <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${escapeHtml(getAktuarAbsenderLine())}</div>
-    <!-- Empfaenger im Schweizer Adressfenster -->
-    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
-        ${letterAddressBlockHtml(member)}
-    </div>
-    <!-- Datum -->
-    <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
-    <!-- Betreff + Beilage-Hinweis -->
-    <div style="position: absolute; top: 110mm; left: 25mm; right: 25mm;">
-        <div style="font-weight: bold; font-size: 14pt; margin-bottom: 3mm;">${escapeHtml(subject)}</div>
-        <hr style="border: none; border-top: 1.5px solid #cc0000; margin: 4mm 0 8mm 0;">
-        <div style="font-size: 11pt; color: #333;">
-            <p>${member?.anrede === 'Frau' ? 'Liebe' : 'Lieber'} ${escapeHtml(member?.vorname || '{{vorname}}')},</p>
-            <p>Beiliegend erhältst du das Dokument zum oben genannten Betreff.</p>
-        </div>
-        <div style="margin-top: 15mm;">
-            Mit freundlichen Grüssen<br><br>
-            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-            <em>Der Vorstand</em>
-        </div>
-        <div style="margin-top: 15mm; padding-top: 5mm; border-top: 1px solid #ddd; font-size: 9pt; color: #666;">
-            Beilage: 1 Dokument
-        </div>
-    </div>
-</div>
-</body></html>`;
-        }
 
         // Formatiert ein Event-Datum fuer die Anzeige (z.B. "29. Juni 2024, 16:00 Uhr")
         function formatEventDate(isoDate, includeTime = true) {
@@ -9697,8 +9599,23 @@
                     anrede: 'Herr', vorname: 'Max', nachname: 'Muster',
                     strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
                 };
-                const coverHtml = generatePdfCoverHTML(subject, sampleMember);
-                const bodyOnly = coverHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
+                // Deckblatt so, wie der Server es baut (/dispatch/brief, Vorschau).
+                let deckblatt = '<div style="padding: 40px; color: #ef4444;">Kein Mitglied mit Adresse für die Vorschau.</div>';
+                if (sampleMember.id) {
+                    try {
+                        const r = await fetch(`${API_BASE}/dispatch/brief`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ member_id: sampleMember.id, subject, body: `Beiliegend erhalten Sie «${subject}».`, vorschau: true, zonen: true })
+                        });
+                        const b = await r.json();
+                        if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`);
+                        const bytes = Uint8Array.from(atob(b.pdf_base64), c => c.charCodeAt(0));
+                        deckblatt = `<iframe src="${URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))}" style="width: 210mm; height: 297mm; border: 1px solid #ddd;"></iframe>`;
+                    } catch (error) {
+                        deckblatt = `<div style="padding: 40px; color: #ef4444;">Vorschau nicht möglich: ${escapeHtml(error.message)}</div>`;
+                    }
+                }
 
                 const pdfFile = document.getElementById('dispatch-pdf-file')?.files[0];
                 let pdfPreview = '';
@@ -9715,9 +9632,7 @@
 
                 modalContent.innerHTML = `
                     <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600;">Seite 1: Deckblatt</div>
-                    <div style="background: white; width: 210mm; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                        ${bodyOnly}
-                    </div>
+                    <div style="text-align: center;">${deckblatt}</div>
                     ${pdfPreview}`;
                 return;
             }
