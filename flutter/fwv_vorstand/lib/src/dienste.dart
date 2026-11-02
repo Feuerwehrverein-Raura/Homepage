@@ -10,6 +10,7 @@ import 'package:fwv_core/fwv_core.dart';
 import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
 import 'email/mailcow_dienst.dart';
+import 'email/posteingang_dienst.dart';
 import 'geraete/app_geraete.dart';
 import 'geraete/kassen_geraete.dart';
 import 'geplant/geplante_auftraege.dart';
@@ -79,6 +80,9 @@ class VorstandDienste {
   /// Postfaecher, Aliase, Speicher (api-dispatch /mailcow) und Zustellliste
   /// (api-members).
   MailcowDienst get mailcow => MailcowDienst(api);
+
+  /// Posteingang der Funktions-Postfaecher (api-dispatch /imap, /contacts).
+  PosteingangDienst get posteingang => PosteingangDienst(api);
 
   /// Geplante Auftraege (api-dispatch /scheduled-jobs), z.B. Beitragsversand.
   GeplanteAuftraegeDienst get geplant => GeplanteAuftraegeDienst(api);

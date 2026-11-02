@@ -13,6 +13,7 @@ import 'ui/email_ansicht.dart';
 import 'ui/geraete_ansicht.dart';
 import 'ui/mitglieder_ansicht.dart';
 import 'ui/nachricht_ansicht.dart';
+import 'ui/posteingang_ansicht.dart';
 
 class VorstandBereich {
   const VorstandBereich({
@@ -60,6 +61,12 @@ final vorstandBereiche = <VorstandBereich>[
     titel: 'Nachricht',
     symbol: Icons.campaign_outlined,
     bauen: (d) => NachrichtAnsicht(dienste: d),
+  ),
+  VorstandBereich(
+    schluessel: 'posteingang',
+    titel: 'Posteingang',
+    symbol: Icons.inbox_outlined,
+    bauen: (d) => PosteingangAnsicht(dienste: d),
   ),
   VorstandBereich(
     schluessel: 'email',

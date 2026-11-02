@@ -32,6 +32,7 @@ void main() {
       'Mitglieder',
       'Beiträge',
       'Nachricht',
+      'Posteingang',
       'E-Mail',
       'Audit',
       'Geräte',
@@ -42,7 +43,8 @@ void main() {
     expect(vorstandBereichIndex('anlaesse'), 0);
     expect(vorstandBereichIndex('antraege'), 1);
     expect(vorstandBereichIndex('mitglieder'), 2);
-    expect(vorstandBereichIndex('geraete'), 7);
+    expect(vorstandBereichIndex('posteingang'), 5);
+    expect(vorstandBereichIndex('geraete'), 8);
     expect(vorstandBereichIndex('gibtsnicht'), isNull);
     expect(vorstandBereichIndex(null), isNull);
   });
