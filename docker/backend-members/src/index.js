@@ -1998,12 +1998,19 @@ async function sendNotificationEmail(memberId, templateName, variables = {}, pus
 
 // Send farewell message to departing member based on delivery preferences
 // DEUTSCH: Sendet eine Verabschiedungs-Nachricht an austretende Mitglieder (per E-Mail und/oder Brief via Pingen)
+/** "Liebe" / "Lieber" je nach Anrede im Profil (Du-Form im Abschied). */
+function anredeDu(m) {
+    if (m?.anrede === 'Frau') return 'Liebe';
+    if (m?.anrede === 'Herr') return 'Lieber';
+    return 'Liebe/r';
+}
+
 /** Text des Abschiedsbriefs aus der E-Mail-Vorlage "Verabschiedung Mitglied":
  * Platzhalter eingesetzt, ohne die Grussformel (die setzt das Brief-Layout). */
 function abschiedsBrief(vorlage, m, { eintrittsdatum, aktuarName }) {
     let text = (vorlage && vorlage.body) || 'Mit diesem Schreiben möchten wir uns herzlich für deine Mitgliedschaft beim Feuerwehrverein Raura Kaiseraugst bedanken.\n\nWir wünschen dir für deine Zukunft alles Gute.';
     text = text.split(/\n\s*Mit kameradschaftlichen Gr(ü|ue)ssen/)[0].trim();
-    const werte = { anrede: m.anrede || '', vorname: m.vorname || '', nachname: m.nachname || '',
+    const werte = { anrede: m.anrede || '', anrede_du: anredeDu(m), vorname: m.vorname || '', nachname: m.nachname || '',
         eintrittsdatum, aktuar_name: aktuarName };
     for (const [k, v] of Object.entries(werte)) text = text.replace(new RegExp(`{{${k}}}`, 'g'), v);
     return { betreff: (vorlage && vorlage.subject) || 'Alles Gute und auf Wiedersehen',
@@ -2056,6 +2063,7 @@ async function sendFarewellMessage(memberData) {
                         template_id: template.id,
                         variables: {
                             anrede: memberData.anrede || '',
+                            anrede_du: anredeDu(memberData),
                             vorname: memberData.vorname || '',
                             nachname: memberData.nachname || '',
                             eintrittsdatum: eintrittsdatum,
