@@ -209,4 +209,4 @@ function scheduleNext(pool) {
     }, ms);
 }
 
-module.exports = { runDailyBackup, scheduleNext };
+module.exports = { runDailyBackup, scheduleNext, loadAll, buildWorkbook };

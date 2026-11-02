@@ -280,7 +280,8 @@ class _Kennzahlen extends StatelessWidget {
   }
 }
 
-/// Telefonliste (PDF) und CSV-Exporte wie in vorstand.html; die Datei geht
+/// Telefonliste (PDF), Voll-Export (Excel) und CSV-Exporte wie in
+/// vorstand.html; die Datei geht
 /// ueber das Teilen-Menue (Desktop: Downloads) weiter.
 class _ExportMenue extends StatelessWidget {
   const _ExportMenue({required this.dienste});
@@ -305,6 +306,22 @@ class _ExportMenue extends StatelessWidget {
     }
   }
 
+  Future<void> _vollExport(BuildContext context) async {
+    final ursprung = stelleVon(context);
+    meldung(context, 'Voll-Export wird erstellt …');
+    try {
+      final bytes = await dienste.export.vollExport();
+      await dienste.umgebung.dateiTeilen(
+        bytes,
+        'FWV_Vollexport_${isoDatum(DateTime.now())}.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ursprung: ursprung,
+      );
+    } on Object catch (e) {
+      if (context.mounted) meldung(context, fehlerText(e));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PopupMenuButton<Object>(
     key: const Key('mitglieder-export'),
@@ -312,6 +329,8 @@ class _ExportMenue extends StatelessWidget {
     icon: const Icon(Icons.file_download_outlined),
     onSelected: (wahl) => wahl is MitgliederExport
         ? _csv(context, wahl)
+        : wahl == 'vollexport'
+        ? _vollExport(context)
         : pdfTeilen(
             context,
             dienste.umgebung,
@@ -325,6 +344,15 @@ class _ExportMenue extends StatelessWidget {
         child: ListTile(
           leading: Icon(Icons.picture_as_pdf_outlined),
           title: Text('Telefonliste (PDF)'),
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+      const PopupMenuItem(
+        key: Key('export-vollexport'),
+        value: 'vollexport',
+        child: ListTile(
+          leading: Icon(Icons.inventory_2_outlined),
+          title: Text('Voll-Export aller Daten (Excel)'),
           contentPadding: EdgeInsets.zero,
         ),
       ),

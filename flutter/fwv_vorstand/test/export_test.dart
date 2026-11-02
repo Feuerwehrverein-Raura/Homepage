@@ -95,6 +95,7 @@ void main() {
             'honorary': '1',
           },
           '/members/pdf/telefonliste' => 'PDF',
+          '/dispatch/vollexport.xlsx' => 'XLSX',
           _ => (404, {'error': 'unbekannt'}),
         },
       );
@@ -121,6 +122,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(b.anfragen.map((a) => a.url.path), contains('/members/pdf/telefonliste'));
       expect(b.geteilt.single.$1, matches(RegExp(r'^Telefonliste_\d{4}-\d{2}-\d{2}\.pdf$')));
+    });
+
+    testWidgets('Voll-Export holt die Excel-Mappe von api-dispatch', (tester) async {
+      await zeigen(tester, MitgliederAnsicht(dienste: b.dienste));
+      await tester.tap(find.byKey(const Key('mitglieder-export')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('export-vollexport')));
+      await tester.pumpAndSettle();
+      expect(b.anfragen.map((a) => a.url.path), contains('/dispatch/vollexport.xlsx'));
+      expect(b.geteilt.single.$1, matches(RegExp(r'^FWV_Vollexport_\d{4}-\d{2}-\d{2}\.xlsx$')));
     });
   });
 }

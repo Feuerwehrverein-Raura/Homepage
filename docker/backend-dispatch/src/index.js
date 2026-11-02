@@ -2335,7 +2335,7 @@ mountContacts(app, pool, authVorstandMail);
 // Taeglicher Backup-Export: Mitglieder, Beitraege, Rechnungen etc. als XLSX
 // per E-Mail an BACKUP_EMAIL (default vorstand@fwv-raura.ch). Laeuft taeglich
 // um 03:00 Europe/Zurich. ENABLE_DAILY_BACKUP=false deaktiviert.
-const { scheduleNext: scheduleDailyBackup, runDailyBackup } = require('./backup-export');
+const { scheduleNext: scheduleDailyBackup, runDailyBackup, loadAll: backupLaden, buildWorkbook: backupMappe } = require('./backup-export');
 if (process.env.ENABLE_DAILY_BACKUP !== 'false') {
     scheduleDailyBackup(pool);
 }
@@ -2347,6 +2347,24 @@ app.post('/internal/run-backup-now', authenticateAny, requireRole('vorstand', 'a
     }
     res.json({ success: true, message: 'Backup gestartet — landet in der Inbox in 1-2 Minuten.' });
     runDailyBackup(pool).catch(err => console.error('Manual backup trigger failed:', err.message));
+});
+
+// Voll-Export fuer die Vorstand-App (Mitglieder > Exportieren): dieselbe XLSX
+// wie die Sicherung per Mail, sofort als Download. Pfad unter /dispatch, weil
+// Traefik den schon an api-dispatch leitet.
+app.get('/dispatch/vollexport.xlsx', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const mappe = backupMappe(await backupLaden(pool));
+        const tag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Zurich' });
+        console.log(`[VOLLEXPORT] ${req.user?.email || req.user?.id || '?'}`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="FWV_Vollexport_${tag}.xlsx"`);
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(mappe);
+    } catch (e) {
+        console.error('[VOLLEXPORT]', e.message);
+        res.status(500).json({ error: 'Export fehlgeschlagen' });
+    }
 });
 
 app.listen(PORT, () => {

@@ -1,5 +1,6 @@
 // Mitglieder-Exporte wie in vorstand.html: CSV (Alle, Nur Aktive,
-// Post-Zustellung, E-Mail-Zustellung) und die Telefonliste als PDF.
+// Post-Zustellung, E-Mail-Zustellung), die Telefonliste als PDF und der
+// Voll-Export aller Vereinsdaten als Excel.
 //
 // Die CSV baut die App selbst aus GET /members (ganze Zeilen, auch Felder,
 // die [VorstandMitglied] nicht kennt, z.B. IBAN). Spalten und Reihenfolge
@@ -116,4 +117,9 @@ class MitgliederExportDienst {
 
   /// Telefonliste aller Mitglieder als PDF (api-members).
   Future<Uint8List> telefonliste() => api.datei('members/pdf/telefonliste');
+
+  /// Alle Vereinsdaten als Excel-Mappe (api-dispatch, dieselbe Datei wie die
+  /// Sicherung per Mail): Mitglieder, Beitraege, Rechnungen, Buchhaltung,
+  /// Anmeldungen, Anlaesse, Versand, Audit-Log, Service-Accounts.
+  Future<Uint8List> vollExport() => api.datei('dispatch/vollexport.xlsx');
 }
