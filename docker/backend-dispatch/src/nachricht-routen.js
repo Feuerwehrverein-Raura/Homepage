@@ -135,7 +135,7 @@ async function briefProtokollieren(pool, { memberId, recipient, subject, letterI
         await pool.query(
             `INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id,
                                        error_message, sent_at)
-             VALUES ('pingen', $1, $2, $3, $6, $4, $5, $7, CASE WHEN $6 = 'sent' THEN NOW() END)`,
+             VALUES ('pingen', $1, $2, $3, $6, $4, $5, $7, $8)`,
             [
                 memberId && UUID.test(String(memberId)) ? memberId : null,
                 JSON.stringify({
@@ -148,7 +148,13 @@ async function briefProtokollieren(pool, { memberId, recipient, subject, letterI
                 letterId || null,
                 eventId && UUID.test(String(eventId)) ? eventId : null,
                 status,
-                fehler ? String(fehler).slice(0, 500) : null
+                fehler ? String(fehler).slice(0, 500) : null,
+                // sent_at in JS statt "CASE WHEN $6 = 'sent'": derselbe
+                // Parameter als varchar-Spalte und als text-Vergleich liess
+                // PostgreSQL jeden Eintrag ablehnen ("inconsistent types
+                // deduced for parameter $6") - vom 01. bis 03.11.2026 kam
+                // kein Brief ins Protokoll.
+                status === 'sent' ? new Date() : null
             ]
         );
     } catch (error) {
