@@ -368,6 +368,8 @@ app.use(helmet({
 const jsonKoerper = express.json();
 app.use((req, res, next) => {
     if (req.path === '/kiosk/bibliothek') return next();
+    // Spesen mit Beleg (bis 10 MB) - eigener Parser in src/spesen.js.
+    if (req.method === 'POST' && req.path === '/members/me/spesen') return next();
     return jsonKoerper(req, res, next);
 });
 
@@ -2516,6 +2518,20 @@ app.get('/members', authenticateAny, requireRole('vorstand', 'admin'), async (re
 
 // Get own member data (self-service)
 // DEUTSCH: Gibt das eigene Mitgliederprofil zurück (Self-Service, basierend auf E-Mail im Token)
+// Spesen (src/spesen.js): Mitglieder reichen ein, der Kassier zahlt aus.
+// Vor /members/:id einhaengen, sonst faengt das /members/spesen ab.
+const spesen = require('./spesen');
+spesen.spesenSchema(pool).catch(e => console.error('[SPESEN] Schema:', e.message));
+spesen.spesenRouten(app, {
+    pool,
+    express,
+    mitgliedAuth: authenticateToken,
+    vorstandAuth: [authenticateAny, requireRole('vorstand', 'admin')],
+    mitgliedZurAnmeldung,
+    mailSenden: (m) => axios.post(`${DISPATCH_API_BASE}/email/send`, m),
+    log: (text, daten) => console.log('[SPESEN]', text, JSON.stringify(daten || {}))
+});
+
 app.get('/members/me', authenticateToken, async (req, res) => {
     try {
         const gefunden = await mitgliedZurAnmeldung(req);

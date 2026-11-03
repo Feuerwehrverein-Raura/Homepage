@@ -12,6 +12,7 @@ function falscheDb(zeilen, { kassier = { vorname: 'Kurt' } } = {}) {
             if (sql.includes('FROM dispatch_log')) return { rows: zeilen };
             if (sql.includes("'%kassier%'")) return { rows: kassier ? [kassier] : [] };
             if (sql.includes("'%aktuar%'")) return { rows: [{ vorname: 'Stefan', nachname: 'Müller' }] };
+            if (sql.includes('FROM pingen_abrechnungen WHERE spesen_id IS NULL')) return { rows: [] };
             if (sql.includes('INSERT INTO pingen_abrechnungen')) { aenderungen.push(['abrechnung:' + werte[2] + ':' + werte[4].join(',')]); return { rows: [] }; }
             if (sql.includes('INSERT INTO dispatch_log')) { aenderungen.push(['mail']); return { rows: [] }; }
             if (sql.startsWith('UPDATE dispatch_log')) { aenderungen.push(werte); return { rows: [] }; }

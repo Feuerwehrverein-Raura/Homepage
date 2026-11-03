@@ -112,9 +112,10 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
         INSERT INTO dispatch_log (type, recipient_email, subject, body, status, sent_at)
         VALUES ('email', $1, $2, $3, 'sent', NOW())`, [kassier.email, mail.subject, mail.text]);
     await pool.query(`
-        INSERT INTO pingen_abrechnungen (art, titel, empfaenger, briefe, summe, letter_ids)
-        VALUES ('taeglich', $1, $2, $3, $4, $5)`,
-    [mail.subject, kassier.email, belastet.length, mail.summe, belastet.map(b => b.letterId)]);
+        INSERT INTO pingen_abrechnungen (art, titel, empfaenger, briefe, summe, letter_ids, text)
+        VALUES ('taeglich', $1, $2, $3, $4, $5, $6)`,
+    [mail.subject, kassier.email, belastet.length, mail.summe, belastet.map(b => b.letterId), mail.text]);
+    await alsSpesenEintragen(pool, log);
     for (const b of belastet) {
         await pool.query('UPDATE dispatch_log SET spesen_gemeldet_am = NOW(), kosten = $2 WHERE id = $1', [b.id, b.kosten]);
     }
@@ -136,6 +137,8 @@ async function spesenSchema(pool) {
             letter_ids TEXT[] NOT NULL DEFAULT '{}',
             erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        ALTER TABLE pingen_abrechnungen ADD COLUMN IF NOT EXISTS text TEXT;
+        ALTER TABLE pingen_abrechnungen ADD COLUMN IF NOT EXISTS spesen_id UUID;
     `);
     // Die einmalige Abrechnung 2026 (Jan-Sep) ging am 03.11.2026 von Hand an
     // den Kassier; sie deckt alle belasteten Briefe vor AB ab.
@@ -145,6 +148,7 @@ async function spesenSchema(pool) {
                'kassier@fwv-raura.ch', 89, 146.06, '2026-11-03T16:50:00+01:00'
         WHERE NOT EXISTS (SELECT 1 FROM pingen_abrechnungen WHERE art = 'nachtrag')
     `);
+    await pool.query("UPDATE pingen_abrechnungen SET text = $1 WHERE art = 'nachtrag' AND text IS NULL", [NACHTRAG_2026]);
     // Abrechnungen aus der Zeit vor dieser Tabelle (03.11.2026, 18:00):
     // aus dispatch_log nachtragen, je Tag eine.
     await pool.query(`
@@ -158,6 +162,50 @@ async function spesenSchema(pool) {
                 AND external_id <> ALL (SELECT unnest(letter_ids) FROM pingen_abrechnungen)) d
         GROUP BY tag
     `, [KASSIER_ADRESSE]);
+}
+
+// Inhalt der von Hand verschickten Abrechnung 2026 - Beleg der Spesen.
+const NACHTRAG_2026 = [
+    'Abrechnung der Pingen-Briefe 2026 bis September', '',
+    '  22.01.2026  Helferaufruf (1 unzustellbar)  17 Briefe  CHF  25.16',
+    '  21.02.2026  Einladung                      16 Briefe  CHF  34.28',
+    '  16.04.2026  Mitgliederbeitrag              28 Briefe  CHF  42.02',
+    '  04.07.2026  Einladung Taco-Abend           14 Briefe  CHF  22.30',
+    '  07.09.2026  Einladung Chilbi               14 Briefe  CHF  22.30', '',
+    'Total: 89 Briefe, CHF 146.06', '',
+    'Preise je Brief laut Pingen; Belege: https://app.pingen.com',
+].join('\n');
+
+/**
+ * Jede Pingen-Abrechnung zusaetzlich als Spesen des Aktuars eintragen
+ * (Tabelle spesen von api-members, Quelle 'pingen', Beleg = Text der
+ * Abrechnung). Die Mail an den Kassier bleibt - sie soll nicht untergehen.
+ * Fehlt die Tabelle noch (api-members aelter), beim naechsten Mal.
+ */
+async function alsSpesenEintragen(pool, log = () => {}) {
+    try {
+        const offen = (await pool.query(
+            'SELECT * FROM pingen_abrechnungen WHERE spesen_id IS NULL ORDER BY erstellt_am')).rows;
+        if (!offen.length) return 0;
+        const aktuar = (await pool.query(
+            "SELECT id, iban FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1")).rows[0];
+        if (!aktuar) return 0;
+        for (const a of offen) {
+            const r = await pool.query(`
+                INSERT INTO spesen (member_id, betrag, datum, zweck, kategorie, iban, beleg, beleg_name, beleg_typ, quelle)
+                VALUES ($1, $2, ($3::timestamptz AT TIME ZONE 'Europe/Zurich')::date, $4, 'Porto', $5, $6, $7, 'text/plain', 'pingen')
+                RETURNING id`,
+            [aktuar.id, a.summe, a.erstellt_am, a.titel, aktuar.iban || null,
+                Buffer.from(`${a.titel}\n\n${a.text || ''}`.trim() + '\n', 'utf8'),
+                `${a.titel.replace(/[^\w.\- äöüÄÖÜ()]/g, '_').slice(0, 100)}.txt`]);
+            await pool.query('UPDATE pingen_abrechnungen SET spesen_id = $1 WHERE id = $2', [r.rows[0].id, a.id]);
+        }
+        log('Pingen-Abrechnungen als Spesen eingetragen', { anzahl: offen.length });
+        return offen.length;
+    } catch (e) {
+        log('Pingen-Spesen: Eintrag in spesen nicht moeglich', { fehler: e.message });
+        return 0;
+    }
 }
 
 /** Belastet heisst: Pingen hat den Preis vom Guthaben abgezogen. */
@@ -227,6 +275,10 @@ function spesenRoute({ pool, briefeListe }) {
 function spesenStarten(pool, deps, zuerichTeile) {
     let erledigt = null;
     let laeuft = false;
+    // Abrechnungen, die noch nicht als Spesen stehen (z.B. api-members kam
+    // spaeter hoch): gleich und dann stuendlich nachtragen.
+    alsSpesenEintragen(pool, deps.log);
+    setInterval(() => alsSpesenEintragen(pool, deps.log), 60 * 60 * 1000);
     setInterval(async () => {
         const z = zuerichTeile(new Date());
         const tag = `${z.jahr}-${z.monat}-${z.tag}`;
@@ -246,4 +298,4 @@ function spesenStarten(pool, deps, zuerichTeile) {
 }
 
 module.exports = { AB, KASSIER_ADRESSE, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema,
-    spesenStarten, istBelastet, spesenUebersicht, spesenRoute };
+    spesenStarten, istBelastet, spesenUebersicht, spesenRoute, alsSpesenEintragen };
