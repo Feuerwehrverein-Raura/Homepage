@@ -77,6 +77,9 @@ class VorstandDienste {
   /// zeigt die Pingen-Ansicht nur einen Hinweis.
   VersandDienst get versand => VersandDienst(api);
 
+  /// Spesen der Mitglieder (Kassier).
+  SpesenDienst get spesen => SpesenDienst(api);
+
   /// Postfaecher, Aliase, Speicher (api-dispatch /mailcow) und Zustellliste
   /// (api-members).
   MailcowDienst get mailcow => MailcowDienst(api);

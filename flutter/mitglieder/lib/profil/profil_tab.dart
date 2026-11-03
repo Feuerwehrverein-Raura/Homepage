@@ -1,5 +1,5 @@
 // Reiter "Profil": eigene Angaben aus `GET members/me`, Bearbeiten, Meine
-// Anmeldungen, Konto (Benachrichtigungen, Zugaenge, VPN) und Austritt. Wie members-android ProfileFragment und
+// Anmeldungen, Spesen, Konto (Benachrichtigungen, Zugaenge, VPN) und Austritt. Wie members-android ProfileFragment und
 // members-ios ProfileView.
 
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
@@ -15,6 +15,7 @@ import '../einstellungen/vpn_screen.dart';
 import '../einstellungen/zugaenge_screen.dart';
 import 'austritt_screen.dart';
 import 'profil_bearbeiten_screen.dart';
+import 'spesen_screen.dart';
 
 class ProfilTab extends StatefulWidget {
   const ProfilTab({super.key, required this.dienste});
@@ -150,6 +151,14 @@ class _ProfilTabState extends State<ProfilTab> {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => MeineAnmeldungenScreen(dienste: widget.dienste)),
           ),
+        ),
+        ListTile(
+          key: const Key('profil-spesen'),
+          leading: const Icon(Icons.receipt_long_outlined),
+          title: const Text('Spesen'),
+          subtitle: const Text('Auslagen für den Verein abrechnen'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _oeffnen(SpesenScreen(dienste: widget.dienste)),
         ),
         ..._ausleihe(context),
         // Was zum eigenen Konto gehoert - frueher unter "Mehr".

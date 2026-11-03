@@ -23,4 +23,5 @@ export 'src/mitglied/benachrichtigungen.dart';
 export 'src/mitglied/json_lesen.dart';
 export 'src/mitglied/mitglieder_dienst.dart';
 export 'src/mitglied/profil.dart';
+export 'src/mitglied/spesen.dart';
 export 'src/mitglied/zugaenge.dart';

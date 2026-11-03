@@ -14,6 +14,7 @@ import 'ui/geraete_ansicht.dart';
 import 'ui/mitglieder_ansicht.dart';
 import 'ui/nachricht_ansicht.dart';
 import 'ui/posteingang_ansicht.dart';
+import 'ui/spesen_ansicht.dart';
 
 class VorstandBereich {
   const VorstandBereich({
@@ -55,6 +56,12 @@ final vorstandBereiche = <VorstandBereich>[
     titel: 'Beiträge',
     symbol: Icons.payments_outlined,
     bauen: (d) => BeitraegeAnsicht(dienste: d),
+  ),
+  VorstandBereich(
+    schluessel: 'spesen',
+    titel: 'Spesen',
+    symbol: Icons.receipt_long_outlined,
+    bauen: (d) => SpesenAnsicht(dienste: d),
   ),
   VorstandBereich(
     schluessel: 'nachricht',

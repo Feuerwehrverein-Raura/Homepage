@@ -3,6 +3,7 @@
 // Netz, kein Firebase.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,6 +104,22 @@ class _Backend {
   List<Object> organisiert = [];
   bool newsletterOk = true;
   bool darfSteuern = false;
+  List<Map<String, Object?>> spesen = [
+    {
+      'id': 's1',
+      'betrag': '12.40',
+      'datum': '2026-10-17',
+      'zweck': 'Klebeband Chilbi',
+      'kategorie': 'Material',
+      'status': 'bezahlt',
+      'iban': 'CH9300762011623852957',
+      'beleg_name': 'Quittung.jpg',
+      'beleg_typ': 'image/jpeg',
+      'anlass': 'Chilbi 2026',
+      'erledigt_am': '2026-10-20T08:00:00Z',
+      'quelle': 'mitglied',
+    },
+  ];
   List<Map<String, Object?>> vpn = [
     {'name': 'ma1b2c3d4-laptop', 'geraet': 'laptop', 'adresse': '10.20.0.7', 'zuletzt': null},
   ];
@@ -131,6 +148,23 @@ class _Backend {
         });
       case 'GET /members/me/notifications':
         return json(prefs);
+      case 'GET /members/me/spesen':
+        return json({'spesen': spesen, 'iban': profil['iban']});
+      case 'POST /members/me/spesen':
+        final b = (body as Map).cast<String, Object?>();
+        spesen = [
+          {
+            ...b,
+            'id': 's2',
+            'status': 'eingereicht',
+            'beleg_base64': null,
+            'quelle': 'mitglied',
+          },
+          ...spesen,
+        ];
+        return json({'id': 's2'}, 201);
+      case 'GET /members/me/spesen/s1/beleg':
+        return http.Response.bytes(utf8.encode('JPEGBELEG'), 200);
       case 'GET /members/me/vpn':
         return json(vpn);
       case 'POST /members/me/vpn':
@@ -275,6 +309,7 @@ void main() {
         return true;
       },
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, utf8.decode(bytes))),
+      dokumentFotoWaehlen: ({required kamera}) async => Uint8List.fromList(utf8.encode('FOTO')),
       plattform: plattform,
       geraeteAngaben: geraeteAngaben,
       update: update,
@@ -508,6 +543,58 @@ void main() {
       expect(os.length, 100);
       expect(os, startsWith('Linux 6.8 x'));
       expect(lang.alsJson()['quelle'], 'unbekannt');
+    });
+  });
+
+  group('Spesen', () {
+    testWidgets('Ohne IBAN: Hinweis, Einreichen gesperrt', (tester) async {
+      await starten(tester);
+      await reiter(tester, 'Profil');
+      await sichtbar(tester, find.byKey(const Key('profil-spesen')));
+      await tippen(tester, find.byKey(const Key('profil-spesen')));
+      expect(find.byKey(const Key('spesen-ohne-iban')), findsOneWidget);
+      expect(tester.widget<FloatingActionButton>(find.byKey(const Key('spesen-neu'))).onPressed, isNull);
+      // Bisherige Spesen trotzdem sichtbar, mit Beleg
+      expect(find.text('Klebeband Chilbi'), findsOneWidget);
+      expect(find.text('Bezahlt'), findsOneWidget);
+      await tippen(tester, find.text('Klebeband Chilbi'));
+      expect(find.textContaining('auf CH93 0076 2011 6238 5295 7'), findsOneWidget);
+      await tippen(tester, find.byKey(const Key('spesen-beleg')));
+      expect(geteilt.single, ('Quittung.jpg', 'JPEGBELEG'));
+    });
+
+    testWidgets('Mit IBAN: Betrag, Zweck, Kategorie, Foto-Beleg, einreichen', (tester) async {
+      backend.profil['iban'] = 'CH9300762011623852957';
+      await starten(tester, jetzt: () => DateTime(2026, 11, 3, 10));
+      await reiter(tester, 'Profil');
+      await sichtbar(tester, find.byKey(const Key('profil-spesen')));
+      await tippen(tester, find.byKey(const Key('profil-spesen')));
+      expect(find.text('Auszahlung auf CH93 0076 2011 6238 5295 7'), findsOneWidget);
+      await tippen(tester, find.byKey(const Key('spesen-neu')));
+
+      await tester.enterText(find.byKey(const Key('spesen-betrag')), '23,50');
+      await tester.enterText(find.byKey(const Key('spesen-zweck')), 'Brot Preisjassen');
+      await tippen(tester, find.byKey(const Key('spesen-kategorie')));
+      await tippen(tester, find.text('Einkauf').last);
+      final senden = find.byKey(const Key('spesen-senden'));
+      expect(tester.widget<FilledButton>(senden).onPressed, isNull, reason: 'Beleg fehlt');
+      await sichtbar(tester, find.byKey(const Key('spesen-foto')));
+      await tippen(tester, find.byKey(const Key('spesen-foto')));
+      expect(find.text('Beleg 2026-11-03.jpg'), findsOneWidget);
+      await sichtbar(tester, senden);
+      await tippen(tester, senden);
+
+      final b = backend.letzter('POST', '/members/me/spesen')! as Map;
+      expect(b['betrag'], 23.5);
+      expect(b['datum'], '2026-11-03');
+      expect(b['zweck'], 'Brot Preisjassen');
+      expect(b['kategorie'], 'Einkauf');
+      expect(b['beleg_typ'], 'image/jpeg');
+      expect(utf8.decode(base64Decode(b['beleg_base64']! as String)), 'FOTO');
+      expect(b.containsKey('event_id'), isFalse);
+      expect(find.text('Eingereicht – der Kassier ist informiert.'), findsOneWidget);
+      expect(find.text('Brot Preisjassen'), findsOneWidget);
+      expect(find.text('Eingereicht'), findsOneWidget);
     });
   });
 

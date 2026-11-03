@@ -46,6 +46,7 @@ export 'src/ui/nachricht/verfassen_ansicht.dart';
 export 'src/ui/nachricht/verlauf_ansicht.dart';
 export 'src/ui/nachricht_ansicht.dart';
 export 'src/ui/posteingang_ansicht.dart';
+export 'src/ui/spesen_ansicht.dart';
 export 'src/versand/einladung.dart';
 export 'src/versand/versand.dart';
 export 'src/versand/versand_dienst.dart';
