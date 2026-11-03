@@ -311,6 +311,12 @@ class VersandDienst {
     return PingenStatistik.ausJson(j is Map ? Map<String, dynamic>.from(j) : const {});
   }
 
+  /// GET pingen/spesen - belastete Briefe des Jahres je Monat, Abrechnungen.
+  Future<PingenSpesen> pingenSpesen(int jahr) async {
+    final j = await api.get('pingen/spesen', abfrage: {'jahr': '$jahr'});
+    return PingenSpesen.ausJson(j is Map ? Map<String, dynamic>.from(j) : const {});
+  }
+
   Future<List<VersandEintrag>> pingenBriefe({int limit = 50}) async => jsonListe(
     await api.get('pingen/letters', abfrage: {'limit': '$limit'}),
     VersandEintrag.ausJson,
@@ -606,4 +612,110 @@ class PingenStatistik {
   final int fehlgeschlagen;
   final int tage7;
   final int tage30;
+}
+
+double _betrag(Object? w) => switch (w) {
+  num n => n.toDouble(),
+  String s => double.tryParse(s) ?? 0,
+  _ => 0,
+};
+
+/// Ein Monat in der Spesen-Uebersicht (GET pingen/spesen).
+class SpesenMonat {
+  const SpesenMonat({
+    required this.monat,
+    this.briefe = 0,
+    this.summe = 0,
+    this.abgerechnet = 0,
+    this.offen = 0,
+  });
+
+  factory SpesenMonat.ausJson(Map<String, dynamic> j) => SpesenMonat(
+    monat: jsonText(j['monat']) ?? '',
+    briefe: jsonZahl(j['briefe']) ?? 0,
+    summe: _betrag(j['summe']),
+    abgerechnet: _betrag(j['abgerechnet']),
+    offen: _betrag(j['offen']),
+  );
+
+  /// 'YYYY-MM'.
+  final String monat;
+  final int briefe;
+  final double summe;
+  final double abgerechnet;
+  final double offen;
+}
+
+/// Eine Spesenabrechnung an den Kassier.
+class SpesenAbrechnung {
+  const SpesenAbrechnung({
+    required this.titel,
+    this.datum,
+    this.briefe = 0,
+    this.summe = 0,
+    this.nachtrag = false,
+  });
+
+  factory SpesenAbrechnung.ausJson(Map<String, dynamic> j) => SpesenAbrechnung(
+    titel: jsonText(j['titel']) ?? '',
+    datum: DateTime.tryParse(jsonText(j['datum']) ?? '')?.toLocal(),
+    briefe: jsonZahl(j['briefe']) ?? 0,
+    summe: _betrag(j['summe']),
+    nachtrag: j['art'] == 'nachtrag',
+  );
+
+  final String titel;
+  final DateTime? datum;
+  final int briefe;
+  final double summe;
+  final bool nachtrag;
+}
+
+/// GET pingen/spesen: was Pingen im Jahr belastet hat, was dem Aktuar schon
+/// zurueckgemeldet ist (abgerechnet) und was noch auf Guthaben wartet.
+class PingenSpesen {
+  const PingenSpesen({
+    required this.jahr,
+    this.monate = const [],
+    this.briefe = 0,
+    this.summe = 0,
+    this.abgerechnet = 0,
+    this.offen = 0,
+    this.wartetBriefe = 0,
+    this.wartetSumme = 0,
+    this.abrechnungen = const [],
+  });
+
+  factory PingenSpesen.ausJson(Map<String, dynamic> j) {
+    Map<String, dynamic> teil(Object? w) => w is Map ? Map<String, dynamic>.from(w) : const {};
+    final total = teil(j['total']);
+    final wartet = teil(j['wartet']);
+    return PingenSpesen(
+      jahr: jsonZahl(j['jahr']) ?? DateTime.now().year,
+      monate: [
+        for (final m in (j['monate'] as List? ?? const []))
+          if (m is Map) SpesenMonat.ausJson(Map<String, dynamic>.from(m)),
+      ],
+      briefe: jsonZahl(total['briefe']) ?? 0,
+      summe: _betrag(total['summe']),
+      abgerechnet: _betrag(total['abgerechnet']),
+      offen: _betrag(total['offen']),
+      wartetBriefe: jsonZahl(wartet['briefe']) ?? 0,
+      wartetSumme: _betrag(wartet['summe']),
+      abrechnungen: [
+        for (final a in (j['abrechnungen'] as List? ?? const []))
+          if (a is Map) SpesenAbrechnung.ausJson(Map<String, dynamic>.from(a)),
+      ],
+    );
+  }
+
+  final int jahr;
+  final List<SpesenMonat> monate;
+  final int briefe;
+  final double summe;
+  final double abgerechnet;
+  final double offen;
+  final int wartetBriefe;
+  final double wartetSumme;
+  final List<SpesenAbrechnung> abrechnungen;
 }

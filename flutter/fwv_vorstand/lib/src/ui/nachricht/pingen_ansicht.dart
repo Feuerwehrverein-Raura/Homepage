@@ -1,6 +1,8 @@
 // Pingen (Post) im Vorstand-Bereich (docs/vorstand-funktionen.md,
 // Abschnitt 8 und «Massen-PDF» aus 7): Guthaben (Live/Staging), Statistik,
-// Briefliste mit Status-Abfrage, ein PDF per Post an ausgewaehlte Mitglieder.
+// Briefliste mit Status-Abfrage, ein PDF per Post an ausgewaehlte Mitglieder,
+// Spesen (was Pingen belastet hat, was dem Kassier gemeldet ist - GET
+// pingen/spesen, siehe docker/backend-dispatch/src/pingen-spesen.js).
 //
 // Vorbild: vorstand-desktop PingenTab und MassPdfPage. Die Status-Abfrage
 // braucht die Pingen-ID (external_id) - der Desktop schickte die
@@ -34,7 +36,16 @@ typedef _Daten = ({
   PingenStatistik? statistik,
   List<VersandEintrag> briefe,
   List<VorstandMitglied> mitglieder,
+  PingenSpesen? spesen,
+  String? spesenFehler,
 });
+
+const _monate = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+String _monatText(String jahrMonat) {
+  final m = int.tryParse(jahrMonat.length >= 7 ? jahrMonat.substring(5, 7) : '');
+  return m == null || m < 1 || m > 12 ? jahrMonat : _monate[m - 1];
+}
 
 /// Hoechstens so viele offene Briefe auf einmal bei Pingen abfragen.
 const _abgleichMax = 30;
@@ -42,6 +53,7 @@ const _abgleichMax = 30;
 class _PingenAnsichtState extends State<PingenAnsicht> {
   var _laden = GlobalKey<LadeAnsichtState<_Daten>>();
   var _staging = false;
+  var _jahr = DateTime.now().year;
 
   final _betreff = TextEditingController();
   ({Uint8List bytes, String dateiname})? _pdf;
@@ -81,7 +93,15 @@ class _PingenAnsichtState extends State<PingenAnsicht> {
       onError: (_) => null,
     );
     final mitglieder = widget.dienste.mitglieder.liste();
+    // Spesen gibt es nur live - Staging kostet nichts.
+    final spesen = staging
+        ? Future.value((null, null))
+        : _dienst.pingenSpesen(_jahr).then<(PingenSpesen?, String?)>(
+            (s) => (s, null),
+            onError: (Object e) => (null, fehlerText(e)),
+          );
     final briefe = await _dienst.pingenBriefe();
+    final (sp, spf) = await spesen;
     final (k, kf) = await konto;
     _status.clear();
     return (
@@ -90,6 +110,8 @@ class _PingenAnsichtState extends State<PingenAnsicht> {
       statistik: await statistik,
       briefe: briefe,
       mitglieder: await mitglieder,
+      spesen: sp,
+      spesenFehler: spf,
     );
   }
 
@@ -250,6 +272,7 @@ class _PingenAnsichtState extends State<PingenAnsicht> {
       ),
       children: [
         KartenSpalten(children: [_konto(context, d), _statistik(context, d.statistik)]),
+        if (!_staging) _spesen(context, d),
         KartenSpalten(
           minBreite: 420,
           children: [_pdfSenden(context, d.mitglieder), _briefe(context, d.briefe)],
@@ -281,6 +304,113 @@ class _PingenAnsichtState extends State<PingenAnsicht> {
               'reicht für ca. ${(k.guthaben! / pingenKostenProBrief).floor()} Briefe',
               style: t.textTheme.bodySmall,
             ),
+        ],
+      ],
+    );
+  }
+
+  void _jahrWechseln(int jahr) {
+    setState(() {
+      _jahr = jahr;
+      _laden = GlobalKey();
+    });
+  }
+
+  Widget _spesen(BuildContext context, _Daten d) {
+    final t = Theme.of(context);
+    final s = d.spesen;
+    final klein = t.textTheme.bodySmall;
+    Widget zeile(String links, String mitte, String rechts, {TextStyle? stil, Key? key}) => Padding(
+      key: key,
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(links, style: stil)),
+          SizedBox(width: 70, child: Text(mitte, style: stil, textAlign: TextAlign.right)),
+          SizedBox(width: 96, child: Text(rechts, style: stil, textAlign: TextAlign.right)),
+        ],
+      ),
+    );
+    return Karte(
+      key: const Key('pingen-spesen'),
+      titel: 'Spesen $_jahr',
+      aktion: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const Key('spesen-jahr-zurueck'),
+            tooltip: 'Vorjahr',
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => _jahrWechseln(_jahr - 1),
+          ),
+          IconButton(
+            key: const Key('spesen-jahr-vor'),
+            tooltip: 'Nächstes Jahr',
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _jahr >= DateTime.now().year ? null : () => _jahrWechseln(_jahr + 1),
+          ),
+        ],
+      ),
+      kinder: [
+        if (s == null)
+          Text('Spesen nicht abrufbar: ${d.spesenFehler ?? 'unbekannt'}', style: klein)
+        else ...[
+          Text(
+            'Was Pingen vom Guthaben abgezogen hat. Das Guthaben streckt der Aktuar vor; '
+            'die Abrechnung geht täglich um 18:00 an kassier@fwv-raura.ch.',
+            style: klein,
+          ),
+          const SizedBox(height: 8),
+          if (s.monate.isEmpty)
+            const Text('Keine Briefe belastet.')
+          else ...[
+            zeile('Monat', 'Briefe', 'CHF', stil: t.textTheme.labelMedium),
+            for (final m in s.monate)
+              zeile(
+                m.offen > 0 ? '${_monatText(m.monat)} · ${franken(m.offen)} offen' : _monatText(m.monat),
+                '${m.briefe}',
+                m.summe.toStringAsFixed(2),
+                key: Key('spesen-${m.monat}'),
+              ),
+            const Divider(),
+            zeile('Total', '${s.briefe}', s.summe.toStringAsFixed(2),
+                stil: t.textTheme.titleSmall, key: const Key('spesen-total')),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(label: Text('Abgerechnet ${franken(s.abgerechnet)}')),
+              if (s.offen > 0)
+                Chip(
+                  key: const Key('spesen-offen'),
+                  label: Text('Noch nicht abgerechnet ${franken(s.offen)}'),
+                ),
+              if (s.wartetBriefe > 0)
+                Chip(
+                  key: const Key('spesen-wartet'),
+                  label: Text(
+                    '${anzahl(s.wartetBriefe, 'Brief wartet', 'Briefe warten')} auf Guthaben '
+                    '(${franken(s.wartetSumme)})',
+                  ),
+                ),
+            ],
+          ),
+          if (s.abrechnungen.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('Abrechnungen an den Kassier', style: t.textTheme.labelMedium),
+            for (final a in s.abrechnungen)
+              zeile(
+                [
+                  if (a.datum case final dt?) '${dt.day}.${dt.month}.${dt.year}',
+                  if (a.nachtrag) 'Nachtrag',
+                ].join(' · '),
+                '${a.briefe}',
+                a.summe.toStringAsFixed(2),
+                stil: klein,
+              ),
+          ],
         ],
       ],
     );
