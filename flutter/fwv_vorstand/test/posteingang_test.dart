@@ -115,6 +115,7 @@ void main() {
       expect(e.cc, '');
       expect(e.betreff, 'AW: Chilbi Helfer');
       expect(e.text, contains('> Ich komme.\n> Gruss Anna'));
+      expect(e.text, startsWith('\n\nAnna Muster <anna@example.ch> schrieb:\n'));
       expect(e.inReplyTo, '<m7@example.ch>');
       expect(e.references, '<m6@fwv-raura.ch> <m7@example.ch>');
     });

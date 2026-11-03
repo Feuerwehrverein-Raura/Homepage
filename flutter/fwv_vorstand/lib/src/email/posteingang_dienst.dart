@@ -198,7 +198,7 @@ typedef MailEntwurf = ({
 MailEntwurf antwortEntwurf(Mail m, {required String ich, bool allen = false, bool weiter = false}) {
   String ohnePraefix(String b) =>
       b.replaceFirst(RegExp(r'^((re|aw|wg|fwd?):\s*)+', caseSensitive: false), '');
-  final datum = m.datum == null ? '' : '${_datumText(m.datum!)} ';
+  final datum = m.datum == null ? '' : _datumText(m.datum!);
   if (weiter) {
     return (
       an: '',
@@ -223,7 +223,7 @@ MailEntwurf antwortEntwurf(Mail m, {required String ich, bool allen = false, boo
     an: m.von,
     cc: weitere.join(', '),
     betreff: 'AW: ${ohnePraefix(m.betreff)}',
-    text: '\n\nAm $datum schrieb ${m.von}:\n$zitat',
+    text: '\n\n${datum.isEmpty ? '${m.von} schrieb' : 'Am $datum schrieb ${m.von}'}:\n$zitat',
     inReplyTo: m.messageId,
     references: [?m.referenzen, ?m.messageId].join(' '),
   );
