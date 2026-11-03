@@ -547,6 +547,24 @@ void main() {
   });
 
   group('Spesen', () {
+    testWidgets('IBAN direkt in Spesen eintragen: falsche abgewiesen, richtige ins Profil', (tester) async {
+      await starten(tester);
+      await reiter(tester, 'Profil');
+      await sichtbar(tester, find.byKey(const Key('profil-spesen')));
+      await tippen(tester, find.byKey(const Key('profil-spesen')));
+      await tester.enterText(find.byKey(const Key('spesen-iban')), 'CH93 0076 2011 6238 5295 8');
+      await tippen(tester, find.byKey(const Key('spesen-iban-speichern')));
+      expect(find.text('Diese IBAN stimmt nicht – bitte nochmals prüfen.'), findsOneWidget);
+      expect(backend.gab('PUT', '/members/me'), isFalse);
+
+      await tester.enterText(find.byKey(const Key('spesen-iban')), 'ch9300762011623852957');
+      await tippen(tester, find.byKey(const Key('spesen-iban-speichern')));
+      expect(backend.letzter('PUT', '/members/me'), {'iban': 'CH93 0076 2011 6238 5295 7'});
+      expect(find.text('Auszahlung auf CH93 0076 2011 6238 5295 7'), findsOneWidget);
+      expect(find.byKey(const Key('spesen-ohne-iban')), findsNothing);
+      expect(tester.widget<FloatingActionButton>(find.byKey(const Key('spesen-neu'))).onPressed, isNotNull);
+    });
+
     testWidgets('Ohne IBAN: Hinweis, Einreichen gesperrt', (tester) async {
       await starten(tester);
       await reiter(tester, 'Profil');

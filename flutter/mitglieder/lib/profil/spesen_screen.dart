@@ -152,23 +152,13 @@ class _SpesenScreenState extends State<SpesenScreen> {
               'Der Kassier zahlt auf deine IBAN aus.',
             ),
             const SizedBox(height: 12),
-            if (d.iban == null || d.iban!.trim().isEmpty)
-              Card(
-                key: const Key('spesen-ohne-iban'),
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text(
-                    'Für die Auszahlung braucht es deine IBAN. Trage sie unter Profil → '
-                    'Profil bearbeiten ein.',
-                  ),
-                ),
-              )
-            else
-              Text(
-                'Auszahlung auf ${ibanFormatieren(d.iban!)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+            _IbanKarte(
+              iban: d.iban,
+              speichern: (iban) async {
+                await widget.dienste.mitglieder.ibanSpeichern(iban);
+                await _ansicht.currentState?.neuLaden();
+              },
+            ),
             const SizedBox(height: 16),
             if (d.spesen.isEmpty)
               const Text('Noch keine Spesen eingereicht.')
@@ -475,6 +465,124 @@ class _SpesenEinreichenScreenState extends State<SpesenEinreichenScreen> {
             label: Text(_sendet ? 'Wird eingereicht …' : 'Einreichen'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// IBAN fuer die Auszahlung: anzeigen, eintragen oder aendern - gespeichert
+/// im Profil (PUT members/me, nur das Feld iban).
+class _IbanKarte extends StatefulWidget {
+  const _IbanKarte({required this.iban, required this.speichern});
+
+  final String? iban;
+  final Future<void> Function(String iban) speichern;
+
+  @override
+  State<_IbanKarte> createState() => _IbanKarteState();
+}
+
+class _IbanKarteState extends State<_IbanKarte> {
+  final _text = TextEditingController();
+  bool _bearbeiten = false;
+  bool _speichert = false;
+
+  bool get _fehlt => widget.iban == null || widget.iban!.trim().isEmpty;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _speichern() async {
+    final iban = _text.text;
+    if (!ibanGueltig(iban)) {
+      meldung(context, 'Diese IBAN stimmt nicht – bitte nochmals prüfen.');
+      return;
+    }
+    setState(() => _speichert = true);
+    try {
+      await widget.speichern(iban);
+      if (!mounted) return;
+      setState(() => _bearbeiten = false);
+      meldung(context, 'IBAN im Profil gespeichert.');
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _speichert = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    if (!_fehlt && !_bearbeiten) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Auszahlung auf ${ibanFormatieren(widget.iban!)}',
+              style: t.textTheme.bodySmall,
+            ),
+          ),
+          TextButton(
+            key: const Key('spesen-iban-aendern'),
+            onPressed: () => setState(() {
+              _text.text = ibanFormatieren(widget.iban!);
+              _bearbeiten = true;
+            }),
+            child: const Text('Ändern'),
+          ),
+        ],
+      );
+    }
+    return Card(
+      key: const Key('spesen-ohne-iban'),
+      color: _fehlt ? t.colorScheme.errorContainer : null,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _fehlt
+                  ? 'Für die Auszahlung braucht es deine IBAN. Sie wird in deinem Profil gespeichert.'
+                  : 'Neue IBAN für die Auszahlung (wird im Profil gespeichert).',
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('spesen-iban'),
+              controller: _text,
+              textCapitalization: TextCapitalization.characters,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'IBAN',
+                hintText: 'CH93 0076 2011 6238 5295 7',
+                border: OutlineInputBorder(),
+                filled: true,
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _speichern(),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (!_fehlt)
+                  TextButton(
+                    onPressed: () => setState(() => _bearbeiten = false),
+                    child: const Text('Abbrechen'),
+                  ),
+                FilledButton(
+                  key: const Key('spesen-iban-speichern'),
+                  onPressed: _speichert || _text.text.trim().isEmpty ? null : _speichern,
+                  child: Text(_speichert ? 'Speichert …' : 'IBAN speichern'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

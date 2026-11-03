@@ -2851,9 +2851,12 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
 // DEUTSCH: Eigenes Profil aktualisieren (nur erlaubte Felder: Adresse, Telefon, IBAN etc.), sendet Benachrichtigung bei Änderungen
 app.put('/members/me', authenticateToken, async (req, res) => {
     try {
-        // Format phone numbers before processing
-        const telefon = formatPhoneNumber(req.body.telefon);
-        const mobile = formatPhoneNumber(req.body.mobile);
+        // Format phone numbers before processing. Fehlt ein Feld im Body,
+        // bleibt es undefined (= unveraendert) - formatPhoneNumber machte
+        // daraus null und loeschte die Nummer (z.B. wenn die Spesen-Seite nur
+        // die IBAN speichert).
+        const telefon = req.body.telefon === undefined ? undefined : formatPhoneNumber(req.body.telefon);
+        const mobile = req.body.mobile === undefined ? undefined : formatPhoneNumber(req.body.mobile);
         const { email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen,
                 vorname, nachname, geburtstag, anrede } = req.body;
 

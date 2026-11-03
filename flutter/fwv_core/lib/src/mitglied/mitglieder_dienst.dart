@@ -23,6 +23,11 @@ class MitgliederDienst {
   Future<MitgliedProfil> profilSpeichern(ProfilAenderung aenderung) async =>
       MitgliedProfil.ausJson(await api.put('members/me', daten: aenderung.alsJson()));
 
+  /// Nur die IBAN aendern (Spesen-Seite); die uebrigen Felder bleiben, weil
+  /// das Backend fehlende Felder unveraendert laesst.
+  Future<MitgliedProfil> ibanSpeichern(String iban) async =>
+      MitgliedProfil.ausJson(await api.put('members/me', daten: {'iban': ibanFormatieren(iban)}));
+
   /// Laedt ein (schon verkleinertes) JPEG als Profilfoto hoch und gibt den
   /// neuen Pfad (`photo_url`) zurueck.
   Future<String?> fotoHochladen(List<int> jpeg) async {
