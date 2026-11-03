@@ -176,5 +176,5 @@ function sammelmailStarten(pool, senden) {
 
 module.exports = {
     sammelSchema, kannSammeln, vormerken, stichzeit, sammelmailBauen,
-    faelligeVersenden, sammelmailStarten, VERSANDSTUNDE
+    faelligeVersenden, sammelmailStarten, VERSANDSTUNDE, zuerichTeile
 };

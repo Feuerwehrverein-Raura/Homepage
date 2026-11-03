@@ -118,45 +118,6 @@ const SENDER_ADDRESS = {
     country: 'CH'
 };
 
-
-
-// DEUTSCH: Kostenmeldung an den Kassier fuer jeden Pingen-Brief - ueber die
-// Sammelmail (sammelmail.js, taeglich 18:00), damit er bei vielen Briefen eine
-// Mail bekommt statt einer pro Brief. Vorher nur bei /pingen/send und sofort;
-// send-post (Hauptweg), send-manual und Arbeitsplan meldeten gar nichts.
-async function sendPingenCostNotification(recipientName, letterId, isStaging = false, betreff = '') {
-    try {
-        const kassierResult = await pool.query(
-            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' AND email IS NOT NULL LIMIT 1"
-        );
-        if (kassierResult.rows.length === 0) {
-            logWarn('Kassier not found for Pingen cost notification');
-            return;
-        }
-        const kassier = kassierResult.rows[0];
-        const environment = isStaging ? ' (STAGING/TEST)' : '';
-        const worum = betreff ? `\nBetreff: ${betreff}` : '';
-        await vormerken(pool, {
-            to: kassier.email,
-            subject: `Pingen-Brief${environment}: ${recipientName}`,
-            text: `Hallo ${kassier.vorname},\n\nEin Brief wurde über Pingen versendet:\n\nEmpfänger: ${recipientName}${worum}\nBrief-ID: ${letterId}\n\nDie genauen Kosten findest du im Pingen Dashboard (https://app.pingen.com).`
-        });
-        logInfo('Pingen cost notification queued for Kassier', { recipient: recipientName, letterId });
-    } catch (error) {
-        logError('Failed to queue Pingen cost notification', { error: error.message });
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
 // DEUTSCH: CORS-Konfiguration - erlaubt alle fwv-raura.ch Subdomains und localhost fuer Entwicklung
 app.use(cors({
     origin: function (origin, callback) {
@@ -2111,11 +2072,24 @@ async function pingenBriefAnlegen({ pdf, dateiname, links, staging = false, prue
     return { letterId, status, grund };
 }
 
+// Status und Preis eines Briefs bei Pingen (Produktion) - fuer die Spesen.
+async function pingenBriefLesen(letterId) {
+    const token = (await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+        grant_type: 'client_credentials',
+        client_id: process.env.PINGEN_CLIENT_ID,
+        client_secret: process.env.PINGEN_CLIENT_SECRET
+    })).data.access_token;
+    const a = (await axios.get(`${getPingenApi(false)}/organisations/${getPingenOrgId(false)}/letters/${letterId}`,
+        { headers: { Authorization: `Bearer ${token}` } })).data.data.attributes;
+    return { status: a.status, preis: a.price_value };
+}
+
 const briefVersenden = briefKern.briefVersand({
     rendern: briefPdfRendern,
     pingen: pingenBriefAnlegen,
     protokollieren: (eintrag) => briefProtokollieren(pool, eintrag),
-    kostenMelden: (name, letterId, betreff) => sendPingenCostNotification(name, letterId, false, betreff),
+    // Kosten meldet src/pingen-spesen.js gesammelt mit Preis, sobald Pingen belastet.
+    kostenMelden: async () => {},
     anlassPdfLaden: (eventId) => anlassPdf(pool, eventId),
     log: logInfo
 });
@@ -2323,6 +2297,17 @@ sammelSchema(pool)
         from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`, ...m
     })))
     .catch(e => console.error('[SAMMELMAIL] init failed:', e.message));
+
+// Pingen-Spesen (src/pingen-spesen.js): taeglich 17:45 belastete Briefe mit
+// Preis abrechnen, geht mit der Sammelmail um 18:00 an den Kassier.
+const spesen = require('./pingen-spesen');
+spesen.spesenSchema(pool)
+    .then(() => spesen.spesenStarten(pool, {
+        briefLesen: pingenBriefLesen,
+        vormerken,
+        log: logInfo
+    }, require('./sammelmail').zuerichTeile))
+    .catch(e => console.error('[PINGEN-SPESEN] init failed:', e.message));
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 // IMAP-Webmail-Endpoints fuer Vorstand (lesen, markieren, loeschen, Anhaenge, senden)
