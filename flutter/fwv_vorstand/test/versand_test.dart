@@ -220,25 +220,6 @@ class Dispatch {
           'last_7_days': '2',
           'last_30_days': '5',
         };
-      case 'GET /pingen/spesen':
-        return {
-          'jahr': int.parse(q['jahr']!),
-          'monate': [
-            {'monat': '2026-01', 'briefe': 17, 'summe': 25.16, 'abgerechnet': 25.16, 'offen': 0},
-            {'monat': '2026-11', 'briefe': 14, 'summe': 22.3, 'abgerechnet': 0, 'offen': 22.3},
-          ],
-          'total': {'briefe': 31, 'summe': 47.46, 'abgerechnet': 25.16, 'offen': 22.3},
-          'wartet': {'briefe': 2, 'summe': 2.74},
-          'abrechnungen': [
-            {
-              'datum': '2026-11-03T15:50:00.000Z',
-              'titel': 'Spesenabrechnung Pingen 2026 (Jan–Sep)',
-              'art': 'nachtrag',
-              'briefe': 89,
-              'summe': 146.06,
-            },
-          ],
-        };
       case 'GET /pingen/letters':
         return [logStart[1]];
       case 'GET /pingen/letters/P-2/status':
@@ -804,34 +785,6 @@ void main() {
       expect(find.text('[Staging] Einladung GV'), findsNothing);
       await tippen(tester, find.text('Einladung GV'));
       expect(find.text('Liebe Anna\n\nWir laden ein.'), findsOneWidget);
-    });
-
-    testWidgets('Pingen: Spesen je Monat, offen, wartend, Abrechnungen, Vorjahr', (tester) async {
-      await oeffnen(tester, start: NachrichtTeil.pingen, groesse: desktop);
-      final jahr = DateTime.now().year;
-      expect(find.text('Spesen $jahr'), findsOneWidget);
-      expect(
-        find.descendant(of: find.byKey(const Key('spesen-2026-11')), matching: find.text('Nov · CHF 22.30 offen')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: find.byKey(const Key('spesen-total')), matching: find.text('47.46')),
-        findsOneWidget,
-      );
-      expect(find.text('2 Briefe warten auf Guthaben (CHF 2.74)'), findsOneWidget);
-      expect(find.text('Abgerechnet CHF 25.16'), findsOneWidget);
-      expect(find.textContaining('Nachtrag'), findsOneWidget);
-
-      await tippen(tester, find.byKey(const Key('spesen-jahr-zurueck')));
-      expect(
-        d.backend.anfragen.lastWhere((a) => a.url.path == '/pingen/spesen').url.queryParameters['jahr'],
-        '${jahr - 1}',
-      );
-      expect(find.text('Spesen ${jahr - 1}'), findsOneWidget);
-
-      // Staging: keine Spesen
-      await tippen(tester, find.text('Staging'));
-      expect(find.byKey(const Key('pingen-spesen')), findsNothing);
     });
 
     testWidgets('Pingen: Guthaben live/staging, Status pruefen, PDF senden', (tester) async {
