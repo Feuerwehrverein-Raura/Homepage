@@ -36,7 +36,8 @@ function franken(n) {
 
 /** Text der Spesenabrechnung: eine Zeile je Brief, Summe, wer zurueckbekommt. */
 function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
-    const summe = briefe.reduce((s, b) => s + Number(b.kosten), 0);
+    // Auf Rappen runden: 14 x 1.63 + ... ergibt sonst 22.299999999999994.
+    const summe = Math.round(briefe.reduce((s, b) => s + Number(b.kosten), 0) * 100) / 100;
     const breite = Math.max(...briefe.map(b => b.name.length));
     const zeilen = briefe.map(b => `  ${b.name.padEnd(breite)}  ${franken(b.kosten)}  ${b.betreff}`);
     const wer = aktuar ? `${`${aktuar.vorname} ${aktuar.nachname}`.trim()} (Aktuar)` : 'der Aktuar';
