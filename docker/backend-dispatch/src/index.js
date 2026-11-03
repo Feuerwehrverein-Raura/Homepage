@@ -2084,6 +2084,30 @@ async function pingenBriefLesen(letterId) {
     return { status: a.status, preis: a.price_value };
 }
 
+// Alle Briefe bei Pingen (Produktion) fuer die Spesen-Uebersicht, 5 min
+// zwischengespeichert - die App laedt den Reiter oft neu.
+let pingenListeCache = null;
+async function pingenBriefeListe() {
+    if (pingenListeCache && Date.now() - pingenListeCache.zeit < 5 * 60 * 1000) return pingenListeCache.briefe;
+    const token = (await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+        grant_type: 'client_credentials',
+        client_id: process.env.PINGEN_CLIENT_ID,
+        client_secret: process.env.PINGEN_CLIENT_SECRET
+    })).data.access_token;
+    const briefe = [];
+    for (let seite = 1; seite <= 50; seite++) {
+        const r = (await axios.get(`${getPingenApi(false)}/organisations/${getPingenOrgId(false)}/letters`,
+            { headers: { Authorization: `Bearer ${token}` }, params: { 'page[number]': seite, 'page[limit]': 100 } })).data;
+        for (const x of r.data || []) {
+            briefe.push({ id: x.id, erstellt: x.attributes.created_at, status: x.attributes.status,
+                preis: x.attributes.price_value });
+        }
+        if (!r.links?.next || !(r.data || []).length) break;
+    }
+    pingenListeCache = { zeit: Date.now(), briefe };
+    return briefe;
+}
+
 const briefVersenden = briefKern.briefVersand({
     rendern: briefPdfRendern,
     pingen: pingenBriefAnlegen,
@@ -2308,6 +2332,8 @@ spesen.spesenSchema(pool)
         log: logInfo
     }, require('./sammelmail').zuerichTeile))
     .catch(e => console.error('[PINGEN-SPESEN] init failed:', e.message));
+app.get('/pingen/spesen', authenticateAny, requireRole('vorstand', 'admin'),
+    spesen.spesenRoute({ pool, briefeListe: pingenBriefeListe }));
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 // IMAP-Webmail-Endpoints fuer Vorstand (lesen, markieren, loeschen, Anhaenge, senden)

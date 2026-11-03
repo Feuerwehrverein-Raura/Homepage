@@ -28,7 +28,7 @@ const KASSIER_ADRESSE = process.env.KASSIER_EMAIL || 'kassier@fwv-raura.ch';
 const NICHT_BELASTET = ['created', 'uploaded', 'validating', 'valid', 'processing_validation',
     'action_required', 'awaiting_credits'];
 /** Status, bei denen nie etwas belastet wird (oder es zurueckkam). */
-const KOSTENLOS = ['cancelled', 'expired', 'deleted'];
+const KOSTENLOS = ['cancelled', 'cancelled_expired', 'expired', 'deleted'];
 
 function franken(n) {
     return `CHF ${Number(n).toFixed(2)}`;
@@ -90,7 +90,8 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
         }
         let name = '';
         try { name = JSON.parse(z.recipient_address || '{}').name || ''; } catch { /* alte Eintraege */ }
-        belastet.push({ id: z.id, name: name || '(ohne Name)', betreff: z.subject || 'Brief', kosten: Number(brief.preis) });
+        belastet.push({ id: z.id, letterId: z.external_id, name: name || '(ohne Name)', betreff: z.subject || 'Brief',
+            kosten: Number(brief.preis) });
     }
     if (!belastet.length) return { abgerechnet: 0, summe: 0, offen: wartet };
 
@@ -110,6 +111,10 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
     await pool.query(`
         INSERT INTO dispatch_log (type, recipient_email, subject, body, status, sent_at)
         VALUES ('email', $1, $2, $3, 'sent', NOW())`, [kassier.email, mail.subject, mail.text]);
+    await pool.query(`
+        INSERT INTO pingen_abrechnungen (art, titel, empfaenger, briefe, summe, letter_ids)
+        VALUES ('taeglich', $1, $2, $3, $4, $5)`,
+    [mail.subject, kassier.email, belastet.length, mail.summe, belastet.map(b => b.letterId)]);
     for (const b of belastet) {
         await pool.query('UPDATE dispatch_log SET spesen_gemeldet_am = NOW(), kosten = $2 WHERE id = $1', [b.id, b.kosten]);
     }
@@ -121,7 +126,101 @@ async function spesenSchema(pool) {
     await pool.query(`
         ALTER TABLE dispatch_log ADD COLUMN IF NOT EXISTS kosten NUMERIC(8,2);
         ALTER TABLE dispatch_log ADD COLUMN IF NOT EXISTS spesen_gemeldet_am TIMESTAMPTZ;
+        CREATE TABLE IF NOT EXISTS pingen_abrechnungen (
+            id SERIAL PRIMARY KEY,
+            art TEXT NOT NULL,
+            titel TEXT NOT NULL,
+            empfaenger TEXT NOT NULL,
+            briefe INTEGER NOT NULL,
+            summe NUMERIC(10,2) NOT NULL,
+            letter_ids TEXT[] NOT NULL DEFAULT '{}',
+            erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
     `);
+    // Die einmalige Abrechnung 2026 (Jan-Sep) ging am 03.11.2026 von Hand an
+    // den Kassier; sie deckt alle belasteten Briefe vor AB ab.
+    await pool.query(`
+        INSERT INTO pingen_abrechnungen (art, titel, empfaenger, briefe, summe, erstellt_am)
+        SELECT 'nachtrag', 'Spesenabrechnung Pingen 2026 (Jan–Sep): 89 Briefe, CHF 146.06',
+               'kassier@fwv-raura.ch', 89, 146.06, '2026-11-03T16:50:00+01:00'
+        WHERE NOT EXISTS (SELECT 1 FROM pingen_abrechnungen WHERE art = 'nachtrag')
+    `);
+    // Abrechnungen aus der Zeit vor dieser Tabelle (03.11.2026, 18:00):
+    // aus dispatch_log nachtragen, je Tag eine.
+    await pool.query(`
+        INSERT INTO pingen_abrechnungen (art, titel, empfaenger, briefe, summe, letter_ids, erstellt_am)
+        SELECT 'taeglich',
+               'Spesenabrechnung Pingen ' || to_char(tag, 'DD.MM.YYYY') || ': ' || count(*) || ' Briefe, CHF '
+                   || to_char(sum(kosten), 'FM999990.00'),
+               $1, count(*), sum(kosten), array_agg(external_id), max(spesen_gemeldet_am)
+        FROM (SELECT *, (spesen_gemeldet_am AT TIME ZONE 'Europe/Zurich')::date AS tag FROM dispatch_log
+              WHERE type = 'pingen' AND kosten > 0 AND spesen_gemeldet_am IS NOT NULL
+                AND external_id <> ALL (SELECT unnest(letter_ids) FROM pingen_abrechnungen)) d
+        GROUP BY tag
+    `, [KASSIER_ADRESSE]);
+}
+
+/** Belastet heisst: Pingen hat den Preis vom Guthaben abgezogen. */
+function istBelastet(b) {
+    return !NICHT_BELASTET.includes(b.status) && !KOSTENLOS.includes(b.status) && Number(b.preis) > 0;
+}
+
+/**
+ * Uebersicht fuer ein Jahr: briefe = alle Pingen-Briefe ({ id, erstellt,
+ * status, preis }), abrechnungen = Zeilen aus pingen_abrechnungen.
+ * Abgerechnet ist ein Brief, wenn eine taegliche Abrechnung ihn nennt oder
+ * er vor AB belastet wurde (Nachtrag).
+ */
+function spesenUebersicht({ briefe, abrechnungen, jahr }) {
+    const genannt = new Set(abrechnungen.flatMap(a => a.letter_ids || []));
+    const rund = (n) => Math.round(n * 100) / 100;
+    const monate = new Map();
+    let wartet = { briefe: 0, summe: 0 };
+    for (const b of briefe) {
+        if (!String(b.erstellt).startsWith(String(jahr))) continue;
+        const monat = String(b.erstellt).slice(0, 7);
+        if (b.status === 'awaiting_credits') {
+            wartet = { briefe: wartet.briefe + 1, summe: wartet.summe + Number(b.preis || 0) };
+            continue;
+        }
+        if (!istBelastet(b)) continue;
+        const m = monate.get(monat) || { monat, briefe: 0, summe: 0, abgerechnet: 0, offen: 0 };
+        const abgerechnet = genannt.has(b.id) || String(b.erstellt) < AB;
+        m.briefe++;
+        m.summe += Number(b.preis);
+        if (abgerechnet) m.abgerechnet += Number(b.preis); else m.offen += Number(b.preis);
+        monate.set(monat, m);
+    }
+    const liste = [...monate.values()].sort((a, b) => a.monat.localeCompare(b.monat))
+        .map(m => ({ ...m, summe: rund(m.summe), abgerechnet: rund(m.abgerechnet), offen: rund(m.offen) }));
+    const total = (k) => rund(liste.reduce((s, m) => s + m[k], 0));
+    return {
+        jahr: Number(jahr),
+        monate: liste,
+        total: { briefe: liste.reduce((s, m) => s + m.briefe, 0), summe: total('summe'),
+            abgerechnet: total('abgerechnet'), offen: total('offen') },
+        wartet: { briefe: wartet.briefe, summe: rund(wartet.summe) },
+        abrechnungen: abrechnungen
+            .filter(a => new Date(a.erstellt_am).getFullYear() === Number(jahr))
+            .map(a => ({ datum: new Date(a.erstellt_am).toISOString(), titel: a.titel, art: a.art,
+                briefe: a.briefe, summe: Number(a.summe), empfaenger: a.empfaenger })),
+    };
+}
+
+/** GET /pingen/spesen?jahr= - briefeListe() liefert alle Pingen-Briefe. */
+function spesenRoute({ pool, briefeListe }) {
+    return async (req, res) => {
+        try {
+            const jahr = /^\d{4}$/.test(String(req.query.jahr || '')) ? req.query.jahr : String(new Date().getFullYear());
+            const [briefe, abrechnungen] = await Promise.all([
+                briefeListe(),
+                pool.query('SELECT * FROM pingen_abrechnungen ORDER BY erstellt_am DESC').then(r => r.rows),
+            ]);
+            res.json(spesenUebersicht({ briefe, abrechnungen, jahr }));
+        } catch (e) {
+            res.status(502).json({ error: `Pingen nicht erreichbar: ${e.message}` });
+        }
+    };
 }
 
 /** Jede Minute schauen; einmal am Tag ab 18:00 Zuerich abrechnen. */
@@ -146,4 +245,5 @@ function spesenStarten(pool, deps, zuerichTeile) {
     }, 60 * 1000);
 }
 
-module.exports = { AB, KASSIER_ADRESSE, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema, spesenStarten };
+module.exports = { AB, KASSIER_ADRESSE, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema,
+    spesenStarten, istBelastet, spesenUebersicht, spesenRoute };
