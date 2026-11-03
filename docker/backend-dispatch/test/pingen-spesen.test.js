@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const P = require('../src/pingen-spesen');
 
-function falscheDb(zeilen, { kassier = { vorname: 'Kurt', email: 'kassier@x.ch' } } = {}) {
+function falscheDb(zeilen, { kassier = { vorname: 'Kurt' } } = {}) {
     const aenderungen = [];
     return {
         aenderungen,
@@ -45,7 +45,8 @@ test('Belastete Briefe mit Preis in eine Abrechnung, Wartende bleiben offen', as
     assert.deepEqual(r, { abgerechnet: 2, summe: 3, offen: 1 });
     assert.equal(vorgemerkt.length, 1);
     const m = vorgemerkt[0];
-    assert.equal(m.to, 'kassier@x.ch');
+    assert.equal(m.to, 'kassier@fwv-raura.ch');
+    assert.match(m.text, /^Hallo Kurt/);
     assert.equal(m.subject, 'Spesenabrechnung Pingen 03.11.2026: 2 Briefe, CHF 3.00');
     assert.match(m.text, /Steve Aerni\s+CHF 1\.63/);
     assert.match(m.text, /Ursula Meyer\s+CHF 1\.37/);
@@ -69,15 +70,17 @@ test('Nichts belastet: keine Mail', async () => {
     assert.equal(db.aenderungen.length, 0);
 });
 
-test('Ohne Kassier bleibt alles offen', async () => {
+test('Ohne Kassier im Mitgliederverzeichnis: trotzdem ans Postfach', async () => {
     const db = falscheDb([zeile(1, 'A')], { kassier: null });
+    const vorgemerkt = [];
     const r = await P.spesenAbrechnen(db, {
         datum: '03.11.2026',
         briefLesen: async () => ({ status: 'sent', preis: 1.63 }),
-        senden: async () => { throw new Error('darf nicht'); },
+        senden: async (m) => vorgemerkt.push(m),
     });
-    assert.equal(r.abgerechnet, 0);
-    assert.equal(db.aenderungen.length, 0);
+    assert.equal(r.abgerechnet, 1);
+    assert.equal(vorgemerkt[0].to, 'kassier@fwv-raura.ch');
+    assert.match(vorgemerkt[0].text, /^Hallo Kassier/);
 });
 
 test('Ein Brief: Einzahl im Betreff', () => {

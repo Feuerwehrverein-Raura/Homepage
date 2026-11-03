@@ -22,6 +22,8 @@ const PRUEFMINUTE = 0;
 // Einzelmeldung (ohne Betrag) bekommen.
 const AB = '2026-11-03';
 
+const KASSIER_ADRESSE = process.env.KASSIER_EMAIL || 'kassier@fwv-raura.ch';
+
 /** Pingen-Status, bei denen (noch) nichts belastet ist. */
 const NICHT_BELASTET = ['created', 'uploaded', 'validating', 'valid', 'processing_validation',
     'action_required', 'awaiting_credits'];
@@ -92,13 +94,13 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
     }
     if (!belastet.length) return { abgerechnet: 0, summe: 0, offen: wartet };
 
-    const kassier = (await pool.query(
-        "SELECT vorname, email FROM members WHERE funktion ILIKE '%kassier%' AND email IS NOT NULL ORDER BY nachname, vorname LIMIT 1"
-    )).rows[0];
-    if (!kassier) {
-        log('Pingen-Spesen: kein Kassier mit E-Mail - bleibt offen');
-        return { abgerechnet: 0, summe: 0, offen: offen.length };
-    }
+    // An das Funktionspostfach (bleibt beim Amtswechsel), Anrede vom Kassier.
+    const kassier = {
+        vorname: (await pool.query(
+            "SELECT vorname FROM members WHERE funktion ILIKE '%kassier%' ORDER BY nachname, vorname LIMIT 1"
+        )).rows[0]?.vorname || 'Kassier',
+        email: KASSIER_ADRESSE,
+    };
     const aktuar = (await pool.query(
         "SELECT vorname, nachname FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1"
     )).rows[0];
@@ -144,4 +146,4 @@ function spesenStarten(pool, deps, zuerichTeile) {
     }, 60 * 1000);
 }
 
-module.exports = { AB, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema, spesenStarten };
+module.exports = { AB, KASSIER_ADRESSE, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema, spesenStarten };
