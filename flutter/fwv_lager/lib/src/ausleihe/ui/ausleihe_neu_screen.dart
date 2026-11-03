@@ -31,6 +31,9 @@ Future<Ausleihe?> ausleiheNeuOeffnen(
   ),
 );
 
+/// Ausleihdauer, wenn kein Zeitraum vorgegeben ist.
+const standardDauer = Duration(days: 7);
+
 class AusleiheNeuScreen extends StatefulWidget {
   const AusleiheNeuScreen({
     super.key,
@@ -44,7 +47,7 @@ class AusleiheNeuScreen extends StatefulWidget {
   /// Lager: Ausleihe fuer Externe (Name, Organisation, Kontakt).
   final bool fuerExterne;
 
-  /// Vorgewaehlter Zeitraum (sonst zuerst waehlen).
+  /// Vorgewaehlter Zeitraum (sonst ab heute eine Woche, [standardDauer]).
   final DateTimeRange? zeitraum;
 
   @override
@@ -52,7 +55,7 @@ class AusleiheNeuScreen extends StatefulWidget {
 }
 
 class _AusleiheNeuScreenState extends State<AusleiheNeuScreen> {
-  final _lader = GlobalKey<LadeAnsichtState<AusleiheAngebot>>();
+  var _lader = GlobalKey<LadeAnsichtState<AusleiheAngebot>>();
   DateTimeRange? _zeitraum;
   AusleiheAngebot? _angebot;
   final _mengen = <int, int>{};
@@ -63,7 +66,9 @@ class _AusleiheNeuScreenState extends State<AusleiheNeuScreen> {
   @override
   void initState() {
     super.initState();
-    _zeitraum = widget.zeitraum;
+    // Standard: ab heute eine Woche - das meiste geht fuer ein Fest oder
+    // ein Wochenende raus (Stefan, 03.11.2026). Aendern geht jederzeit.
+    _zeitraum = widget.zeitraum ?? DateTimeRange(start: _heute, end: _heute.add(standardDauer));
   }
 
   int get _anzahl => _mengen.values.where((m) => m > 0).length + _kisten.length;
@@ -87,6 +92,8 @@ class _AusleiheNeuScreenState extends State<AusleiheNeuScreen> {
     if (gewaehlt == null || !mounted) return;
     setState(() {
       _zeitraum = gewaehlt;
+      // Neuer Schluessel: sonst laedt die Ansicht das Angebot nicht neu.
+      _lader = GlobalKey();
       _angebot = null;
       _mengen.clear();
       _kisten.clear();

@@ -162,7 +162,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('ausleihen-neu')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Zuerst den Zeitraum wählen'), findsOneWidget);
+    // Standard: ab heute eine Woche, das Angebot ist gleich da.
+    expect(find.text('11.10.2026 – 18.10.2026'), findsOneWidget);
+    expect(zugang.letzter('angebot'), ['2026-10-11', '2026-10-18']);
     expect(tester.widget<FilledButton>(find.byKey(const Key('weiter'))).onPressed, isNull);
 
     await zeitraumWaehlen(tester);
