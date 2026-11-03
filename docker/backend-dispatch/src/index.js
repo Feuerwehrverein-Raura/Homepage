@@ -2298,13 +2298,13 @@ sammelSchema(pool)
     })))
     .catch(e => console.error('[SAMMELMAIL] init failed:', e.message));
 
-// Pingen-Spesen (src/pingen-spesen.js): taeglich 17:45 belastete Briefe mit
-// Preis abrechnen, geht mit der Sammelmail um 18:00 an den Kassier.
+// Pingen-Spesen (src/pingen-spesen.js): taeglich 18:00 belastete Briefe mit
+// Preis abrechnen, als eigene Mail an den Kassier.
 const spesen = require('./pingen-spesen');
 spesen.spesenSchema(pool)
     .then(() => spesen.spesenStarten(pool, {
         briefLesen: pingenBriefLesen,
-        vormerken,
+        senden: (m) => transporter.sendMail({ from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`, ...m }),
         log: logInfo
     }, require('./sammelmail').zuerichTeile))
     .catch(e => console.error('[PINGEN-SPESEN] init failed:', e.message));

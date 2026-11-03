@@ -6,16 +6,17 @@
 // bezahlt war (Preisjassen 03.11.2026: 14 Meldungen, 13 Briefe warteten auf
 // Guthaben). Das Guthaben laedt der Aktuar mit eigenem Geld auf.
 //
-// Jetzt: taeglich um 17:45 (Europe/Zurich) fragt der Dienst Pingen nach jedem
+// Jetzt: taeglich um 18:00 (Europe/Zurich) fragt der Dienst Pingen nach jedem
 // noch nicht abgerechneten Brief. Was Pingen belastet hat, kommt mit dem
 // genauen Preis in EINE Spesenabrechnung an den Kassier ("vorgestreckt vom
-// Aktuar"); sie geht mit der Sammelmail um 18:00 raus. Briefe, die noch auf
+// Aktuar") - als eigene Mail, nicht in der Sammelmail, damit sie als Beleg
+// fuer sich steht. Briefe, die noch auf
 // Guthaben warten oder in der Pruefung sind, bleiben fuer den naechsten Tag
 // liegen. Stornierte und abgelehnte Briefe kosten nichts und werden nur als
 // erledigt markiert.
 
-const PRUEFSTUNDE = 17;
-const PRUEFMINUTE = 45;
+const PRUEFSTUNDE = 18;
+const PRUEFMINUTE = 0;
 
 // Erst ab hier abrechnen: die Briefe davor hatte der Kassier schon als
 // Einzelmeldung (ohne Betrag) bekommen.
@@ -38,7 +39,7 @@ function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
     const zeilen = briefe.map(b => `  ${b.name.padEnd(breite)}  ${franken(b.kosten)}  ${b.betreff}`);
     const wer = aktuar ? `${`${aktuar.vorname} ${aktuar.nachname}`.trim()} (Aktuar)` : 'der Aktuar';
     return {
-        subject: `Pingen-Spesen ${datum}: ${briefe.length} ${briefe.length === 1 ? 'Brief' : 'Briefe'}, ${franken(summe)}`,
+        subject: `Spesenabrechnung Pingen ${datum}: ${briefe.length} ${briefe.length === 1 ? 'Brief' : 'Briefe'}, ${franken(summe)}`,
         text: [
             `Hallo ${kassier.vorname}`,
             '',
@@ -57,10 +58,11 @@ function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
 
 /**
  * Offene Briefe bei Pingen nachfragen, belastete abrechnen.
- * briefLesen(letterId) -> { status, preis } (Pingen-API, price_value).
+ * briefLesen(letterId) -> { status, preis } (Pingen-API, price_value);
+ * senden({ to, subject, text }) schickt die Abrechnung als eigene Mail.
  * Gibt { abgerechnet, summe, offen } zurueck.
  */
-async function spesenAbrechnen(pool, { briefLesen, vormerken, datum, log = () => {} }) {
+async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {} }) {
     const offen = (await pool.query(`
         SELECT id, external_id, subject, recipient_address FROM dispatch_log
         WHERE type = 'pingen' AND external_id IS NOT NULL AND spesen_gemeldet_am IS NULL
@@ -102,11 +104,14 @@ async function spesenAbrechnen(pool, { briefLesen, vormerken, datum, log = () =>
     )).rows[0];
 
     const mail = abrechnungBauen(belastet, { kassier, aktuar, datum });
-    await vormerken(pool, { to: kassier.email, subject: mail.subject, text: mail.text });
+    await senden({ to: kassier.email, subject: mail.subject, text: mail.text });
+    await pool.query(`
+        INSERT INTO dispatch_log (type, recipient_email, subject, body, status, sent_at)
+        VALUES ('email', $1, $2, $3, 'sent', NOW())`, [kassier.email, mail.subject, mail.text]);
     for (const b of belastet) {
         await pool.query('UPDATE dispatch_log SET spesen_gemeldet_am = NOW(), kosten = $2 WHERE id = $1', [b.id, b.kosten]);
     }
-    log('Pingen-Spesen vorgemerkt', { briefe: belastet.length, summe: mail.summe });
+    log('Pingen-Spesen verschickt', { briefe: belastet.length, summe: mail.summe });
     return { abgerechnet: belastet.length, summe: mail.summe, offen: wartet };
 }
 
@@ -117,7 +122,7 @@ async function spesenSchema(pool) {
     `);
 }
 
-/** Jede Minute schauen; einmal am Tag ab 17:45 Zuerich abrechnen. */
+/** Jede Minute schauen; einmal am Tag ab 18:00 Zuerich abrechnen. */
 function spesenStarten(pool, deps, zuerichTeile) {
     let erledigt = null;
     let laeuft = false;

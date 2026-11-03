@@ -1,5 +1,5 @@
 // Pingen-Spesen (src/pingen-spesen.js): nur belastete Briefe mit Preis,
-// eine Abrechnung an den Kassier, Wartende bleiben offen (Datenbank nachgebaut).
+// eine eigene Mail an den Kassier, Wartende bleiben offen (Datenbank nachgebaut).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const P = require('../src/pingen-spesen');
@@ -12,6 +12,7 @@ function falscheDb(zeilen, { kassier = { vorname: 'Kurt', email: 'kassier@x.ch' 
             if (sql.includes('FROM dispatch_log')) return { rows: zeilen };
             if (sql.includes("'%kassier%'")) return { rows: kassier ? [kassier] : [] };
             if (sql.includes("'%aktuar%'")) return { rows: [{ vorname: 'Stefan', nachname: 'Müller' }] };
+            if (sql.includes('INSERT INTO dispatch_log')) { aenderungen.push(['mail']); return { rows: [] }; }
             if (sql.startsWith('UPDATE dispatch_log')) { aenderungen.push(werte); return { rows: [] }; }
             throw new Error('unerwartet: ' + sql);
         }
@@ -39,20 +40,20 @@ test('Belastete Briefe mit Preis in eine Abrechnung, Wartende bleiben offen', as
             if (id === 'L5') throw Object.assign(new Error('weg'), { response: { status: 404 } });
             return pingen[id];
         },
-        vormerken: async (_pool, m) => vorgemerkt.push(m),
+        senden: async (m) => vorgemerkt.push(m),
     });
     assert.deepEqual(r, { abgerechnet: 2, summe: 3, offen: 1 });
     assert.equal(vorgemerkt.length, 1);
     const m = vorgemerkt[0];
     assert.equal(m.to, 'kassier@x.ch');
-    assert.equal(m.subject, 'Pingen-Spesen 03.11.2026: 2 Briefe, CHF 3.00');
+    assert.equal(m.subject, 'Spesenabrechnung Pingen 03.11.2026: 2 Briefe, CHF 3.00');
     assert.match(m.text, /Steve Aerni\s+CHF 1\.63/);
     assert.match(m.text, /Ursula Meyer\s+CHF 1\.37/);
     assert.match(m.text, /Total: CHF 3\.00/);
     assert.match(m.text, /Stefan Müller \(Aktuar\) vorgestreckt/);
     assert.doesNotMatch(m.text, /Tschudin/);
     // abgerechnet: 1 und 2 mit Preis, 4 und 5 mit 0; 3 bleibt offen
-    assert.deepEqual(db.aenderungen.map(w => w.join(':')).sort(), ['1:1.63', '2:1.37', '4', '5']);
+    assert.deepEqual(db.aenderungen.map(w => w.join(':')).sort(), ['1:1.63', '2:1.37', '4', '5', 'mail']);
 });
 
 test('Nichts belastet: keine Mail', async () => {
@@ -61,7 +62,7 @@ test('Nichts belastet: keine Mail', async () => {
     const r = await P.spesenAbrechnen(db, {
         datum: '03.11.2026',
         briefLesen: async () => ({ status: 'awaiting_credits', preis: 1.63 }),
-        vormerken: async (_p, m) => vorgemerkt.push(m),
+        senden: async (m) => vorgemerkt.push(m),
     });
     assert.deepEqual(r, { abgerechnet: 0, summe: 0, offen: 1 });
     assert.equal(vorgemerkt.length, 0);
@@ -73,7 +74,7 @@ test('Ohne Kassier bleibt alles offen', async () => {
     const r = await P.spesenAbrechnen(db, {
         datum: '03.11.2026',
         briefLesen: async () => ({ status: 'sent', preis: 1.63 }),
-        vormerken: async () => { throw new Error('darf nicht'); },
+        senden: async () => { throw new Error('darf nicht'); },
     });
     assert.equal(r.abgerechnet, 0);
     assert.equal(db.aenderungen.length, 0);
@@ -82,6 +83,6 @@ test('Ohne Kassier bleibt alles offen', async () => {
 test('Ein Brief: Einzahl im Betreff', () => {
     const m = P.abrechnungBauen([{ name: 'A', betreff: 'X', kosten: 1.63 }],
         { kassier: { vorname: 'K' }, aktuar: null, datum: '04.11.2026' });
-    assert.equal(m.subject, 'Pingen-Spesen 04.11.2026: 1 Brief, CHF 1.63');
+    assert.equal(m.subject, 'Spesenabrechnung Pingen 04.11.2026: 1 Brief, CHF 1.63');
     assert.match(m.text, /hat der Aktuar vorgestreckt/);
 });
