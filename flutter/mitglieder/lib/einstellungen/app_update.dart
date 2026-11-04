@@ -100,8 +100,11 @@ class KeinAppUpdate implements AppUpdate {
 }
 
 class AndroidAppUpdate implements AppUpdate {
-  AndroidAppUpdate({required this.appVersion, http.Client? client, this.kanal = const MethodChannel(kanalName)})
-    : _client = client ?? http.Client() {
+  AndroidAppUpdate({
+    required this.appVersion,
+    http.Client? client,
+    this.kanal = const MethodChannel(kanalName),
+  }) : _client = client ?? http.Client() {
     kanal.setMethodCallHandler((call) async {
       if (call.method == 'geladen') _beiGeladen?.call();
     });

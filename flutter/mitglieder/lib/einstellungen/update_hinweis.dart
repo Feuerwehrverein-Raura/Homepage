@@ -21,7 +21,11 @@ import 'app_update.dart';
 (ScaffoldMessengerState, ScaffoldFeatureController<SnackBar, SnackBarClosedReason>)? _offen;
 
 /// [auchOhneUpdate]: von Hand gesucht - dann auch "neueste Version" melden.
-Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste, {bool auchOhneUpdate = false}) async {
+Future<void> updateHinweisZeigen(
+  BuildContext context,
+  Dienste dienste, {
+  bool auchOhneUpdate = false,
+}) async {
   final messenger = ScaffoldMessenger.of(context);
   final update = dienste.update;
   final stand = await update.pruefen();
@@ -38,7 +42,10 @@ Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste, {bool au
       showCloseIcon: true,
       content: const Text('Neue Version geladen.'),
       duration: const Duration(minutes: 10),
-      action: SnackBarAction(label: 'Neu starten', onPressed: () => unawaited(update.playAbschliessen())),
+      action: SnackBarAction(
+        label: 'Neu starten',
+        onPressed: () => unawaited(update.playAbschliessen()),
+      ),
     ),
   );
 
@@ -86,7 +93,10 @@ Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste, {bool au
                   label: 'Aktualisieren',
                   onPressed: () => unawaited(desktopUpdateInstallieren(context, stand)),
                 )
-              : SnackBarAction(label: 'Herunterladen', onPressed: () => unawaited(dienste.linkOeffnen(seite))),
+              : SnackBarAction(
+                  label: 'Herunterladen',
+                  onPressed: () => unawaited(dienste.linkOeffnen(seite)),
+                ),
         ),
       );
   }
@@ -122,7 +132,10 @@ Future<void> apkUpdateErklaeren(
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Später')),
-        FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Herunterladen')),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Herunterladen'),
+        ),
       ],
     ),
   );
