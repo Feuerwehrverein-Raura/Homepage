@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:fwv_core/desktop.dart';
 import 'package:fwv_core/fwv_core.dart';
@@ -29,6 +29,7 @@ class Dienste {
     this.freierPlatz,
     this.imWlan,
     this.desktopUpdate,
+    this.speicherMitteilung,
   }) : _musikZugang = musikZugang ?? ((s) => ApiMusikZugang(s.api));
 
   /// Die echte App: Schluesselbund des Systems (macOS Schluesselbund,
@@ -85,6 +86,7 @@ class Dienste {
       freierPlatz: (ort) => geraet.invokeMethod<int>('frei', {'pfad': ort.path}),
       imWlan: () async => await geraet.invokeMethod<bool>('unbegrenzt') ?? false,
       handy: true,
+      speicherMitteilung: SpeicherMitteilung(geraet),
     );
   }
 
@@ -97,6 +99,9 @@ class Dienste {
   /// Computer: neuere Fassung von www.fwv-raura.ch laden und installieren.
   /// Null auf Android (eigener Updater, update.dart) und in Tests.
   final DesktopUpdater? desktopUpdate;
+
+  /// Nur Android: Speichern laeuft im Hintergrund weiter (SpeicherDienst.kt).
+  final SpeicherMitteilung? speicherMitteilung;
 
   /// Nur Android: freier Speicher und WLAN vom System.
   final Future<int?> Function(Directory ort)? freierPlatz;
@@ -124,6 +129,7 @@ class Dienste {
     if (ordner == null) return null;
     if (_ablage case final a?) return a;
     final a = _ablage = _neueAblage(ordner);
+    if (speicherMitteilung case final m?) a.addListener(() => m.melden(a));
     unawaited(a.laden().then((_) => a.aktualisieren()).catchError((Object _) {}));
     return a;
   }
@@ -164,3 +170,54 @@ class Dienste {
 }
 
 GeheimSpeicher _macEinEintrag(GeheimSpeicher s) => Platform.isMacOS ? GebuendelterSpeicher(s) : s;
+
+/// Android: Solange Musik aufs Handy geladen wird, haelt ein
+/// Vordergrunddienst die App am Leben (sonst friert Android sie im
+/// Hintergrund ein) und zeigt den Fortschritt als Mitteilung - hoechstens
+/// einmal je Sekunde neu.
+class SpeicherMitteilung {
+  SpeicherMitteilung(this._kanal, {DateTime Function()? jetzt}) : _jetzt = jetzt ?? DateTime.now;
+
+  final MethodChannel _kanal;
+  final DateTime Function() _jetzt;
+  bool _aktiv = false;
+  String? _zuletzt;
+  DateTime? _wann;
+
+  void melden(MusikAblage ablage) => stand(
+    laeuft: ablage.laedtHerunter,
+    fertig: ablage.anzahlTitel,
+    offen: ablage.offen,
+    titel: ablage.holtTitel?.anzeige,
+  );
+
+  @visibleForTesting
+  void stand({required bool laeuft, required int fertig, required int offen, String? titel}) {
+    if (!laeuft) {
+      if (_aktiv) {
+        _aktiv = false;
+        _zuletzt = null;
+        _wann = null;
+        unawaited(_kanal.invokeMethod<void>('speichernEnde').catchError((Object _) {}));
+      }
+      return;
+    }
+    final text = ['Noch $offen Titel', ?titel].join(' · ');
+    final jetzt = _jetzt();
+    if (_aktiv && (text == _zuletzt || jetzt.difference(_wann!) < const Duration(seconds: 1))) {
+      return;
+    }
+    _aktiv = true;
+    _zuletzt = text;
+    _wann = jetzt;
+    unawaited(
+      _kanal
+          .invokeMethod<void>('speichernStand', {
+            'text': text,
+            'fertig': fertig,
+            'gesamt': fertig + offen,
+          })
+          .catchError((Object _) {}),
+    );
+  }
+}

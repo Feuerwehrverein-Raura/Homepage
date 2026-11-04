@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Musik speichern laeuft im Hintergrund weiter (SpeicherDienst.kt). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Updates von www.fwv-raura.ch selbst installieren (lib/update.dart). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- allowBackup="false": die Anmeldedaten liegen verschluesselt mit einem
@@ -54,6 +57,10 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+        <!-- Musik aufs Handy speichern, auch im Hintergrund. -->
+        <service android:name=".SpeicherDienst"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
         <!-- Heruntergeladene Updates fuer den Paketinstaller. -->
         <provider
             android:name="androidx.core.content.FileProvider"

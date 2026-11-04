@@ -2,6 +2,7 @@ package ch.fwvraura.musik
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -24,7 +25,9 @@ import java.security.MessageDigest
  * Musik im Hintergrund, dazu zwei Kanaele:
  *
  *  - ch.fwvraura.musik/geraet: freier Speicher (StatFs) und ob das Netz
- *    unbegrenzt ist (WLAN) - fuer die gespeicherte Musik (lib/dienste.dart).
+ *    unbegrenzt ist (WLAN) - fuer die gespeicherte Musik (lib/dienste.dart);
+ *    "speichernStand"/"speichernEnde": Vordergrunddienst, damit das Laden
+ *    im Hintergrund weiterlaeuft (SpeicherDienst.kt).
  *  - ch.fwvraura.musik/update: wie in der Kassen-App - APK von
  *    www.fwv-raura.ch laden, SHA-256 pruefen, Paketinstaller oeffnen
  *    (lib/update.dart).
@@ -45,6 +48,20 @@ class MainActivity : AudioServiceActivity() {
                     }
                 )
                 "unbegrenzt" -> result.success(unbegrenztesNetz())
+                "speichernStand" -> {
+                    mitteilungenErlauben()
+                    SpeicherDienst.stand(
+                        this,
+                        call.argument<String>("text") ?: "",
+                        call.argument<Int>("fertig") ?: 0,
+                        call.argument<Int>("gesamt") ?: 0,
+                    )
+                    result.success(null)
+                }
+                "speichernEnde" -> {
+                    SpeicherDienst.ende(this)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -138,5 +155,17 @@ class MainActivity : AudioServiceActivity() {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         })
+    }
+
+    /** Android 13+: ohne Erlaubnis bleibt die Fortschritts-Mitteilung unsichtbar
+     *  (der Dienst laeuft trotzdem). Nur einmal fragen. */
+    private var mitteilungGefragt = false
+
+    private fun mitteilungenErlauben() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || mitteilungGefragt) return
+        mitteilungGefragt = true
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
     }
 }
