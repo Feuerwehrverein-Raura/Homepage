@@ -12,7 +12,7 @@ ersetzt `vorstand-desktop` (Tauri), siehe `docs/flutter-entscheidung.md`
 | Anmeldung | flutter_appauth, `com.fwv.members:/oauth2redirect` | eigener Loopback-Login (unten) |
 | Token-Speicher | Schlüsselbund / Keystore | flutter_secure_storage: Linux libsecret, Windows Anmeldeinformationen, macOS Schlüsselbund (alter Datei-Schlüsselbund) |
 | Dateien (PDF, .ics) | Teilen-Menü | unter «Downloads» speichern und mit dem System-Programm öffnen |
-| Update | Play / GitHub-APK | Hinweis «Neue Version verfügbar» aus `members-latest.json`, Knopf führt zur Release-Seite |
+| Update | Play / GitHub-APK | aus `versionen.json` (unten): Windows installiert still und startet neu, macOS öffnet das DMG, Linux: Release-Seite |
 | Push | Firebase | keiner (Firebase gibt es für Linux/Windows nicht) |
 | Adressbuch | Android: Abgleich | CardDAV (wie iOS) |
 
@@ -102,6 +102,29 @@ Release (`desktop-release`), feste Namen auch unter `members-latest`
 - QR-Code-/Barcode-Scan (mobile_scanner) hat nur auf macOS ein Plugin; auf
   Linux/Windows funktioniert der Scan nicht (Login per QR-Code, Lager).
   Ungetestet, wie sich der Scanner dort meldet.
-- Kein automatisches Update wie bei Tauri (nur Hinweis + Download).
 - Signieren für Windows (Authenticode) und macOS (Developer ID,
   Notarisierung).
+
+## Update aus der App
+
+Gemeinsam für Mitglieder-App und FWV Musik: `DesktopUpdater` in
+`fwv_core/lib/src/update/desktop_update.dart`.
+
+- **Quelle:** `www.fwv-raura.ch/download/versionen.json`, Eintrag
+  `<app>.desktop` mit Version, Release-Seite und je System Adresse und
+  SHA-256 der Datei. Der Vereinsserver trägt das alle 15 min nach
+  (`docker/app-downloads/holen.sh`); die Prüfsumme kommt aus dem
+  GitHub-Release (`digest`), die Dateien bleiben auf GitHub.
+- **Windows:** Installer laden, Prüfsumme prüfen, mit `/VERYSILENT`
+  starten, App beenden. `windows-setup.iss` startet die App nach einem
+  stillen Lauf wieder (`skipifnotsilent`).
+- **macOS:** DMG laden, prüfen, im Finder öffnen, App beenden (sonst
+  ersetzt der Finder sie nicht). Selbst austauschen geht nicht: die App
+  läuft in der Sandbox. Das DMG-Fenster zeigt einen Pfeil nach
+  «Programme» (`flutter/packaging/dmg-bauen.sh`, dmgbuild,
+  Hintergrund `packaging/dmg/hintergrund.svg` → `.tiff` mit 1x und 2x).
+- **Linux:** nur Hinweis, Knopf öffnet die Release-Seite (Installieren
+  braucht das Systempasswort).
+- Eigener http-Client: kein Quarantäne-Vermerk, Gatekeeper und
+  SmartScreen fragen nicht.
+

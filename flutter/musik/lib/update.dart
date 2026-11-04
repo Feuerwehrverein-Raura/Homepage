@@ -3,10 +3,14 @@
 // docker/app-downloads/holen.sh) nach der neuesten Fassung. Laden, SHA-256
 // pruefen und Installer oeffnen macht android/.../MainActivity.kt ueber den
 // Kanal ch.fwvraura.musik/update - wie in der Kassen-App.
+//
+// Am Computer: DesktopUpdateHinweis unten, mit dem DesktopUpdater aus
+// fwv_core (dieselbe versionen.json, Eintrag musik.desktop).
 
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:fwv_core/desktop.dart' show DesktopFassung, DesktopUpdater;
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
@@ -113,6 +117,82 @@ class _UpdateHinweisState extends State<UpdateHinweis> {
                 : 'Lädt FWV Musik ${widget.version.version} … $p %'),
       ),
       actions: [TextButton(onPressed: p == null ? _los : null, child: const Text('Aktualisieren'))],
+    );
+  }
+}
+
+/// Hinweis oben im Programm am Computer: Windows installiert still und
+/// startet neu, macOS oeffnet das DMG (App in «Programme» ziehen), Linux
+/// fuehrt zur Download-Seite (fwv_core DesktopUpdater).
+class DesktopUpdateHinweis extends StatefulWidget {
+  const DesktopUpdateHinweis({
+    super.key,
+    required this.updater,
+    required this.fassung,
+    required this.seiteOeffnen,
+  });
+
+  final DesktopUpdater updater;
+  final DesktopFassung fassung;
+  final Future<void> Function(Uri seite) seiteOeffnen;
+
+  @override
+  State<DesktopUpdateHinweis> createState() => _DesktopUpdateHinweisState();
+}
+
+class _DesktopUpdateHinweisState extends State<DesktopUpdateHinweis> {
+  int? _prozent;
+  String? _fehler;
+
+  bool get _selbst => widget.updater.kannSelbst(widget.fassung);
+
+  Future<void> _los() async {
+    if (!_selbst) {
+      await widget.seiteOeffnen(widget.fassung.seite);
+      return;
+    }
+    setState(() {
+      _prozent = 0;
+      _fehler = null;
+    });
+    try {
+      // Kommt nur bei einem Fehler zurueck - sonst beendet sich die App.
+      await widget.updater.installieren(
+        widget.fassung,
+        fortschritt: (a) {
+          final p = (a * 100).floor();
+          if (mounted && p != _prozent) setState(() => _prozent = p);
+        },
+      );
+    } on Object catch (e) {
+      _fehler = '$e'.replaceFirst('Exception: ', '');
+    }
+    if (mounted) setState(() => _prozent = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _prozent;
+    final v = widget.fassung.version;
+    final mac = widget.updater.system == 'macos';
+    return MaterialBanner(
+      key: const Key('desktop-update-hinweis'),
+      leading: const Icon(Icons.system_update),
+      content: Text(
+        _fehler ??
+            (p != null
+                ? 'Lädt FWV Musik $v … $p %'
+                : mac && _selbst
+                ? 'FWV Musik $v ist da. Nach dem Laden öffnet sich ein Fenster: '
+                      'FWV Musik in «Programme» ziehen und «Ersetzen» wählen.'
+                : 'FWV Musik $v ist da.'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: p == null ? _los : null,
+          child: Text(_selbst ? 'Aktualisieren' : 'Herunterladen'),
+        ),
+      ],
     );
   }
 }

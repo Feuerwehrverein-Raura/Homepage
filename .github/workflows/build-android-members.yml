@@ -547,11 +547,10 @@ jobs:
         run: |
           set -euo pipefail
           APP="build/macos/Build/Products/Release/FWV Raura.app"
-          mkdir -p "$GITHUB_WORKSPACE/desktop" dmg
+          mkdir -p "$GITHUB_WORKSPACE/desktop"
           ditto -c -k --keepParent "$APP" "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-macos.zip"
-          cp -R "$APP" dmg/
-          ln -s /Applications dmg/Programme
-          hdiutil create -volname "FWV Raura" -srcfolder dmg -ov -format UDZO \
+          # Fenster mit Hintergrund und Pfeil «in Programme ziehen»
+          "$GITHUB_WORKSPACE/flutter/packaging/dmg-bauen.sh" "$APP" "FWV Raura" \
             "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-macos.dmg"
 
       - uses: actions/upload-artifact@v4

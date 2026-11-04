@@ -11,6 +11,7 @@ import 'package:fwv_core/desktop.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -27,6 +28,7 @@ class Dienste {
     this.handy = false,
     this.freierPlatz,
     this.imWlan,
+    this.desktopUpdate,
   }) : _musikZugang = musikZugang ?? ((s) => ApiMusikZugang(s.api));
 
   /// Die echte App: Schluesselbund des Systems (macOS Schluesselbund,
@@ -59,6 +61,10 @@ class Dienste {
       musikOrdner: () async => Directory(
         '${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}Musik',
       ),
+      desktopUpdate: DesktopUpdater(
+        app: 'musik',
+        appVersion: () async => (await PackageInfo.fromPlatform()).version,
+      ),
     );
   }
 
@@ -85,8 +91,12 @@ class Dienste {
   final SitzungsVerwaltung sitzung;
   final AuthentikAnmeldung authentik;
 
-  /// Android: "Handy" in den Texten, keine ganze Sammlung, nur im WLAN laden.
+  /// Android: "Handy" in den Texten, nur im WLAN laden (sonst nachfragen).
   final bool handy;
+
+  /// Computer: neuere Fassung von www.fwv-raura.ch laden und installieren.
+  /// Null auf Android (eigener Updater, update.dart) und in Tests.
+  final DesktopUpdater? desktopUpdate;
 
   /// Nur Android: freier Speicher und WLAN vom System.
   final Future<int?> Function(Directory ort)? freierPlatz;

@@ -12,7 +12,9 @@ import 'package:fwv_anlass/fwv_anlass.dart' show fwvThema, nachfragen;
 import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen;
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:fwv_core/desktop.dart' show DesktopFassung;
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'anmeldung.dart';
 import 'dienste.dart';
@@ -52,6 +54,7 @@ class _MusikAppState extends State<MusikApp> {
   final _navigator = GlobalKey<NavigatorState>();
   late final Future<void> _start = widget.dienste.sitzung.laden();
   NeueVersion? _update;
+  DesktopFassung? _desktopUpdate;
 
   @override
   void initState() {
@@ -63,6 +66,10 @@ class _MusikAppState extends State<MusikApp> {
         if (mounted && v != null) setState(() => _update = v);
       });
     }
+    // Computer: neuere Fassung? Windows und macOS installieren sie selbst.
+    widget.dienste.desktopUpdate?.pruefen().then((f) {
+      if (mounted && f != null) setState(() => _desktopUpdate = f);
+    });
   }
 
   @override
@@ -93,10 +100,21 @@ class _MusikAppState extends State<MusikApp> {
       themeMode: ThemeMode.light,
       builder: (context, kind) {
         final update = _update;
-        if (update == null || kind == null) return kind ?? const SizedBox();
+        final desktop = _desktopUpdate;
+        final updater = dienste.desktopUpdate;
+        final Widget? hinweis = update != null
+            ? UpdateHinweis(version: update)
+            : desktop != null && updater != null
+            ? DesktopUpdateHinweis(
+                updater: updater,
+                fassung: desktop,
+                seiteOeffnen: (seite) => launchUrl(seite, mode: LaunchMode.externalApplication),
+              )
+            : null;
+        if (hinweis == null || kind == null) return kind ?? const SizedBox();
         return Column(
           children: [
-            SafeArea(bottom: false, child: UpdateHinweis(version: update)),
+            SafeArea(bottom: false, child: hinweis),
             Expanded(
               child: MediaQuery.removePadding(context: context, removeTop: true, child: kind),
             ),

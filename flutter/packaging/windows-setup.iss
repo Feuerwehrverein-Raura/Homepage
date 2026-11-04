@@ -54,3 +54,5 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#ExeName}"; Tasks: desktopic
 
 [Run]
 Filename: "{app}\{#ExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; Update aus der App (DesktopUpdater in fwv_core, /VERYSILENT): danach wieder starten
+Filename: "{app}\{#ExeName}"; Flags: nowait skipifnotsilent

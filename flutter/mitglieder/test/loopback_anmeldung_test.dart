@@ -279,15 +279,23 @@ void main() {
       expect(pfad(''), '/d/Datei');
     });
 
-    test('Update-Hinweis fuehrt zur Release-Seite', () {
-      const json = '{"version":"1.0.21","versionCode":10021,"apk":"https://example.org/a.apk"}';
-      final s = desktopStand(json, '1.0.20 (10020)');
-      expect(s, isA<DownloadUpdate>());
-      expect(
-        (s as DownloadUpdate).seite.toString(),
-        'https://github.com/Feuerwehrverein-Raura/Homepage/releases/tag/members-v1.0.21',
+    test('Update: Windows und macOS installieren selbst, Linux nur die Release-Seite', () {
+      final f = DesktopFassung(
+        version: '1.0.43',
+        seite: Uri.parse('https://github.com/Feuerwehrverein-Raura/Homepage/releases/tag/members-v1.0.43'),
+        datei: Uri.parse('https://example.org/fwv-raura-1.0.43-windows-x64-setup.exe'),
+        sha256: 'a' * 64,
       );
-      expect(desktopStand(json, '1.0.21 (10021)'), isA<KeinUpdate>());
+      DesktopUpdater updater(String system) =>
+          DesktopUpdater(app: 'mitglieder', appVersion: () async => '1.0.42 (10042)', system: system);
+      final win = desktopStand(updater('windows'), f) as DownloadUpdate;
+      expect(win.installieren, isNotNull);
+      expect(win.dmg, isFalse);
+      expect((desktopStand(updater('macos'), f) as DownloadUpdate).dmg, isTrue);
+      final linux = desktopStand(updater('linux'), f) as DownloadUpdate;
+      expect(linux.installieren, isNull);
+      expect(linux.seite, f.seite);
+      expect(desktopStand(updater('linux'), null), isA<KeinUpdate>());
     });
   });
 }

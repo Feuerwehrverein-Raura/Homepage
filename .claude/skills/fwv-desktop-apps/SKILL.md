@@ -71,6 +71,14 @@ Desktop-Releases werden **nie** «Latest» (`--latest=false`):
   Schluesselbund-Passwort. Erwartet im Log: `satisfies its Designated
   Requirement` und `certificate root = H"3d21942b…"`. Entitlements:
   `network.client` + `network.server` (Loopback-Anmeldung).
+- **DMG:** `flutter/packaging/dmg-bauen.sh` (dmgbuild) - Fenster mit
+  Hintergrund und Pfeil «in Programme ziehen». Hintergrund aendern:
+  `packaging/dmg/hintergrund.svg`, mit Chrome headless in 600x400 und
+  1200x800 rendern, `tiffutil -cathidpicheck` → `hintergrund.tiff`.
+- **Update aus der App:** `DesktopUpdater` (fwv_core), Daten aus
+  `versionen.json` → `<app>.desktop` (holen.sh). Neue App: Schluessel in
+  holen.sh (Schleife «Desktop-Dateien dazu») ergaenzen. Dateinamen
+  `-windows-x64-setup.exe`, `-macos.dmg`, `_amd64.deb` nicht aendern.
 - **Linux:** `linux/packaging/deb-bauen.sh` + `.desktop`-Datei, gebaut auf
   ubuntu-latest. Braucht die App libmpv (Musik): `libmpv-dev` beim Bauen,
   `libmpv2` in `Depends`.

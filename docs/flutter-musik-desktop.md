@@ -113,7 +113,8 @@ Android-Abschnitt von `apps.html`, erscheint erst, wenn
   Vereinsserver holt das APK (`docker/app-downloads/holen.sh`, alle 15 min).
 - **Updates:** `lib/update.dart` liest `versionen.json`, zeigt oben einen
   Hinweis; laden, SHA-256 prüfen und Installer öffnen macht
-  `MainActivity.kt` (wie die Kassen-App).
+  `MainActivity.kt` (wie die Kassen-App). Am Computer: `DesktopUpdater`
+  aus fwv_core (`docs/flutter-desktop.md`, «Update aus der App»).
 - **Anmeldung:** `AppAuthAnmeldung` (`lib/appauth_anmeldung.dart`), Provider
   `fwv-members-app` mit eigener Rückleitung
   `ch.fwvraura.musik:/oauth2redirect` (in Authentik eingetragen am
@@ -151,7 +152,6 @@ Aufrufe (api-members): `GET /kiosk/ergaenzen/suche?q=`,
 
 ## Offen
 
-- Kein Update-Hinweis in der App (Download von der Release-Seite).
 - Unsigniert auf Windows und macOS.
 - Kein Eintrag auf www.fwv-raura.ch/download/.
 - Eigenes Symbol (heute das Mitglieder-Logo).

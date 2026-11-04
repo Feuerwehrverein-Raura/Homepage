@@ -3,7 +3,9 @@
 // hoechstens alle paar Stunden) und auf Wunsch unter Mehr > Version; nie
 // blockierend. Mit Schaltflaeche bleibt der Hinweis stehen, bis man sie oder
 // das Kreuz antippt - immer nur einer auf einmal. Beim APK-Update erklaert
-// vor dem Herunterladen ein kurzer Dialog die Rueckfrage von Chrome.
+// vor dem Herunterladen ein kurzer Dialog die Rueckfrage von Chrome. Am
+// Computer (Windows, macOS) laedt und installiert die App selbst, mit
+// Fortschritt in einem Dialog.
 
 import 'dart:async';
 
@@ -19,11 +21,7 @@ import 'app_update.dart';
 (ScaffoldMessengerState, ScaffoldFeatureController<SnackBar, SnackBarClosedReason>)? _offen;
 
 /// [auchOhneUpdate]: von Hand gesucht - dann auch "neueste Version" melden.
-Future<void> updateHinweisZeigen(
-  BuildContext context,
-  Dienste dienste, {
-  bool auchOhneUpdate = false,
-}) async {
+Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste, {bool auchOhneUpdate = false}) async {
   final messenger = ScaffoldMessenger.of(context);
   final update = dienste.update;
   final stand = await update.pruefen();
@@ -40,10 +38,7 @@ Future<void> updateHinweisZeigen(
       showCloseIcon: true,
       content: const Text('Neue Version geladen.'),
       duration: const Duration(minutes: 10),
-      action: SnackBarAction(
-        label: 'Neu starten',
-        onPressed: () => unawaited(update.playAbschliessen()),
-      ),
+      action: SnackBarAction(label: 'Neu starten', onPressed: () => unawaited(update.playAbschliessen())),
     ),
   );
 
@@ -80,16 +75,18 @@ Future<void> updateHinweisZeigen(
           ),
         ),
       );
-    case DownloadUpdate(:final version, :final seite):
+    case DownloadUpdate(:final version, :final seite, :final installieren):
       zeigen(
         SnackBar(
           showCloseIcon: true,
           content: Text('Neue Version verfügbar: $version'),
           duration: const Duration(seconds: 30),
-          action: SnackBarAction(
-            label: 'Herunterladen',
-            onPressed: () => unawaited(dienste.linkOeffnen(seite)),
-          ),
+          action: installieren != null && context.mounted
+              ? SnackBarAction(
+                  label: 'Aktualisieren',
+                  onPressed: () => unawaited(desktopUpdateInstallieren(context, stand)),
+                )
+              : SnackBarAction(label: 'Herunterladen', onPressed: () => unawaited(dienste.linkOeffnen(seite))),
         ),
       );
   }
@@ -125,12 +122,78 @@ Future<void> apkUpdateErklaeren(
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Später')),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Herunterladen'),
-        ),
+        FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Herunterladen')),
       ],
     ),
   );
   if (laden == true) await linkOeffnen(apk);
+}
+
+/// Desktop-Update (Windows, macOS): Dialog mit Fortschritt, waehrenddessen
+/// laedt und prueft [DownloadUpdate.installieren] die neue Fassung. Danach
+/// beendet sich die App - Windows startet sie neu, auf dem Mac oeffnet sich
+/// das DMG-Fenster. Der Dialog bleibt nur bei einem Fehler stehen.
+Future<void> desktopUpdateInstallieren(BuildContext context, DownloadUpdate update) => showDialog<void>(
+  context: context,
+  barrierDismissible: false,
+  builder: (context) => _DesktopUpdateDialog(update: update),
+);
+
+class _DesktopUpdateDialog extends StatefulWidget {
+  const _DesktopUpdateDialog({required this.update});
+
+  final DownloadUpdate update;
+
+  @override
+  State<_DesktopUpdateDialog> createState() => _DesktopUpdateDialogState();
+}
+
+class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
+  double? _anteil;
+  String? _fehler;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_los());
+  }
+
+  Future<void> _los() async {
+    try {
+      await widget.update.installieren!((a) {
+        if (mounted) setState(() => _anteil = a);
+      });
+    } on Object catch (e) {
+      if (mounted) setState(() => _fehler = '$e'.replaceFirst('Exception: ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fehler = _fehler;
+    return AlertDialog(
+      title: Text('Version ${widget.update.version}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (fehler != null)
+            Text(fehler)
+          else ...[
+            Text(
+              widget.update.dmg
+                  ? 'Wird geladen. Danach schliesst sich die App, und es öffnet sich ein Fenster: '
+                        '«FWV Raura» in «Programme» ziehen und «Ersetzen» wählen.'
+                  : 'Wird geladen und installiert. Die App startet danach von selbst neu.',
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(value: _anteil),
+          ],
+        ],
+      ),
+      actions: [
+        if (fehler != null) TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Schliessen')),
+      ],
+    );
+  }
 }

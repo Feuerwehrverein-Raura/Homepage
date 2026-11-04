@@ -7,7 +7,8 @@
 //   macOS: Schluesselbund) - wie keyring in vorstand-desktop.
 // - Dateien (PDF, .ics): kein Teilen-Menue, sondern speichern unter
 //   "Downloads" und mit dem passenden Programm oeffnen.
-// - Update: Hinweis aus www.fwv-raura.ch/download/versionen.json, Download auf der Release-Seite.
+// - Update: aus www.fwv-raura.ch/download/versionen.json; Windows und macOS
+//   installieren selbst (fwv_core DesktopUpdater), Linux: Release-Seite.
 // - Kein Push (Firebase gibt es auf Linux/Windows nicht), kein
 //   Kontakt-Abgleich (Adressbuch ueber CardDAV).
 
@@ -15,6 +16,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Rect;
+import 'package:fwv_core/desktop.dart' show DesktopFassung, DesktopUpdater;
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -65,29 +67,18 @@ Future<Directory> _downloadOrdner() async {
   return getTemporaryDirectory();
 }
 
-/// Release-Seite einer Version (dort liegen .deb, .tar.gz, .zip, .dmg).
-Uri releaseSeite(String version) =>
-    Uri.parse('https://github.com/Feuerwehrverein-Raura/Homepage/releases/tag/members-v$version');
-
-/// Hinweis auf eine neuere Desktop-Fassung: dieselbe versionen.json wie
-/// die APK (www.fwv-raura.ch/download/), der Knopf fuehrt aber zur
-/// Release-Seite der Version. Installieren muss man von Hand.
+/// Neuere Desktop-Fassung? Dieselbe versionen.json wie die APK
+/// (www.fwv-raura.ch/download/), Eintrag mitglieder.desktop. Windows und
+/// macOS installieren selbst (fwv_core DesktopUpdater), Linux fuehrt zur
+/// Release-Seite.
 class DesktopAppUpdate implements AppUpdate {
-  DesktopAppUpdate({required this.appVersion, http.Client? client}) : _client = client ?? http.Client();
+  DesktopAppUpdate({required Future<String> Function() appVersion, http.Client? client, String? system})
+    : updater = DesktopUpdater(app: 'mitglieder', appVersion: appVersion, client: client, system: system);
 
-  final Future<String> Function() appVersion;
-  final http.Client _client;
+  final DesktopUpdater updater;
 
   @override
-  Future<UpdateStand> pruefen() async {
-    try {
-      final antwort = await _client.get(versionsDatei).timeout(const Duration(seconds: 10));
-      if (antwort.statusCode != 200) return const KeinUpdate();
-      return desktopStand(antwort.body, await appVersion());
-    } on Object {
-      return const KeinUpdate();
-    }
-  }
+  Future<UpdateStand> pruefen() async => desktopStand(updater, await updater.pruefen());
 
   @override
   Future<bool> playLaden() async => false;
@@ -99,8 +90,12 @@ class DesktopAppUpdate implements AppUpdate {
   Future<void> playAbschliessen() async {}
 }
 
-/// Wie [versionsStand], aber mit der Release-Seite statt der APK.
-UpdateStand desktopStand(String json, String installiert) => switch (versionsStand(json, installiert)) {
-  ApkUpdate(:final version) => DownloadUpdate(version: version, seite: releaseSeite(version)),
-  final andere => andere,
-};
+UpdateStand desktopStand(DesktopUpdater updater, DesktopFassung? f) {
+  if (f == null) return const KeinUpdate();
+  return DownloadUpdate(
+    version: f.version,
+    seite: f.seite,
+    installieren: updater.kannSelbst(f) ? (fortschritt) => updater.installieren(f, fortschritt: fortschritt) : null,
+    dmg: updater.system == 'macos',
+  );
+}

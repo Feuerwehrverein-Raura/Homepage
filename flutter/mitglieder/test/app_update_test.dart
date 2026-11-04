@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_mitglieder/einstellungen/app_update.dart';
@@ -142,6 +144,60 @@ void main() {
 
     testWidgets('Später: kein Download', (tester) async {
       expect(await oeffnen(tester, 'Später'), isEmpty);
+    });
+  });
+
+  group('desktopUpdateInstallieren', () {
+    Future<void> zeigen(WidgetTester tester, DownloadUpdate update) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => desktopUpdateInstallieren(context, update),
+              child: const Text('los'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('los'));
+      await tester.pump();
+    }
+
+    testWidgets('zeigt den Fortschritt, auf dem Mac mit Erklaerung zum Fenster', (tester) async {
+      final laeuft = Completer<void>();
+      await zeigen(
+        tester,
+        DownloadUpdate(
+          version: '1.0.43',
+          seite: Uri.parse('https://example.org'),
+          dmg: true,
+          installieren: (fortschritt) {
+            fortschritt(0.5);
+            return laeuft.future;
+          },
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('in «Programme» ziehen'), findsOneWidget);
+      expect(tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator)).value, 0.5);
+      expect(find.text('Schliessen'), findsNothing);
+      laeuft.complete();
+    });
+
+    testWidgets('Fehler bleibt stehen, bis man schliesst', (tester) async {
+      await zeigen(
+        tester,
+        DownloadUpdate(
+          version: '1.0.43',
+          seite: Uri.parse('https://example.org'),
+          installieren: (_) async => throw Exception('Die geladene Datei ist beschädigt.'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Die geladene Datei ist beschädigt.'), findsOneWidget);
+      await tester.tap(find.text('Schliessen'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
     });
   });
 }

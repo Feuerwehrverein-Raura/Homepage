@@ -57,9 +57,17 @@ class ApkUpdate extends UpdateStand {
 
 /// Neuere Desktop-Fassung: [seite] ist die Release-Seite mit den Dateien.
 class DownloadUpdate extends UpdateStand {
-  const DownloadUpdate({required this.version, required this.seite});
+  const DownloadUpdate({required this.version, required this.seite, this.installieren, this.dmg = false});
   final String version;
   final Uri seite;
+
+  /// Windows und macOS (desktop/desktop.dart): laedt, prueft und installiert
+  /// selbst, danach beendet sich die App. Kommt nur bei einem Fehler zurueck.
+  /// Null (Linux): nur die [seite] oeffnen.
+  final Future<void> Function(void Function(double anteil) fortschritt)? installieren;
+
+  /// macOS: Statt still zu installieren oeffnet sich das DMG-Fenster.
+  final bool dmg;
 }
 
 abstract class AppUpdate {
@@ -92,11 +100,8 @@ class KeinAppUpdate implements AppUpdate {
 }
 
 class AndroidAppUpdate implements AppUpdate {
-  AndroidAppUpdate({
-    required this.appVersion,
-    http.Client? client,
-    this.kanal = const MethodChannel(kanalName),
-  }) : _client = client ?? http.Client() {
+  AndroidAppUpdate({required this.appVersion, http.Client? client, this.kanal = const MethodChannel(kanalName)})
+    : _client = client ?? http.Client() {
     kanal.setMethodCallHandler((call) async {
       if (call.method == 'geladen') _beiGeladen?.call();
     });
