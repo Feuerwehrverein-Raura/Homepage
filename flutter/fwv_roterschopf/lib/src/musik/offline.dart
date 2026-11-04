@@ -415,6 +415,15 @@ class GespeichertSeite extends StatelessWidget {
                     ),
             ),
             if (ablage.laedtHerunter) const LinearProgressIndicator(),
+            if (ablage.kenntMobilfunk)
+              SwitchListTile(
+                key: const Key('mobilfunk-schalter'),
+                secondary: const Icon(Icons.signal_cellular_alt),
+                title: const Text('Auch über Mobilfunk laden'),
+                subtitle: const Text('Sonst nur im WLAN – das schont das Datenvolumen'),
+                value: ablage.mobilfunkImmer,
+                onChanged: ablage.mobilfunkImmerSetzen,
+              ),
             if (ablage.sammlung(GespeicherteSammlung.alleId) == null)
               ListTile(
                 leading: const Icon(Icons.library_music),

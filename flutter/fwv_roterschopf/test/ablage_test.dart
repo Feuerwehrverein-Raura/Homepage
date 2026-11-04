@@ -282,6 +282,24 @@ void main() {
     expect(geholt, contains(_span.pfad));
   });
 
+  test('Schalter "Auch über Mobilfunk": laedt gleich weiter und gilt nach Neustart', () async {
+    final a = neueAblage(imWlan: () async => false);
+    expect(a.kenntMobilfunk, isTrue);
+    await a.interpretSpeichern('Queen', [_queen, _queen2]);
+    await fertig(a);
+    expect(a.offen, 2);
+
+    await a.mobilfunkImmerSetzen(true);
+    await fertig(a);
+    expect(a.offen, 0);
+
+    final neu = neueAblage(imWlan: () async => false);
+    await neu.laden();
+    expect(neu.mobilfunkImmer, isTrue);
+    expect(await neu.darfLaden(), isTrue);
+    expect(neueAblage().kenntMobilfunk, isFalse, reason: 'Computer: kein Schalter');
+  });
+
   test('Eingeschlafene Verbindung: neuer Versuch, nach dem dritten Mal Schluss', () async {
     var anfragen = 0;
     final a =

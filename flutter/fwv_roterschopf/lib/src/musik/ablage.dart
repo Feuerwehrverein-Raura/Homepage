@@ -99,10 +99,28 @@ class MusikAblage extends ChangeNotifier {
   /// die App beendet wird.
   bool mobilfunk = false;
 
+  bool _mobilfunkImmer = false;
+
+  /// Schalter unter "Gespeichert": immer auch ueber Mobilfunk laden. Steht
+  /// in ablage.json, gilt also auch nach einem Neustart.
+  bool get mobilfunkImmer => _mobilfunkImmer;
+
+  /// Nur auf dem Handy gibt es den Unterschied WLAN / Mobilfunk.
+  bool get kenntMobilfunk => imWlan != null;
+
+  Future<void> mobilfunkImmerSetzen(bool ja) async {
+    await laden();
+    _mobilfunkImmer = ja;
+    await _schreiben();
+    notifyListeners();
+    // Wartet etwas nur aufs WLAN: jetzt gleich weiterladen.
+    if (ja && offen > 0) unawaited(_herunterladen());
+  }
+
   /// Darf jetzt geladen werden (WLAN oder Mobilfunk erlaubt)?
   Future<bool> darfLaden() async {
     final wlan = imWlan;
-    if (wlan == null || mobilfunk) return true;
+    if (wlan == null || mobilfunk || _mobilfunkImmer) return true;
     try {
       return await wlan();
     } on Object {
@@ -204,6 +222,7 @@ class MusikAblage extends ChangeNotifier {
       try {
         final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
         _naechste = (j['naechste'] as num?)?.toInt() ?? 1;
+        _mobilfunkImmer = j['mobilfunk'] == true;
         for (final MapEntry(:key, :value) in (j['dateien'] as Map? ?? const {}).entries) {
           if (value is Map) {
             _dateien['$key'] = ('${value['datei']}', (value['groesse'] as num?)?.toInt() ?? 0);
@@ -233,6 +252,7 @@ class MusikAblage extends ChangeNotifier {
     await neu.writeAsString(
       jsonEncode({
         'naechste': _naechste,
+        'mobilfunk': _mobilfunkImmer,
         'dateien': {
           for (final MapEntry(:key, :value) in _dateien.entries)
             key: {'datei': value.$1, 'groesse': value.$2},
@@ -476,7 +496,9 @@ class MusikAblage extends ChangeNotifier {
         final pfad = _naechsterFehlender();
         if (pfad == null) break;
         if (!await darfLaden()) {
-          _fehler = 'Kein WLAN – geladen wird, sobald du wieder im WLAN abgleichst.';
+          _fehler =
+              'Kein WLAN – geladen wird, sobald du wieder im WLAN abgleichst '
+              '(oder „Auch über Mobilfunk laden“ einschalten).';
           break;
         }
         if (_holt != pfad) versuch = 0;
