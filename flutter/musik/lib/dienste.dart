@@ -124,7 +124,6 @@ class Dienste {
     geraet: handy ? 'Handy' : 'Computer',
     freierPlatz: freierPlatz,
     imWlan: imWlan,
-    ganzeSammlung: !handy,
   );
 
   MusikPlayer? _player;

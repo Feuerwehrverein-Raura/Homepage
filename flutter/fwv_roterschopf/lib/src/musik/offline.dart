@@ -415,7 +415,7 @@ class GespeichertSeite extends StatelessWidget {
                     ),
             ),
             if (ablage.laedtHerunter) const LinearProgressIndicator(),
-            if (ablage.ganzeSammlung && ablage.sammlung(GespeicherteSammlung.alleId) == null)
+            if (ablage.sammlung(GespeicherteSammlung.alleId) == null)
               ListTile(
                 leading: const Icon(Icons.library_music),
                 title: const Text('Alles speichern'),

@@ -76,7 +76,6 @@ class MusikAblage extends ChangeNotifier {
     this.geraet = 'Computer',
     this.freierPlatz,
     this.imWlan,
-    this.ganzeSammlung = true,
   }) : _http = client ?? http.Client();
 
   /// Wo die Dateien liegen (in der App: Application Support/Musik). Erst
@@ -95,10 +94,6 @@ class MusikAblage extends ChangeNotifier {
   /// Auf dem Handy: Ist das Netz unbegrenzt (WLAN)? Sonst wird nur geladen,
   /// wenn [mobilfunk] erlaubt ist. Ohne: immer laden.
   final Future<bool> Function()? imWlan;
-
-  /// "Alles speichern" anbieten? Auf dem Handy nicht: Die ganze Sammlung ist
-  /// fuer die meisten Handys zu gross.
-  final bool ganzeSammlung;
 
   /// Auch ueber Mobilfunk laden - nach der Rueckfrage beim Speichern, bis
   /// die App beendet wird.
