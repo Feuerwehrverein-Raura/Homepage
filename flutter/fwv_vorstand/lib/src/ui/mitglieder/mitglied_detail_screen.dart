@@ -304,6 +304,13 @@ class _MitgliedDetailScreenState extends State<MitgliedDetailScreen> {
           if (m.geburtstag case final g?)
             InfoZeile(symbol: Icons.cake_outlined, titel: 'Geburtstag', text: schweizerDatum(g)),
         ]),
+        _gruppe('Auszahlung', [
+          if (m.iban case final i? when i.trim().isNotEmpty)
+            _zeile(Icons.account_balance_outlined, 'IBAN', ibanFormatieren(i), () async {
+              await Clipboard.setData(ClipboardData(text: ibanKompakt(i)));
+              if (context.mounted) meldung(context, 'IBAN kopiert');
+            }),
+        ]),
         _gruppe('Mitgliedschaft', [
           InfoZeile(symbol: Icons.badge_outlined, titel: 'Status', text: m.status ?? '–'),
           InfoZeile(

@@ -256,6 +256,16 @@ void main() {
       expect(geaendert.aenderungen(original), {'telefon': null});
     });
 
+    test('IBAN: liest sie, schickt sie in Vierergruppen', () {
+      final m = VorstandMitglied.ausJson({'id': 'm9', 'iban': 'CH9300762011623852957'});
+      expect(m.iban, 'CH9300762011623852957');
+      final original = MitgliedEntwurf.aus(m);
+      expect(original.aenderungen(original), isEmpty);
+      final neu = MitgliedEntwurf.aus(VorstandMitglied.ausJson({'id': 'm9'}));
+      expect(MitgliedEntwurf.aus(m).alsJson()['iban'], 'CH93 0076 2011 6238 5295 7');
+      expect(neu.aenderungen(original), {'iban': null});
+    });
+
     test('Kennzahlen kommen als Text', () {
       final z = MitgliederKennzahlen.ausJson({'total': '12', 'aktiv': 9, 'pendent': '2'});
       expect((z.gesamt, z.aktiv, z.pendent, z.ehren), (12, 9, 2, 0));

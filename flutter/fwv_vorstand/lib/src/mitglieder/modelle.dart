@@ -123,6 +123,7 @@ class VorstandMitglied {
     this.zustellungEmail = true,
     this.zustellungPost = false,
     this.bemerkungen,
+    this.iban,
     this.foto,
     this.benutzername,
     this.authentikUserId,
@@ -151,6 +152,7 @@ class VorstandMitglied {
     zustellungEmail: jsonWahr(m['zustellung_email']) ?? true,
     zustellungPost: jsonWahr(m['zustellung_post']) ?? false,
     bemerkungen: jsonText(m['bemerkungen']),
+    iban: jsonText(m['iban']),
     foto: jsonText(m['foto']),
     benutzername: jsonText(m['benutzername']),
     authentikUserId: jsonText(m['authentik_user_id']),
@@ -185,6 +187,9 @@ class VorstandMitglied {
   final bool zustellungEmail;
   final bool zustellungPost;
   final String? bemerkungen;
+
+  /// Fuer Rueckerstattungen (Spesen); traegt meist das Mitglied selbst ein.
+  final String? iban;
 
   /// Meist relativ (`/uploads/photo-123.jpg`).
   final String? foto;
@@ -304,6 +309,7 @@ class MitgliedEntwurf {
     this.zustellungEmail = true,
     this.zustellungPost = false,
     this.bemerkungen,
+    this.iban,
   });
 
   factory MitgliedEntwurf.aus(VorstandMitglied m) => MitgliedEntwurf(
@@ -327,6 +333,7 @@ class MitgliedEntwurf {
     zustellungEmail: m.zustellungEmail,
     zustellungPost: m.zustellungPost,
     bemerkungen: m.bemerkungen,
+    iban: m.iban,
   );
 
   final String? anrede;
@@ -349,6 +356,7 @@ class MitgliedEntwurf {
   final bool zustellungEmail;
   final bool zustellungPost;
   final String? bemerkungen;
+  final String? iban;
 
   /// Alle Felder; Leeres als null, damit man einen Eintrag auch loeschen
   /// kann.
@@ -375,6 +383,7 @@ class MitgliedEntwurf {
       'zustellung_email': zustellungEmail,
       'zustellung_post': zustellungPost,
       'bemerkungen': t(bemerkungen),
+      'iban': t(iban) == null ? null : ibanFormatieren(iban!),
     };
   }
 

@@ -8,6 +8,7 @@
 // Tastatur sichtbar. Gibt das gespeicherte Mitglied zurueck.
 
 import 'package:fwv_anlass/fwv_anlass.dart';
+import 'package:fwv_core/fwv_core.dart' show ibanFormatieren, ibanGueltig;
 import 'package:material_ui/material_ui.dart';
 
 import '../../dienste.dart';
@@ -43,6 +44,9 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
   late final _plz = TextEditingController(text: _original.plz);
   late final _ort = TextEditingController(text: _original.ort);
   late final _bemerkungen = TextEditingController(text: _original.bemerkungen);
+  late final _iban = TextEditingController(
+    text: _original.iban == null ? null : ibanFormatieren(_original.iban!),
+  );
 
   late String? _anrede = _original.anrede;
   late String? _geschlecht = _original.geschlecht;
@@ -72,6 +76,7 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
       _plz,
       _ort,
       _bemerkungen,
+      _iban,
     ]) {
       c.dispose();
     }
@@ -99,6 +104,7 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
     zustellungEmail: _zustellungEmail,
     zustellungPost: _zustellungPost,
     bemerkungen: _bemerkungen.text,
+    iban: _iban.text,
   );
 
   void _zugehoerigkeitWaehlen(String? wert) {
@@ -250,6 +256,13 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
                     const SizedBox(width: 12),
                     Expanded(child: _feld(_ort, 'Ort')),
                   ],
+                ),
+                _titel('Auszahlung'),
+                _feld(
+                  _iban,
+                  'IBAN',
+                  pruefen: _ibanPruefen,
+                  hinweis: 'Für Rückerstattungen (Spesen)',
                 ),
                 _titel('Mitgliedschaft'),
                 _auswahl(
@@ -412,6 +425,9 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
     );
   }
 }
+
+String? _ibanPruefen(String t) =>
+    ibanGueltig(t) ? null : 'Diese IBAN stimmt nicht – bitte Zeichen und Prüfziffer kontrollieren.';
 
 /// Einfache Pruefung gegen Tippfehler; die echte macht der Mailserver.
 String? _emailPruefen(String t) => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)
