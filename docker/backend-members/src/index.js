@@ -14,6 +14,8 @@ const fs = require('fs');
 const https = require('https');   // DEUTSCH: fuer den Bondrucker (ePOS ueber HTTPS)
 const PDFDocument = require('pdfkit');
 const admin = require('firebase-admin');
+const webpush = require('web-push');
+const { pushVersand: pushVersandBauen, pushSchema } = require('./push-versand');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
@@ -35,6 +37,8 @@ const { mitgliedErneuerung, ZUGANG_DAUER: MITGLIED_ZUGANG_DAUER, ZUGANG_SEKUNDEN
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
 let fcmInitialized = false;
+/** Wer einen Push "an alle" bekommt. */
+const PUSH_AN_ALLE_STATUS = ['Aktivmitglied', 'Ehrenmitglied', 'Passivmitglied'];
 try {
     const credPath = process.env.FIREBASE_ADMIN_CREDENTIALS_PATH;
     const credJson = process.env.FIREBASE_ADMIN_JSON;
@@ -68,7 +72,6 @@ try {
  *                                  (ziel, eventId - siehe src/push-daten.js)
  */
 async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
-    if (!fcmInitialized) return;
     try {
         const pref = await pool.query(
             'SELECT enabled FROM notification_preferences WHERE member_id=$1 AND notification_type=$2',
@@ -78,37 +81,15 @@ async function sendPushToMember(memberId, notificationType, title, body, data = 
             return; // User hat diesen Typ deaktiviert
         }
         const tokens = await pool.query(
-            'SELECT token FROM fcm_tokens WHERE member_id=$1',
+            'SELECT token, platform FROM fcm_tokens WHERE member_id=$1',
             [memberId]
         );
         if (tokens.rows.length === 0) return;
-
-        const stringData = fcmDaten(notificationType, data);
-        const message = {
+        const r = await pushVersand.senden(tokens.rows, {
             notification: { title, body },
-            data: stringData,
-            tokens: tokens.rows.map(r => r.token)
-        };
-        const response = await admin.messaging().sendEachForMulticast(message);
-        const invalidTokens = [];
-        response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-                const code = resp.error && resp.error.code;
-                if (code === 'messaging/registration-token-not-registered' ||
-                    code === 'messaging/invalid-registration-token' ||
-                    code === 'messaging/invalid-argument') {
-                    invalidTokens.push(tokens.rows[idx].token);
-                }
-            }
+            data: fcmDaten(notificationType, data)
         });
-        if (invalidTokens.length > 0) {
-            await pool.query(
-                'DELETE FROM fcm_tokens WHERE token = ANY($1::text[])',
-                [invalidTokens]
-            );
-            console.log(`FCM: cleaned up ${invalidTokens.length} invalid tokens for member ${memberId}`);
-        }
-        console.log(`FCM push to member ${memberId} (${notificationType}): ${response.successCount}/${tokens.rows.length} delivered`);
+        console.log(`Push to member ${memberId} (${notificationType}): ${r.gesendet}/${tokens.rows.length} delivered`);
     } catch (err) {
         console.error('sendPushToMember failed:', err.message);
     }
@@ -120,29 +101,20 @@ async function sendPushToMember(memberId, notificationType, title, body, data = 
  * "Ich gehe schauen" selbst; aeltere Apps die gewohnte Mitteilung.
  */
 async function sendAlarmPush(memberId, title, body, data = {}) {
-    if (!fcmInitialized) return;
     try {
         const pref = await pool.query(
             "SELECT enabled FROM notification_preferences WHERE member_id=$1 AND notification_type='general'", [memberId]);
         if (pref.rows[0]?.enabled === false) return;
         await pool.query('ALTER TABLE fcm_tokens ADD COLUMN IF NOT EXISTS alarm_knopf BOOLEAN NOT NULL DEFAULT false');
-        const tokens = (await pool.query('SELECT token, alarm_knopf FROM fcm_tokens WHERE member_id=$1', [memberId])).rows;
+        const tokens = (await pool.query('SELECT token, platform, alarm_knopf FROM fcm_tokens WHERE member_id=$1', [memberId])).rows;
         const stringData = fcmDaten('kuehler_alarm', { ...data, title, body });
-        const kaputt = [];
         for (const knopf of [true, false]) {
-            const t = tokens.filter(r => r.alarm_knopf === knopf).map(r => r.token);
+            const t = tokens.filter(r => r.alarm_knopf === knopf);
             if (!t.length) continue;
-            const message = knopf
-                ? { data: stringData, android: { priority: 'high' }, tokens: t }
-                : { notification: { title, body }, data: stringData, tokens: t };
-            const response = await admin.messaging().sendEachForMulticast(message);
-            response.responses.forEach((resp, i) => {
-                const code = resp.error && resp.error.code;
-                if (code === 'messaging/registration-token-not-registered' ||
-                    code === 'messaging/invalid-registration-token') kaputt.push(t[i]);
-            });
+            await pushVersand.senden(t, knopf
+                ? { data: stringData, android: { priority: 'high' } }
+                : { notification: { title, body }, data: stringData });
         }
-        if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
     } catch (err) {
         console.error('sendAlarmPush failed:', err.message);
     }
@@ -335,6 +307,10 @@ const pool = new Pool({
 });
 // Erneuern der Mitglieder-Anmeldungen ohne Authentik (src/mitglied-erneuerung.js)
 const mitgliedAnmeldung = mitgliedErneuerung(pool);
+// Alle Pushs gehen hierueber: Handy (FCM), Browser (Web-Push), Desktop
+// (Postfach). Siehe src/push-versand.js.
+const pushVersand = pushVersandBauen({ pool, fcm: () => (fcmInitialized ? admin.messaging() : null), webpush });
+if (process.env.NODE_ENV !== 'test') pushSchema(pool).catch(e => console.error('[PUSH] Schema:', e.message));
 
 // Middleware - CORS must be before helmet
 // DEUTSCH: CORS erlaubt nur *.fwv-raura.ch Subdomains und localhost
@@ -4852,20 +4828,11 @@ async function vorstandKandidaten() {
 }
 
 async function vorstandPushSenden(memberIds, nachricht) {
-    if (!fcmInitialized || !memberIds.length) return;
+    if (!memberIds.length) return;
     const r = await pool.query(
-        'SELECT token FROM fcm_tokens WHERE member_id = ANY($1::uuid[])', [memberIds]);
-    const tokens = r.rows.map(t => t.token);
-    const kaputt = [];
-    for (let i = 0; i < tokens.length; i += 500) {
-        const teil = tokens.slice(i, i + 500);
-        const antwort = await admin.messaging().sendEachForMulticast(fcmNachricht(nachricht, teil));
-        antwort.responses.forEach((x, j) => {
-            if (!x.success && ['messaging/registration-token-not-registered',
-                'messaging/invalid-registration-token'].includes(x.error?.code)) kaputt.push(teil[j]);
-        });
-    }
-    if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
+        'SELECT token, platform FROM fcm_tokens WHERE member_id = ANY($1::uuid[])', [memberIds]);
+    const { tokens: _, ...fcm } = fcmNachricht(nachricht, []);
+    await pushVersand.senden(r.rows, fcm);
 }
 
 const vorstandMeldung = vorstandMelder({ kandidaten: vorstandKandidaten, senden: vorstandPushSenden });
@@ -4915,8 +4882,9 @@ app.post('/internal/push-to-member', async (req, res) => {
 });
 
 /**
- * DEUTSCH: Push-Broadcast an alle aktiven Mitglieder, die diesen Notification-Type
- * nicht explizit deaktiviert haben. FCM multicast in 500er-Batches.
+ * DEUTSCH: Push-Broadcast an alle Mitglieder (PUSH_AN_ALLE_STATUS), die diesen
+ * Notification-Type nicht deaktiviert haben - Handy, Browser und Desktop
+ * (src/push-versand.js).
  */
 app.post('/internal/push-broadcast', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;
@@ -4927,49 +4895,24 @@ app.post('/internal/push-broadcast', async (req, res) => {
     if (!notificationType || !title) {
         return res.status(400).json({ error: 'notificationType, title required' });
     }
-    if (!fcmInitialized) return res.json({ success: true, sent: 0, note: 'FCM not initialized' });
 
     try {
+        // Ehren- und Passivmitglieder wie Aktivmitglieder (Vorgabe 05.11.2026).
         const tokens = await pool.query(`
-            SELECT t.token FROM fcm_tokens t
+            SELECT t.token, t.platform FROM fcm_tokens t
             JOIN members m ON t.member_id = m.id
             LEFT JOIN notification_preferences p
               ON p.member_id = m.id AND p.notification_type = $1
-            WHERE m.status = 'Aktivmitglied'
+            WHERE m.status = ANY($2::text[])
               AND (p.enabled IS NULL OR p.enabled = true)
-        `, [notificationType]);
-        const allTokens = tokens.rows.map(r => r.token);
-        if (allTokens.length === 0) return res.json({ success: true, sent: 0 });
-
-        const stringData = fcmDaten(notificationType, data);
-        let sent = 0;
-        const invalid = [];
-        for (let i = 0; i < allTokens.length; i += 500) {
-            const batch = allTokens.slice(i, i + 500);
-            const message = { notification: { title, body }, data: stringData, tokens: batch };
-            try {
-                const resp = await admin.messaging().sendEachForMulticast(message);
-                sent += resp.successCount;
-                resp.responses.forEach((r, idx) => {
-                    if (!r.success) {
-                        const code = r.error && r.error.code;
-                        if (code === 'messaging/registration-token-not-registered' ||
-                            code === 'messaging/invalid-registration-token' ||
-                            code === 'messaging/invalid-argument') {
-                            invalid.push(batch[idx]);
-                        }
-                    }
-                });
-            } catch (e) {
-                console.error('push-broadcast batch failed:', e.message);
-            }
-        }
-        if (invalid.length) {
-            await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [invalid]);
-            console.log(`push-broadcast: cleaned up ${invalid.length} invalid tokens`);
-        }
-        console.log(`push-broadcast (${notificationType}): ${sent}/${allTokens.length} delivered`);
-        res.json({ success: true, sent, total: allTokens.length });
+        `, [notificationType, PUSH_AN_ALLE_STATUS]);
+        if (tokens.rows.length === 0) return res.json({ success: true, sent: 0 });
+        const r = await pushVersand.senden(tokens.rows, {
+            notification: { title, body },
+            data: fcmDaten(notificationType, data)
+        });
+        console.log(`push-broadcast (${notificationType}): ${r.gesendet}/${tokens.rows.length} delivered`);
+        res.json({ success: true, sent: r.gesendet, total: tokens.rows.length });
     } catch (err) {
         console.error('push-broadcast failed:', err);
         res.status(500).json({ error: err.message });
@@ -5848,6 +5791,32 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('/members/me/fcm-token error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Web-Push (mein.html): oeffentlicher VAPID-Schluessel fuer das Abo im
+// Browser. Das Abo selbst meldet die App wie ein FCM-Token an (platform web).
+app.get('/push/web-schluessel', async (req, res) => {
+    try {
+        res.json({ schluessel: await pushVersand.oeffentlicherSchluessel() });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Desktop-Programm: neue Mitteilungen fuer dieses Geraet abholen (danach
+// geleert). ?token= ist die Geraete-Kennung, angemeldet mit platform desktop.
+app.get('/members/me/push-postfach', authenticateToken, async (req, res) => {
+    try {
+        const token = String(req.query.token || '');
+        if (!token) return res.status(400).json({ error: 'token erforderlich' });
+        const m = await mitgliedZurAnmeldung(req);
+        if (!m) return res.status(404).json({ error: 'Member profile not found' });
+        const liste = await pushVersand.abholen(m.id, token);
+        if (!liste) return res.status(404).json({ error: 'Geraet nicht angemeldet' });
+        res.json({ mitteilungen: liste });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -7167,9 +7136,9 @@ app.post('/kiosk/t400/musik/:aktion', authenticateToken, roterSchopfZugang, asyn
 // Prioritaet); wer den Typ "schopf_musik" abgeschaltet hat, bekommt nichts.
 
 async function schopfPushSenden(memberIds, daten) {
-    if (!fcmInitialized || !memberIds.length) return;
+    if (!memberIds.length) return;
     const tokens = await pool.query(`
-        SELECT t.member_id, t.token FROM fcm_tokens t
+        SELECT t.member_id, t.token, t.platform FROM fcm_tokens t
         WHERE t.member_id = ANY($1::uuid[])
           AND NOT EXISTS (SELECT 1 FROM notification_preferences p
                           WHERE p.member_id = t.member_id
@@ -7178,14 +7147,8 @@ async function schopfPushSenden(memberIds, daten) {
     if (!tokens.rows.length) return;
     const data = Object.fromEntries(Object.entries({ notificationType: 'schopf_musik', ...daten })
         .map(([k, v]) => [k, String(v ?? '')]));
-    const antwort = await admin.messaging().sendEachForMulticast({
-        data, tokens: tokens.rows.map(r => r.token), android: { priority: 'high' }
-    });
-    const kaputt = antwort.responses
-        .map((r, i) => (!r.success && ['messaging/registration-token-not-registered',
-            'messaging/invalid-registration-token'].includes(r.error?.code)) ? tokens.rows[i].token : null)
-        .filter(Boolean);
-    if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
+    // Reiner Daten-Push: geht nur an Android/iOS (push-versand.js).
+    await pushVersand.senden(tokens.rows, { data, android: { priority: 'high' } });
 }
 
 const schopfMusikMelder = schopfMelder({

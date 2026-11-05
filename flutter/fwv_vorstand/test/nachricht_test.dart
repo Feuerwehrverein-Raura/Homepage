@@ -55,16 +55,25 @@ void main() {
   testWidgets('Senden erst mit Titel und Text; Vorschau folgt der Eingabe', (tester) async {
     await oeffnen(tester);
     expect(senden(tester).onPressed, isNull);
-    expect(find.text('Titel und Text erscheinen hier.'), findsOneWidget);
+    expect(find.text('Titel und Text erscheinen hier.'), findsNWidgets(2));
 
     await ausfuellen(tester);
     expect(senden(tester).onPressed, isNotNull);
     final vorschau = find.byKey(const Key('push-vorschau'));
-    expect(find.descendant(of: vorschau, matching: find.text('Übung am Samstag')), findsOneWidget);
+    // Android (zugeklappt, eine Zeile) und Computer/Browser.
+    expect(
+      find.descendant(of: vorschau, matching: find.text('Übung am Samstag')),
+      findsNWidgets(2),
+    );
     expect(
       find.descendant(of: vorschau, matching: find.text('Treffpunkt 9 Uhr Magazin.')),
-      findsOneWidget,
+      findsNWidgets(2),
     );
+    final android = find.descendant(
+      of: find.byKey(const Key('push-vorschau-android')),
+      matching: find.text('Treffpunkt 9 Uhr Magazin.'),
+    );
+    expect(tester.widget<Text>(android).maxLines, 1);
     expect(tester.takeException(), isNull);
   });
 

@@ -131,14 +131,22 @@ class _BenachrichtigungenScreenState extends State<BenachrichtigungenScreen> {
     final farben = Theme.of(context).colorScheme;
     return switch (_erlaubnis) {
       null => const ListTile(title: Text('…')),
-      PushErlaubnis.erlaubt => const ListTile(
-        leading: Icon(Icons.check_circle_outline),
-        title: Text('Mitteilungen auf diesem Gerät erlaubt'),
+      PushErlaubnis.erlaubt => ListTile(
+        leading: const Icon(Icons.check_circle_outline),
+        title: const Text('Mitteilungen auf diesem Gerät erlaubt'),
+        // Desktop: kein Firebase, das Programm holt sie selbst ab.
+        subtitle: widget.dienste.push.plattform == 'desktop'
+            ? const Text('Kommen, solange das Programm läuft (auch minimiert).')
+            : null,
       ),
       PushErlaubnis.abgelehnt => ListTile(
         leading: Icon(Icons.notifications_off_outlined, color: farben.error),
         title: const Text('Mitteilungen sind für diese App abgeschaltet.'),
-        subtitle: const Text('In den Einstellungen des Telefons wieder erlauben.'),
+        subtitle: Text(
+          widget.dienste.push.plattform == 'web'
+              ? 'In den Website-Einstellungen des Browsers wieder erlauben.'
+              : 'In den Einstellungen des Geräts wieder erlauben.',
+        ),
       ),
       PushErlaubnis.nichtGefragt => ListTile(
         leading: const Icon(Icons.notifications_outlined),

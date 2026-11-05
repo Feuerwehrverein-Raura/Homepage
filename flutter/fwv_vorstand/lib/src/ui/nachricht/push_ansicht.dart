@@ -103,9 +103,9 @@ class _PushAnsichtState extends State<PushAnsicht> {
         Text('App-Push an alle', style: t.textTheme.titleLarge),
         const SizedBox(height: 4),
         Text(
-          'Erreicht nur Mitglieder mit installierter App und erlaubten Benachrichtigungen '
-          '(Kanal «Allgemein», in der App abschaltbar). Für alle anderen: «Verfassen» '
-          '(E-Mail oder Brief).',
+          'Erreicht Aktiv- und Ehrenmitglieder mit der App, dem Programm am Computer oder '
+          'mein.html im Browser, sofern dort Mitteilungen erlaubt sind (Kanal «Allgemein», '
+          'in der App abschaltbar). Für alle anderen: «Verfassen» (E-Mail oder Brief).',
           style: t.textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
@@ -195,6 +195,10 @@ class _PushAnsichtState extends State<PushAnsicht> {
 }
 
 /// So etwa sieht die Mitteilung auf dem Handy aus.
+/// Wie die Mitteilung ungefaehr ankommt - nachgezeichnet, nicht echt:
+/// Android zeigt zugeklappt eine Zeile Text (aufgeklappt mehr), Computer
+/// und Browser Titel und etwa drei Zeilen. Wie viel genau, haengt vom
+/// Geraet und der Schriftgroesse ab.
 class _Vorschau extends StatelessWidget {
   const _Vorschau({required this.titel, required this.text});
 
@@ -204,19 +208,41 @@ class _Vorschau extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final grau = t.textTheme.labelMedium?.copyWith(color: t.colorScheme.outline);
+    return Column(
+      key: const Key('push-vorschau'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+          child: Text('Vorschau (ungefähr)', style: grau),
+        ),
+        _karte(t, 'Android, zugeklappt', key: const Key('push-vorschau-android'), zeilen: 1),
+        _karte(t, 'Computer und Browser', key: const Key('push-vorschau-computer'), zeilen: 3),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: Text(
+            'Kommt an: Android-App, Programm am Computer (solange es läuft) und mein.html im '
+            'Browser – überall nur, wenn Mitteilungen erlaubt sind. Android zeigt den ganzen '
+            'Text erst nach dem Aufklappen.',
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _karte(ThemeData t, String wo, {required Key key, required int zeilen}) {
     final leer = titel.isEmpty && text.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-          child: Text(
-            'Vorschau',
-            style: t.textTheme.labelMedium?.copyWith(color: t.colorScheme.outline),
-          ),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          child: Text(wo, style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.outline)),
         ),
         Card(
-          key: const Key('push-vorschau'),
+          key: key,
           margin: const EdgeInsets.only(bottom: 12),
           color: t.colorScheme.surfaceContainerHighest,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -256,7 +282,7 @@ class _Vorschau extends StatelessWidget {
                         if (text.isNotEmpty)
                           Text(
                             text,
-                            maxLines: 4,
+                            maxLines: zeilen,
                             overflow: TextOverflow.ellipsis,
                             style: t.textTheme.bodyMedium,
                           ),

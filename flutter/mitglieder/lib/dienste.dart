@@ -28,7 +28,9 @@ import 'einstellungen/geraet_meldung.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
 import 'roterschopf/schopf_pruefung.dart';
+import 'push/desktop_push.dart';
 import 'push/push_dienst.dart';
+import 'push/web_push.dart';
 import 'web/browser.dart';
 
 /// Datei teilen: Inhalt, Dateiname, MIME-Typ und (fuer iPad) die Stelle,
@@ -121,7 +123,13 @@ class Dienste {
         ? GebuendelterSpeicher(SichererSpeicher(null, 'ch.fwvraura.members'))
         : SichererSpeicher(null, 'ch.fwvraura.members');
     final speicher = SitzungsSpeicher(geheim);
-    final push = FirebasePush();
+    // Handy: Firebase. Browser: Web-Push (push/web_push.dart). Desktop:
+    // Postfach beim Backend (push/desktop_push.dart).
+    final PushDienst push = kIsWeb
+        ? WebPush()
+        : istDesktop
+        ? DesktopPush(speicher: geheim)
+        : FirebasePush();
     const kontakte = KontakteAbgleich();
     late final Dienste dienste;
     final sitzung = SitzungsVerwaltung(
@@ -154,7 +162,21 @@ class Dienste {
       schopfPruefTakt: const Duration(minutes: 10),
       geraeteAngaben: geraeteAngabenAusSystem,
     );
-    push.beiAntippen = dienste.pushAngetippt;
+    switch (push) {
+      case FirebasePush p:
+        p.beiAntippen = dienste.pushAngetippt;
+      case WebPush p:
+        p.beiAntippen = dienste.pushAngetippt;
+        p.schluesselHolen = () async =>
+            '${((await dienste.sitzung.api.get('push/web-schluessel')) as Map)['schluessel']}';
+      case DesktopPush p:
+        p.beiAntippen = dienste.pushAngetippt;
+        p.abholen = (token) async => dienste._alsMitgliedAngemeldet
+            ? postfachLesen(
+                await dienste.sitzung.api.get('members/me/push-postfach', abfrage: {'token': token}),
+              )
+            : const [];
+    }
     return dienste;
   }
 
