@@ -130,14 +130,129 @@ function png(text, { modul = 8 } = {}) {
     return PNG.sync.write(bild);
 }
 
-/** Mail-Anhang (inline, cid) oder null, wenn kein Code moeglich ist. */
-function anhang(z) {
+/** QR-Code als SVG (Modul = 1 Einheit, ohne Ruhezone) mit Schweizerkreuz. */
+function svg(text) {
+    const qr = QRCode.create(text, { errorCorrectionLevel: 'M' });
+    const n = qr.modules.size;
+    let pfad = '';
+    for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) if (qr.modules.get(y, x)) pfad += `M${x} ${y}h1v1h-1z`;
+    }
+    const k = n * 7 / 46;
+    const o = (n - k) / 2;
+    const r = k * 0.06;
+    const b = k * 0.18;
+    const l = b * (1 + 2 * 7 / 6);
+    const m = n / 2;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges">`
+        + `<rect width="${n}" height="${n}" fill="#fff"/><path d="${pfad}" fill="#000"/>`
+        + `<rect x="${o}" y="${o}" width="${k}" height="${k}" fill="#fff"/>`
+        + `<rect x="${o + r}" y="${o + r}" width="${k - 2 * r}" height="${k - 2 * r}" fill="#000"/>`
+        + `<rect x="${m - b / 2}" y="${m - l / 2}" width="${b}" height="${l}" fill="#fff"/>`
+        + `<rect x="${m - l / 2}" y="${m - b / 2}" width="${l}" height="${b}" fill="#fff"/></svg>`;
+}
+
+const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** "1590" -> "1 590.00" (SIX 3.5.3: Leerzeichen als Tausender-Trenner). */
+function betragText(b) {
+    const [ganz, rappen] = Number(b).toFixed(2).split('.');
+    return `${ganz.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}.${rappen}`;
+}
+
+/** Ecken eines Feldes zum Ausfuellen (SIX 3.5.3/3.5.4: 0.75 pt). */
+function eckenFeld(breiteMm, hoeheMm) {
+    const e = 3;
+    const w = breiteMm;
+    const h = hoeheMm;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"`
+        + ' style="overflow:visible;display:block">'
+        + `<path d="M0 ${e}V0H${e}M${w - e} 0H${w}V${e}M${w} ${h - e}V${h}H${w - e}M${e} ${h}H0V${h - e}"`
+        + ' fill="none" stroke="#000" stroke-width="0.26"/></svg>';
+}
+
+/**
+ * Zahlteil (148 x 105 mm) wie auf der QR-Rechnung, fuer die Anzeige online
+ * (SIX 3.5 und 3.8: ohne Empfangsschein). Schrift Liberation Sans/Arial,
+ * Titel 11 pt, Ueberschriften 8 pt fett, Werte 10 pt.
+ */
+function zahlteilHtml(z) {
+    const text = inhalt(z);
+    const zeilen = text.split('\n');
+    const { strasse, nummer } = strasseTeilen(z.strasse);
+    const land = zeilen[10];
+    const ortZeile = `${land === 'CH' ? '' : `${land}-`}${zeilen[8]} ${zeilen[9]}`;
+    const iban = zeilen[3].replace(/(.{4})(?=.)/g, '$1 ');
+    const konto = [iban, zeilen[5], [strasse, nummer].filter(Boolean).join(' '), ortZeile].filter(Boolean);
+    const mitteilung = zeilen[29];
+    const betrag = zeilen[18];
+    const titel = t => `<div class="t">${esc(t)}</div>`;
+    const werte = ws => ws.map(w => `<div class="w">${esc(w)}</div>`).join('');
+    return `<!doctype html><html><head><meta charset="utf-8"><style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #fff; }
+        #zahlteil { position: relative; width: 148mm; height: 105mm; background: #fff; color: #000;
+            font-family: 'Liberation Sans', Arial, Helvetica, sans-serif; border: 0.2mm solid #000; }
+        .abs { position: absolute; }
+        .h { font-size: 11pt; font-weight: bold; }
+        .t { font-size: 8pt; font-weight: bold; line-height: 11pt; }
+        .w { font-size: 10pt; line-height: 11pt; }
+        .gruppe { margin-bottom: 9pt; }
+    </style></head><body><div id="zahlteil">
+        <div class="abs h" style="left:5mm;top:5mm">Zahlteil</div>
+        <div class="abs" style="left:5mm;top:17mm;width:46mm;height:46mm">${svg(text)}</div>
+        <div class="abs" style="left:5mm;top:68mm;width:12mm">${titel('Währung')}${werte(['CHF'])}</div>
+        <div class="abs" style="left:19mm;top:68mm;width:32mm">${titel('Betrag')}${betrag
+            ? werte([betragText(betrag)])
+            : `<div style="margin-top:1mm">${eckenFeld(30, 10)}</div>`}</div>
+        <div class="abs" style="left:56mm;top:5mm;width:87mm">
+            <div class="gruppe">${titel('Konto / Zahlbar an')}${werte(konto)}</div>
+            ${mitteilung ? `<div class="gruppe">${titel('Zusätzliche Informationen')}${werte([mitteilung])}</div>` : ''}
+            <div class="gruppe">${titel('Zahlbar durch (Name/Adresse)')}<div style="margin-top:1mm">${eckenFeld(65, 25)}</div></div>
+        </div>
+    </div></body></html>`;
+}
+
+/** Zahlteil als PNG (Chrome per puppeteer), 3-fach fuer scharfe Schrift. */
+async function zahlteilPng(z) {
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: 700, height: 500, deviceScaleFactor: 3 });
+        await page.setContent(zahlteilHtml(z), { waitUntil: 'load' });
+        const el = await page.$('#zahlteil');
+        return Buffer.from(await el.screenshot({ type: 'png' }));
+    } finally {
+        await browser.close();
+    }
+}
+
+/**
+ * Mail-Anhang (inline, cid) mit dem ganzen Zahlteil; geht Chrome nicht, nur
+ * der QR-Code. null, wenn kein Code moeglich ist.
+ */
+async function anhang(z, { log = () => {} } = {}) {
     if (fehlt(z)) return null;
-    return { filename: 'QR-Zahlteil.png', content: png(inhalt(z)), contentType: 'image/png', cid: 'qr-zahlteil' };
+    try {
+        return { filename: 'Zahlteil.png', content: await zahlteilPng(z), contentType: 'image/png', cid: 'qr-zahlteil',
+            zahlteil: true };
+    } catch (e) {
+        log('Zahlteil: Bild nicht erzeugt, nur QR-Code', { fehler: e.message });
+        return { filename: 'QR-Code.png', content: png(inhalt(z)), contentType: 'image/png', cid: 'qr-zahlteil' };
+    }
 }
 
 /** HTML-Block fuer die Mail (zum Anhang aus anhang()). */
-const HTML_BLOCK = '<p style="margin-top:16px">Zum Auszahlen mit der Bank-App scannen:<br>'
-    + '<img src="cid:qr-zahlteil" alt="QR-Zahlteil" width="220" height="220"></p>';
+function htmlBlock(a) {
+    const bild = a.zahlteil
+        ? '<img src="cid:qr-zahlteil" alt="Zahlteil" width="560" style="max-width:100%;height:auto">'
+        : '<img src="cid:qr-zahlteil" alt="QR-Code" width="220" height="220">';
+    return '<p style="margin-top:16px">Zum Auszahlen den QR-Code mit der Bank-App scannen '
+        + '(nur für E-Banking und Mobile Banking):</p>' + bild;
+}
 
-module.exports = { ibanGueltig, strasseTeilen, plzUndLand, fehlt, inhalt, png, anhang, HTML_BLOCK };
+module.exports = {
+    ibanGueltig, strasseTeilen, plzUndLand, fehlt, inhalt, png, svg, betragText, zahlteilHtml, zahlteilPng,
+    anhang, htmlBlock,
+};

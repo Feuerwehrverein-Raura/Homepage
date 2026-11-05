@@ -73,18 +73,19 @@ function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
 }
 
 /** QR-Code zum Auszahlen an den Aktuar (html + attachments) oder {}. */
-function zahlteilMail(mail, aktuar) {
+async function zahlteilMail(mail, aktuar, log = () => {}) {
     if (!aktuar?.iban) return {};
-    const qr = qrZahlung.anhang({
+    const qr = await qrZahlung.anhang({
         iban: aktuar.iban, name: `${aktuar.vorname} ${aktuar.nachname}`.trim(),
         strasse: aktuar.strasse, plz: aktuar.plz, ort: aktuar.ort,
         betrag: mail.summe, mitteilung: mail.subject,
-    });
+    }, { log });
     if (!qr) return {};
     const html = mail.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/\n/g, '<br>');
-    return { html: `<div style="font-family:monospace;white-space:pre-wrap">${html}</div>${qrZahlung.HTML_BLOCK}`,
-        attachments: [qr] };
+    const { zahlteil: _, ...anhang } = qr;
+    return { html: `<div style="font-family:monospace;white-space:pre-wrap">${html}</div>${qrZahlung.htmlBlock(qr)}`,
+        attachments: [anhang] };
 }
 
 /**
@@ -136,7 +137,7 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
     )).rows[0];
 
     const mail = abrechnungBauen(belastet, { kassier, aktuar, datum });
-    await senden({ to: kassier.email, subject: mail.subject, text: mail.text, ...zahlteilMail(mail, aktuar) });
+    await senden({ to: kassier.email, subject: mail.subject, text: mail.text, ...await zahlteilMail(mail, aktuar, log) });
     await pool.query(`
         INSERT INTO dispatch_log (type, recipient_email, subject, body, status, sent_at)
         VALUES ('email', $1, $2, $3, 'sent', NOW())`, [kassier.email, mail.subject, mail.text]);

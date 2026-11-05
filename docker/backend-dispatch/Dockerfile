@@ -1,7 +1,8 @@
 FROM node:20-alpine
 ARG VERSION=0.0.0
 ENV APP_VERSION=${VERSION}
-RUN apk add --no-cache chromium
+# font-liberation: Schrift fuer den QR-Zahlteil (SIX erlaubt Liberation Sans).
+RUN apk add --no-cache chromium font-liberation
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 WORKDIR /app
