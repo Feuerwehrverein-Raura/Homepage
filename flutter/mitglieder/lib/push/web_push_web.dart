@@ -5,7 +5,7 @@
 //   Fenster per postMessage, sonst oeffnet er /mein.html?push=<Daten>.
 // - Das Abo (endpoint + Schluessel) meldet die App wie ein FCM-Token an
 //   (POST members/me/fcm-token, platform web); das Backend schickt mit
-//   seinem VAPID-Schluessel (GET push/web-schluessel,
+//   seinem VAPID-Schluessel (GET members/me/web-push-schluessel,
 //   docker/backend-members/src/push-versand.js).
 // - Erlaubnis fragt der Browser nur nach einem Klick zuverlaessig: dafuer
 //   Einstellungen -> Benachrichtigungen -> «Mitteilungen erlauben».

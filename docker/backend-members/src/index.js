@@ -5796,7 +5796,8 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
 
 // Web-Push (mein.html): oeffentlicher VAPID-Schluessel fuer das Abo im
 // Browser. Das Abo selbst meldet die App wie ein FCM-Token an (platform web).
-app.get('/push/web-schluessel', async (req, res) => {
+// Unter /members: /push auf api.fwv-raura.ch gehoert api-events (Traefik).
+app.get('/members/me/web-push-schluessel', authenticateToken, async (req, res) => {
     try {
         res.json({ schluessel: await pushVersand.oeffentlicherSchluessel() });
     } catch (e) {

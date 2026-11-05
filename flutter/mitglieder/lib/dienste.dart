@@ -168,7 +168,7 @@ class Dienste {
       case WebPush p:
         p.beiAntippen = dienste.pushAngetippt;
         p.schluesselHolen = () async =>
-            '${((await dienste.sitzung.api.get('push/web-schluessel')) as Map)['schluessel']}';
+            '${((await dienste.sitzung.api.get('members/me/web-push-schluessel')) as Map)['schluessel']}';
       case DesktopPush p:
         p.beiAntippen = dienste.pushAngetippt;
         p.abholen = (token) async => dienste._alsMitgliedAngemeldet
