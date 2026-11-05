@@ -128,6 +128,11 @@ function kassierMail(s, { mitglied, anlass }) {
             `  Auszahlung: ${ibanText(s.iban)} (${wer})`, '',
             'Den Beleg und «Bezahlt» bzw. «Ablehnen» findest du in der Mitglieder-App unter Vorstand → Spesen.',
         ].join('\n'),
+        // api-dispatch haengt daraus den QR-Code zum Auszahlen an (qr-zahlung.js).
+        zahlteil: {
+            iban: s.iban, name: wer, strasse: mitglied.strasse, plz: mitglied.plz, ort: mitglied.ort,
+            betrag: Number(s.betrag), mitteilung: `Spesen: ${s.zweck}`,
+        },
     };
 }
 
@@ -153,7 +158,7 @@ function erledigtMail(s, { mitglied }) {
 
 const LISTE_FELDER = `s.id, s.member_id, s.betrag, s.datum, s.zweck, s.kategorie, s.event_id, s.iban,
     s.beleg_name, s.beleg_typ, s.quelle, s.status, s.grund, s.erstellt_am, s.erledigt_am, s.erledigt_von,
-    m.vorname, m.nachname, e.title AS anlass`;
+    m.vorname, m.nachname, m.strasse, m.plz, m.ort, e.title AS anlass`;
 
 /**
  * Endpunkte einhaengen.

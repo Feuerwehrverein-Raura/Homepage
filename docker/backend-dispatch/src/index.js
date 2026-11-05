@@ -332,6 +332,15 @@ app.post('/email/send', authenticateAny, requireRole('vorstand', 'admin'), async
                 return { filename: a.filename, content, contentType: a.contentType };
             });
         }
+        // zahlteil: { iban, name, strasse, plz, ort, betrag, mitteilung } ->
+        // QR-Code zum Auszahlen als Bild in der Mail (src/qr-zahlung.js).
+        if (req.body.zahlteil) {
+            const qr = require('./qr-zahlung').anhang(req.body.zahlteil);
+            if (qr) {
+                mailOptions.attachments = [...(mailOptions.attachments || []), qr];
+                mailOptions.html += require('./qr-zahlung').HTML_BLOCK;
+            }
+        }
         const info = await transporter.sendMail(mailOptions);
 
         // Log

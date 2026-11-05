@@ -8,6 +8,7 @@ import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
+import 'qr_zahlteil.dart';
 
 class SpesenAnsicht extends StatefulWidget {
   const SpesenAnsicht({super.key, required this.dienste});
@@ -215,6 +216,8 @@ class _SpesenAnsichtState extends State<SpesenAnsicht> {
                   ),
                 ),
                 if (s.status == SpesenStatus.eingereicht) ...[
+                  if (s.qrZahlung case final z?)
+                    QrZahlteilKnopf(key: Key('spesen-qr-${s.id}'), zahlung: z),
                   TextButton.icon(
                     key: Key('spesen-ablehnen-${s.id}'),
                     onPressed: arbeitet ? null : () => _erledigen(s, bezahlt: false),

@@ -50,6 +50,15 @@ test('Mail an den Kassier nennt Betrag, Zweck, Anlass und IBAN', () => {
     assert.match(m.body, /CH93 0076 2011 6238 5295 7 \(Anna Muster\)/);
 });
 
+test('Mail an den Kassier: Angaben fuer den QR-Code (api-dispatch)', () => {
+    const m = S.kassierMail({ betrag: '23.50', datum: '2026-11-02', zweck: 'Brot', kategorie: 'Einkauf', iban: 'CH9300762011623852957' },
+        { mitglied: { vorname: 'Anna', nachname: 'Muster', strasse: 'Hauptstrasse 12', plz: '4303', ort: 'Kaiseraugst' } });
+    assert.deepEqual(m.zahlteil, {
+        iban: 'CH9300762011623852957', name: 'Anna Muster', strasse: 'Hauptstrasse 12', plz: '4303',
+        ort: 'Kaiseraugst', betrag: 23.5, mitteilung: 'Spesen: Brot',
+    });
+});
+
 test('Mail ans Mitglied: bezahlt mit IBAN, abgelehnt mit Begruendung, an versand_email', () => {
     const s = { betrag: 23.5, datum: '2026-11-02', zweck: 'Brot', iban: 'CH9300762011623852957' };
     const mitglied = { vorname: 'Anna', email: 'a@x.ch', versand_email: 'anna@x.ch' };

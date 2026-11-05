@@ -15,6 +15,8 @@
 // liegen. Stornierte und abgelehnte Briefe kosten nichts und werden nur als
 // erledigt markiert.
 
+const qrZahlung = require('./qr-zahlung');
+
 const PRUEFSTUNDE = 18;
 const PRUEFMINUTE = 0;
 
@@ -70,6 +72,21 @@ function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
     };
 }
 
+/** QR-Code zum Auszahlen an den Aktuar (html + attachments) oder {}. */
+function zahlteilMail(mail, aktuar) {
+    if (!aktuar?.iban) return {};
+    const qr = qrZahlung.anhang({
+        iban: aktuar.iban, name: `${aktuar.vorname} ${aktuar.nachname}`.trim(),
+        strasse: aktuar.strasse, plz: aktuar.plz, ort: aktuar.ort,
+        betrag: mail.summe, mitteilung: mail.subject,
+    });
+    if (!qr) return {};
+    const html = mail.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+    return { html: `<div style="font-family:monospace;white-space:pre-wrap">${html}</div>${qrZahlung.HTML_BLOCK}`,
+        attachments: [qr] };
+}
+
 /**
  * Offene Briefe bei Pingen nachfragen, belastete abrechnen.
  * briefLesen(letterId) -> { status, preis } (Pingen-API, price_value);
@@ -115,11 +132,11 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
         email: KASSIER_ADRESSE,
     };
     const aktuar = (await pool.query(
-        "SELECT vorname, nachname, iban FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1"
+        "SELECT vorname, nachname, iban, strasse, plz, ort FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1"
     )).rows[0];
 
     const mail = abrechnungBauen(belastet, { kassier, aktuar, datum });
-    await senden({ to: kassier.email, subject: mail.subject, text: mail.text });
+    await senden({ to: kassier.email, subject: mail.subject, text: mail.text, ...zahlteilMail(mail, aktuar) });
     await pool.query(`
         INSERT INTO dispatch_log (type, recipient_email, subject, body, status, sent_at)
         VALUES ('email', $1, $2, $3, 'sent', NOW())`, [kassier.email, mail.subject, mail.text]);
@@ -310,4 +327,4 @@ function spesenStarten(pool, deps, zuerichTeile) {
 }
 
 module.exports = { AB, KASSIER_ADRESSE, NICHT_BELASTET, KOSTENLOS, abrechnungBauen, spesenAbrechnen, spesenSchema,
-    spesenStarten, istBelastet, spesenUebersicht, spesenRoute, alsSpesenEintragen };
+    spesenStarten, zahlteilMail, istBelastet, spesenUebersicht, spesenRoute, alsSpesenEintragen };

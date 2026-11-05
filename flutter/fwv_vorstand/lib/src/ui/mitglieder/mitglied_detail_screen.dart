@@ -12,6 +12,7 @@ import '../../dienste.dart';
 import '../../mitglieder/mitglieder_verwaltung.dart';
 import '../../mitglieder/modelle.dart';
 import 'bausteine.dart';
+import '../qr_zahlteil.dart';
 import 'mitglied_formular_screen.dart';
 import 'zugangs_dokumente_teil.dart';
 
@@ -310,6 +311,20 @@ class _MitgliedDetailScreenState extends State<MitgliedDetailScreen> {
               await Clipboard.setData(ClipboardData(text: ibanKompakt(i)));
               if (context.mounted) meldung(context, 'IBAN kopiert');
             }),
+          if (m.iban case final i? when i.trim().isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: QrZahlteilKnopf(
+                key: const Key('mitglied-qr'),
+                zahlung: QrZahlung(
+                  iban: i,
+                  name: m.name,
+                  strasse: m.strasse,
+                  plz: m.plz,
+                  ort: m.ort,
+                ),
+              ),
+            ),
         ]),
         _gruppe('Mitgliedschaft', [
           InfoZeile(symbol: Icons.badge_outlined, titel: 'Status', text: m.status ?? '–'),

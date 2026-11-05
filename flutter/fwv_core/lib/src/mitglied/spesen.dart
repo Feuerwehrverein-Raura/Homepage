@@ -8,6 +8,7 @@ import 'dart:typed_data';
 
 import '../api/api_client.dart';
 import 'json_lesen.dart';
+import 'qr_zahlung.dart';
 
 /// Wie das Backend (KATEGORIEN).
 const spesenKategorien = ['Einkauf', 'Porto', 'Fahrt', 'Material', 'Verpflegung', 'Anderes'];
@@ -49,6 +50,9 @@ class Spesen {
     this.grund,
     this.pingen = false,
     this.name,
+    this.strasse,
+    this.plz,
+    this.ort,
     this.erstellt,
     this.erledigt,
     this.erledigtVon,
@@ -68,6 +72,9 @@ class Spesen {
     grund: jsonText(j['grund']),
     pingen: j['quelle'] == 'pingen',
     name: [jsonText(j['vorname']), jsonText(j['nachname'])].whereType<String>().join(' '),
+    strasse: jsonText(j['strasse']),
+    plz: jsonText(j['plz']),
+    ort: jsonText(j['ort']),
     erstellt: jsonZeitpunkt(j['erstellt_am']),
     erledigt: jsonZeitpunkt(j['erledigt_am']),
     erledigtVon: jsonText(j['erledigt_von']),
@@ -90,11 +97,28 @@ class Spesen {
   /// Automatisch aus der Pingen-Abrechnung (Porto, Aktuar).
   final bool pingen;
 
-  /// Wer eingereicht hat (Liste des Kassiers).
+  /// Wer eingereicht hat (Liste des Kassiers), mit Adresse fuer den
+  /// QR-Code.
   final String? name;
+  final String? strasse;
+  final String? plz;
+  final String? ort;
   final DateTime? erstellt;
   final DateTime? erledigt;
   final String? erledigtVon;
+
+  /// Fuer den QR-Code zum Auszahlen; null ohne IBAN.
+  QrZahlung? get qrZahlung => iban == null
+      ? null
+      : QrZahlung(
+          iban: iban!,
+          name: name ?? '',
+          strasse: strasse,
+          plz: plz,
+          ort: ort,
+          betrag: betrag,
+          mitteilung: 'Spesen: $zweck',
+        );
 }
 
 /// GET members/me/spesen: eigene Spesen und die IBAN fuer die Auszahlung.
