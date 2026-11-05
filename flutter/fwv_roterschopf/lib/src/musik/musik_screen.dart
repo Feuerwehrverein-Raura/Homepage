@@ -25,6 +25,7 @@ import 'ergaenzen.dart';
 import 'modelle.dart';
 import 'laptop.dart';
 import 'offline.dart';
+import 'offline_zugang.dart';
 import 'player.dart';
 import 'titelsuche.dart';
 import 'zugang.dart';
@@ -75,6 +76,11 @@ class MusikScreen extends StatefulWidget {
 }
 
 class _MusikScreenState extends State<MusikScreen> {
+  /// Mit Ablage: ohne Netz antwortet, was auf dem Geraet gespeichert ist.
+  late final MusikZugang _zugang = switch (widget.ablage) {
+    final a? => OfflineMusikZugang(widget.zugang, a),
+    null => widget.zugang,
+  };
   MusikPlayer? _eigener;
   late final MusikPlayer _player =
       widget.player ??
@@ -93,13 +99,13 @@ class _MusikScreenState extends State<MusikScreen> {
 
   void _titelSuchen(BuildContext context) => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => TitelSucheSeite(zugang: widget.zugang, player: _player),
+      builder: (_) => TitelSucheSeite(zugang: _zugang, player: _player),
     ),
   );
 
   @override
   Widget build(BuildContext context) {
-    final zugang = widget.zugang;
+    final zugang = _zugang;
     final ablage = widget.ablage;
     // Am Computer: Cmd+F (macOS) bzw. Ctrl+F oeffnet die Titelsuche.
     return CallbackShortcuts(
@@ -138,15 +144,39 @@ class _MusikScreenState extends State<MusikScreen> {
                 ],
               ),
             ),
-            body: TabBarView(
+            body: Column(
               children: [
-                _PlaylistsSeite(zugang: zugang, player: _player, ablage: ablage),
-                if (ablage != null)
-                  InterpretenSeite(zugang: zugang, player: _player, ablage: ablage),
-                _SenderSeite(zugang: zugang, player: _player),
-                if (widget.ergaenzen) ErgaenzenSeite(zugang: zugang),
-                if (ablage != null) GespeichertSeite(player: _player, ablage: ablage),
-                if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
+                if (zugang case final OfflineMusikZugang o)
+                  ValueListenableBuilder(
+                    valueListenable: o.ohneNetz,
+                    builder: (context, ohne, _) => ohne
+                        ? Material(
+                            key: const Key('ohne-netz'),
+                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            child: ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.cloud_off),
+                              title: Text(
+                                'Ohne Netz – es ist zu sehen, was auf diesem ${ablage!.geraet} '
+                                'gespeichert ist.',
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _PlaylistsSeite(zugang: zugang, player: _player, ablage: ablage),
+                      if (ablage != null)
+                        InterpretenSeite(zugang: zugang, player: _player, ablage: ablage),
+                      _SenderSeite(zugang: zugang, player: _player),
+                      if (widget.ergaenzen) ErgaenzenSeite(zugang: zugang),
+                      if (ablage != null) GespeichertSeite(player: _player, ablage: ablage),
+                      if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
+                    ],
+                  ),
+                ),
               ],
             ),
             bottomNavigationBar: MiniPlayer(player: _player),
@@ -249,8 +279,7 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
                     icon: const Icon(Icons.shuffle),
                     onPressed: _alleAbspielen,
                   ),
-                  if (widget.ablage case final ablage?)
-                    alleSpeichernKnopf(ablage),
+                  if (widget.ablage case final ablage?) alleSpeichernKnopf(ablage),
                 ],
               ),
             ),

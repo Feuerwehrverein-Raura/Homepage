@@ -134,6 +134,16 @@ class _SpeichernKnopfState extends State<SpeichernKnopf> {
       listenable: ablage,
       builder: (context, _) {
         final s = ablage.sammlung(widget.id);
+        if (s == null && ablage.alleGespeichert && widget.id.startsWith('interpret:')) {
+          return Tooltip(
+            message: 'In „Alle Titel“ gespeichert',
+            child: Padding(
+              key: Key('in-alle-${widget.id}'),
+              padding: const EdgeInsets.all(12),
+              child: Icon(Icons.offline_pin, color: Theme.of(context).disabledColor),
+            ),
+          );
+        }
         if (s == null) {
           if (_bereitet) {
             return const Padding(

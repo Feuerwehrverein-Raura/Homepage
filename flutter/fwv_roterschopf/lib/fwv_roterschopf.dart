@@ -11,6 +11,7 @@ export 'src/musik/ergaenzen.dart';
 export 'src/musik/modelle.dart';
 export 'src/musik/musik_screen.dart';
 export 'src/musik/offline.dart';
+export 'src/musik/offline_zugang.dart';
 export 'src/musik/laptop.dart';
 export 'src/musik/player.dart';
 export 'src/musik/radio.dart';

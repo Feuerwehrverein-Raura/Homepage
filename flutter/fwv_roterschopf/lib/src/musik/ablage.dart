@@ -60,6 +60,9 @@ class GespeicherteSammlung {
   };
 
   static String playlistId(String id) => 'playlist:$id';
+
+  /// Id der Playlist auf dem Server, null bei Interpret und "Alle Titel".
+  String? get serverId => id.startsWith('playlist:') ? id.substring(9) : null;
   static String interpretId(String name) => 'interpret:$name';
 
   /// Die ganze Sammlung ("Alle Titel").
@@ -197,6 +200,26 @@ class MusikAblage extends ChangeNotifier {
     return null;
   }
 
+  /// Ist die ganze Sammlung gespeichert? Dann sind Interpreten darin
+  /// enthalten und werden nicht einzeln gefuehrt.
+  bool get alleGespeichert => sammlung(GespeicherteSammlung.alleId) != null;
+
+  /// Alle Titel, deren Datei hier liegt (fuer die Ansicht ohne Netz).
+  List<MusikTitel> get lokaleTitel {
+    final gesehen = <String>{};
+    return [
+      for (final s in _sammlungen)
+        for (final t in s.titel)
+          if (_dateien.containsKey(t.pfad) && gesehen.add(t.pfad)) t,
+    ];
+  }
+
+  /// Gespeicherte Playlists (ohne Interpreten und "Alle Titel").
+  List<GespeicherteSammlung> get gespeichertePlaylists => [
+    for (final s in _sammlungen)
+      if (s.serverId != null) s,
+  ];
+
   /// Die Datei des Titels, wenn er gespeichert ist.
   File? datei(String pfad) {
     final d = _dateien[pfad];
@@ -231,6 +254,8 @@ class MusikAblage extends ChangeNotifier {
         for (final s in (j['sammlungen'] as List? ?? const [])) {
           if (s is Map) _sammlungen.add(GespeicherteSammlung.ausJson(Map<String, dynamic>.from(s)));
         }
+        // Frueher blieben Interpreten neben "Alle Titel" stehen.
+        if (_sammlungen.any((s) => s.alle)) _sammlungen.removeWhere((s) => s.interpret);
       } on FormatException {
         // Kaputtes Verzeichnis: neu anfangen, die Dateien raeumt _aufraeumen weg.
       }
@@ -245,7 +270,17 @@ class MusikAblage extends ChangeNotifier {
 
   File _verzeichnis(Directory ort) => File('${ort.path}${Platform.pathSeparator}ablage.json');
 
-  Future<void> _schreiben() async {
+  Future<void>? _schreibt;
+
+  /// Nacheinander, nie gleichzeitig: Zwei Schreiber auf dieselbe .neu-Datei
+  /// liessen das zweite Umbenennen scheitern - und damit den Download.
+  Future<void> _schreiben() {
+    final vorher = _schreibt ?? Future<void>.value();
+    final jetzt = _schreibt = vorher.catchError((Object _) {}).then((_) => _schreibenJetzt());
+    return jetzt;
+  }
+
+  Future<void> _schreibenJetzt() async {
     final ort = _ort!;
     final f = _verzeichnis(ort);
     final neu = File('${f.path}.neu');
@@ -285,6 +320,8 @@ class MusikAblage extends ChangeNotifier {
   /// Alle [titel] des Interpreten [name] speichern.
   Future<void> interpretSpeichern(String name, List<MusikTitel> titel) async {
     await laden();
+    // Steckt schon in "Alle Titel".
+    if (alleGespeichert) return;
     await _merken(
       GespeicherteSammlung(
         id: GespeicherteSammlung.interpretId(name),
@@ -367,6 +404,9 @@ class MusikAblage extends ChangeNotifier {
   }
 
   Future<void> _merken(GespeicherteSammlung s) async {
+    // "Alle Titel" enthaelt jeden Interpreten - die einzelnen braucht es
+    // dann nicht mehr (ihre Dateien bleiben, "Alle Titel" braucht sie).
+    if (s.alle) _sammlungen.removeWhere((x) => x.interpret);
     final i = _sammlungen.indexWhere((x) => x.id == s.id);
     if (i < 0) {
       _sammlungen.add(s);

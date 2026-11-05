@@ -47,6 +47,18 @@ class _Zugang extends MusikZugang {
   }
 
   @override
+  Future<List<PlaylistKurz>> playlists() async {
+    if (_netz case final f?) throw f;
+    return const [PlaylistKurz(id: 'p1', name: 'Vom Server')];
+  }
+
+  @override
+  Future<Bibliothek> bibliothek({String? suche}) async {
+    if (_netz case final f?) throw f;
+    return const Bibliothek();
+  }
+
+  @override
   Future<List<Uri>> hoerAdressen(List<String> pfade) async {
     if (_netz case final f?) throw f;
     freigaben.add(pfade);
@@ -217,23 +229,60 @@ void main() {
 
   test('Alles speichern: ganze Sammlung zuletzt geladen, beim Abgleich neue Titel dazu', () async {
     final a = neueAblage();
-    // Der erste Titel haengt, bis auch der Interpret eingetragen ist.
-    sperre = Completer<void>();
     await a.allesSpeichern(zugang.alle);
+    // Steckt schon in "Alle Titel": kein eigener Eintrag.
     await a.interpretSpeichern('Span', [_span]);
-    sperre!.complete();
-    sperre = null;
     await fertig(a);
     expect(a.sammlung(GespeicherteSammlung.alleId)!.titel, hasLength(3));
+    expect(a.sammlung(GespeicherteSammlung.interpretId('Span')), isNull);
     expect(a.anzahlTitel, 3);
-    // Der erste Titel lief schon; danach kam der Interpret vor dem Rest.
-    expect(geholt, [_queen.pfad, _span.pfad, _queen2.pfad]);
 
     const neu = MusikTitel(pfad: 'Baschi/Gib mer e Chance.mp3', interpret: 'Baschi');
     zugang.alle = [...zugang.alle, neu];
     await a.aktualisieren();
     await fertig(a);
     expect(a.datei(neu.pfad), isNotNull);
+  });
+
+  test('Alle Titel ersetzt einzeln gespeicherte Interpreten, Playlists bleiben', () async {
+    final a = neueAblage();
+    await a.interpretSpeichern('Span', [_span]);
+    await a.playlistSpeichern(const Playlist(id: 'p1', name: 'Apéro', titel: [_span]));
+    await fertig(a);
+    await a.allesSpeichern(zugang.alle);
+    await fertig(a);
+    expect(a.sammlungen.map((s) => s.id), [GespeicherteSammlung.alleId, 'playlist:p1']);
+    expect(a.datei(_span.pfad), isNotNull, reason: 'Datei bleibt, Alle Titel braucht sie');
+    expect(a.alleGespeichert, isTrue);
+    expect(a.gespeichertePlaylists.single.serverId, 'p1');
+    expect(a.lokaleTitel.map((t) => t.pfad), unorderedEquals(zugang.alle.map((t) => t.pfad)));
+  });
+
+  test('Ohne Netz: Titel, Playlists und Suche aus der Ablage', () async {
+    final a = neueAblage();
+    await a.allesSpeichern(zugang.alle);
+    await a.playlistSpeichern(const Playlist(id: 'p1', name: 'Apéro', titel: [_span]));
+    await fertig(a);
+    final o = OfflineMusikZugang(zugang, a);
+
+    expect((await o.playlists()).single.name, 'Vom Server');
+    expect(o.ohneNetz.value, isFalse);
+
+    zugang.offline = true;
+    expect(await o.alleTitel(), hasLength(3));
+    expect(o.ohneNetz.value, isTrue);
+    final p = await o.playlists();
+    expect(p.single.id, 'p1');
+    expect(p.single.anzahl, 1);
+    expect((await o.playlist('p1')).titel.single.pfad, _span.pfad);
+    expect((await o.bibliothek(suche: 'queen radio')).titel.single.pfad, _queen2.pfad);
+    expect((await o.bibliothek()).gesamt, 3);
+    // Nicht gespeichert: weiterhin der Fehler.
+    await expectLater(o.playlist('p2'), throwsA(isA<ApiFehler>()));
+
+    zugang.offline = false;
+    await o.alleTitel();
+    expect(o.ohneNetz.value, isFalse);
   });
 
   test('Platzbedarf: nur was noch fehlt, freier Platz gemessen, zu wenig Platz erkannt', () async {
