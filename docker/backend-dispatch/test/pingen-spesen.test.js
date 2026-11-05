@@ -11,7 +11,7 @@ function falscheDb(zeilen, { kassier = { vorname: 'Kurt' } } = {}) {
         async query(sql, werte) {
             if (sql.includes('FROM dispatch_log')) return { rows: zeilen };
             if (sql.includes("'%kassier%'")) return { rows: kassier ? [kassier] : [] };
-            if (sql.includes("'%aktuar%'")) return { rows: [{ vorname: 'Stefan', nachname: 'Müller' }] };
+            if (sql.includes("'%aktuar%'")) return { rows: [{ vorname: 'Stefan', nachname: 'Müller', iban: 'CH9300762011623852957' }] };
             if (sql.includes('FROM pingen_abrechnungen WHERE spesen_id IS NULL')) return { rows: [] };
             if (sql.includes('INSERT INTO pingen_abrechnungen')) { aenderungen.push(['abrechnung:' + werte[2] + ':' + werte[4].join(',')]); return { rows: [] }; }
             if (sql.includes('INSERT INTO dispatch_log')) { aenderungen.push(['mail']); return { rows: [] }; }
@@ -83,6 +83,7 @@ test('Ohne Kassier im Mitgliederverzeichnis: trotzdem ans Postfach', async () =>
     assert.equal(r.abgerechnet, 1);
     assert.equal(vorgemerkt[0].to, 'kassier@fwv-raura.ch');
     assert.match(vorgemerkt[0].text, /^Hallo Kassier/);
+    assert.match(vorgemerkt[0].text, /Auszahlung: CH93 0076 2011 6238 5295 7 \(Stefan Müller\)/);
 });
 
 test('Ein Brief: Einzahl im Betreff', () => {
@@ -90,6 +91,7 @@ test('Ein Brief: Einzahl im Betreff', () => {
         { kassier: { vorname: 'K' }, aktuar: null, datum: '04.11.2026' });
     assert.equal(m.subject, 'Spesenabrechnung Pingen 04.11.2026: 1 Brief, CHF 1.63');
     assert.match(m.text, /hat der Aktuar vorgestreckt/);
+    assert.match(m.text, /IBAN fehlt/);
 });
 
 test('Uebersicht: Monate, abgerechnet (Nachtrag vor AB und taeglich), offen, wartend', () => {

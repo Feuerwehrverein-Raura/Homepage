@@ -34,13 +34,21 @@ function franken(n) {
     return `CHF ${Number(n).toFixed(2)}`;
 }
 
+/** "CH9300762011623852957" -> "CH93 0076 2011 6238 5295 7" */
+function ibanText(iban) {
+    const roh = String(iban || '').replace(/\s+/g, '').toUpperCase();
+    return roh ? roh.replace(/(.{4})(?=.)/g, '$1 ') : null;
+}
+
 /** Text der Spesenabrechnung: eine Zeile je Brief, Summe, wer zurueckbekommt. */
 function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
     // Auf Rappen runden: 14 x 1.63 + ... ergibt sonst 22.299999999999994.
     const summe = Math.round(briefe.reduce((s, b) => s + Number(b.kosten), 0) * 100) / 100;
     const breite = Math.max(...briefe.map(b => b.name.length));
     const zeilen = briefe.map(b => `  ${b.name.padEnd(breite)}  ${franken(b.kosten)}  ${b.betreff}`);
-    const wer = aktuar ? `${`${aktuar.vorname} ${aktuar.nachname}`.trim()} (Aktuar)` : 'der Aktuar';
+    const name = aktuar ? `${aktuar.vorname} ${aktuar.nachname}`.trim() : null;
+    const wer = name ? `${name} (Aktuar)` : 'der Aktuar';
+    const iban = ibanText(aktuar?.iban);
     return {
         subject: `Spesenabrechnung Pingen ${datum}: ${briefe.length} ${briefe.length === 1 ? 'Brief' : 'Briefe'}, ${franken(summe)}`,
         text: [
@@ -53,6 +61,9 @@ function abrechnungBauen(briefe, { kassier, aktuar, datum }) {
             `Total: ${franken(summe)}`,
             '',
             `Das Pingen-Guthaben hat ${wer} vorgestreckt – bitte zurückerstatten.`,
+            iban ? `Auszahlung: ${iban} (${name})` : 'Auszahlung: IBAN fehlt im Profil des Aktuars.',
+            '',
+            'Als Spesen eingetragen: «Bezahlt» in der Mitglieder-App unter Vorstand → Spesen.',
             'Belege und Rechnungen: https://app.pingen.com',
         ].join('\n'),
         summe,
@@ -104,7 +115,7 @@ async function spesenAbrechnen(pool, { briefLesen, senden, datum, log = () => {}
         email: KASSIER_ADRESSE,
     };
     const aktuar = (await pool.query(
-        "SELECT vorname, nachname FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1"
+        "SELECT vorname, nachname, iban FROM members WHERE funktion ILIKE '%aktuar%' ORDER BY nachname, vorname LIMIT 1"
     )).rows[0];
 
     const mail = abrechnungBauen(belastet, { kassier, aktuar, datum });
