@@ -88,10 +88,11 @@ VIDEO_ZUSATZ = (r"(?i)\s*[\(\[](?:official\s+)?(?:4k\s+|hd\s+|hq\s+)?(?:music\s+
 # Videotitel "<Interpret> - <Titel>": den Interpreten vorne abschneiden,
 # aber nur, wenn er derselbe ist wie der des Kanals (sonst wird aus
 # "Captain Jack - Short Mix" der Band Captain Jack nichts Falsches). Die
-# Schreibweise aus dem Titel gewinnt ("zebrahead" -> "Zebrahead").
+# Schreibweise aus dem Titel gewinnt ("zebrahead" -> "Zebrahead"). Nicht bei
+# Fassungen wie "Captain Jack - Short Mix": da ist "Captain Jack" der Songname.
 # Trenner ohne Doppelpunkt: --parse-metadata trennt QUELLE:ZIEL am ersten ":".
 TITEL_INTERPRET = ("%(artist,uploader)s \u27eb %(title)s"
-                   ":(?i)^(?P<_i>.+?) \u27eb (?P<artist>(?P=_i)) - (?P<title>.+)$")
+                   ":(?i)^(?P<_i>.+?) \u27eb (?P<artist>(?P=_i)) - (?P<title>(?!.*\\b(?:mix|remix|edit|version|rework)$).+)$")
 
 _auftraege = []
 _sperre = threading.Lock()

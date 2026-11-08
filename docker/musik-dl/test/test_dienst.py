@@ -136,7 +136,8 @@ class DienstTest(unittest.TestCase):
             return (m.group("artist"), m.group("title")) if m else None
         self.assertEqual(vorne("Rammstein", "Rammstein - Du Hast"), ("Rammstein", "Du Hast"))
         self.assertEqual(vorne("zebrahead", "Zebrahead - Ignite"), ("Zebrahead", "Ignite"))
-        self.assertEqual(vorne("Captain Jack", "Captain Jack - Short Mix"), ("Captain Jack", "Short Mix"))
+        self.assertIsNone(vorne("Captain Jack", "Captain Jack - Short Mix"))
+        self.assertIsNone(vorne("Helene Fischer", "Helene Fischer - Atemlos - Remix"))
         self.assertIsNone(vorne("Span", "Louenesee"))
         self.assertIsNone(vorne("SomeLabel", "Bligg - Us Mänsch"))
 
