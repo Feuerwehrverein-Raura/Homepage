@@ -100,6 +100,21 @@ class DienstTest(unittest.TestCase):
         # Arbeitsordner ist weg.
         self.assertFalse(os.path.exists(os.path.join(self.d.ARBEIT, a["id"])))
 
+    def test_kanal_zusaetze_fallen_weg(self):
+        """"Rammstein Official" stand neben "Rammstein" in der Sammlung."""
+        import re
+        befehl = self.d.befehl_fuer("https://youtu.be/x", "/x")
+        i = befehl.index("--replace-in-metadata")
+        self.assertEqual(befehl[i:i + 4],
+                         ["--replace-in-metadata", "uploader,channel", self.d.KANAL_ZUSATZ, ""])
+        weg = lambda s: re.sub(self.d.KANAL_ZUSATZ, "", s)
+        self.assertEqual(weg("Rammstein Official"), "Rammstein")
+        self.assertEqual(weg("Rammstein Official Channel"), "Rammstein")
+        self.assertEqual(weg("RammsteinVEVO"), "Rammstein")
+        self.assertEqual(weg("Die Toten Hosen - Topic"), "Die Toten Hosen")
+        self.assertEqual(weg("Official Hige Dandism"), "Official Hige Dandism")
+        self.assertEqual(weg("Span"), "Span")
+
     def test_youtube_mit_yt_dlp_spotify_mit_spotdl(self):
         yt = self.d.befehl_fuer("https://www.youtube.com/watch?v=uoym8LBzsPs", "/a")
         self.assertEqual(yt[0], "yt-dlp")
