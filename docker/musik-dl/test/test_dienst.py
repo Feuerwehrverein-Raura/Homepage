@@ -115,6 +115,31 @@ class DienstTest(unittest.TestCase):
         self.assertEqual(weg("Official Hige Dandism"), "Official Hige Dandism")
         self.assertEqual(weg("Span"), "Span")
 
+    def test_videotitel_wird_bereinigt(self):
+        """Aus Musikvideos wurde "Rammstein - Rammstein - Du Hast (Official 4K Video)"."""
+        import re
+        befehl = self.d.befehl_fuer("https://youtu.be/x", "/x")
+        self.assertIn(self.d.VIDEO_ZUSATZ, befehl)
+        i = befehl.index("--parse-metadata")
+        self.assertEqual(befehl[i + 1], self.d.TITEL_INTERPRET)
+        weg = lambda s: re.sub(self.d.VIDEO_ZUSATZ, "", s)
+        self.assertEqual(weg("Rammstein - Du Hast (Official 4K Video)"), "Rammstein - Du Hast")
+        self.assertEqual(weg("FiNCH - WENN DU DUMM BiST (Official Music Video)"), "FiNCH - WENN DU DUMM BiST")
+        self.assertEqual(weg("Zebrahead - Ignite (Lyric Video)"), "Zebrahead - Ignite")
+        self.assertEqual(weg("Bligg - Us Mänsch [HD]"), "Bligg - Us Mänsch")
+        self.assertEqual(weg("Adele - Hello (Live at the BBC)"), "Adele - Hello (Live at the BBC)")
+        # Wie yt-dlp --parse-metadata: QUELLE ausgefuellt, ZIEL als Ausdruck.
+        quelle, ziel = self.d.TITEL_INTERPRET.split(":", 1)
+        self.assertNotIn(":", quelle)
+        def vorne(interpret, titel):
+            m = re.search(ziel, quelle.replace("%(artist,uploader)s", interpret).replace("%(title)s", titel))
+            return (m.group("artist"), m.group("title")) if m else None
+        self.assertEqual(vorne("Rammstein", "Rammstein - Du Hast"), ("Rammstein", "Du Hast"))
+        self.assertEqual(vorne("zebrahead", "Zebrahead - Ignite"), ("Zebrahead", "Ignite"))
+        self.assertEqual(vorne("Captain Jack", "Captain Jack - Short Mix"), ("Captain Jack", "Short Mix"))
+        self.assertIsNone(vorne("Span", "Louenesee"))
+        self.assertIsNone(vorne("SomeLabel", "Bligg - Us Mänsch"))
+
     def test_youtube_mit_yt_dlp_spotify_mit_spotdl(self):
         yt = self.d.befehl_fuer("https://www.youtube.com/watch?v=uoym8LBzsPs", "/a")
         self.assertEqual(yt[0], "yt-dlp")

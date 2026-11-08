@@ -79,6 +79,20 @@ ERLAUBTE_SEITEN = YOUTUBE_SEITEN + ("open.spotify.com",)
 # Zusaetze am Ende eines Kanalnamens, die nicht zum Interpreten gehoeren.
 KANAL_ZUSATZ = r"(?i)(?:\s*-\s*Topic|\s*VEVO|\s+Official(?:\s+(?:Channel|Music))?)$"
 
+# Zusaetze in Videotiteln: "(Official 4K Video)", "(Lyric Video)", "[HD]" ...
+# Live-Fassungen u.ae. bleiben stehen, die sind ein anderes Stueck.
+VIDEO_ZUSATZ = (r"(?i)\s*[\(\[](?:official\s+)?(?:4k\s+|hd\s+|hq\s+)?(?:music\s+|lyrics?\s+)?"
+                r"(?:video|audio|visuali[sz]er|lyrics?|clip)(?:\s+(?:4k|hd|hq))?[\)\]]"
+                r"|\s*[\(\[](?:4k|hd|hq)[\)\]]")
+
+# Videotitel "<Interpret> - <Titel>": den Interpreten vorne abschneiden,
+# aber nur, wenn er derselbe ist wie der des Kanals (sonst wird aus
+# "Captain Jack - Short Mix" der Band Captain Jack nichts Falsches). Die
+# Schreibweise aus dem Titel gewinnt ("zebrahead" -> "Zebrahead").
+# Trenner ohne Doppelpunkt: --parse-metadata trennt QUELLE:ZIEL am ersten ":".
+TITEL_INTERPRET = ("%(artist,uploader)s \u27eb %(title)s"
+                   ":(?i)^(?P<_i>.+?) \u27eb (?P<artist>(?P=_i)) - (?P<title>.+)$")
+
 _auftraege = []
 _sperre = threading.Lock()
 _schlange = queue.Queue()
@@ -219,6 +233,9 @@ def befehl_fuer(quelle, ordner):
             # der Sammlung (Rammstein und "Rammstein Official", 08.11.2026).
             # Gleicher Ausdruck im Helfer (pjc-docker, matrix-yt-dl/fwv-musik.js).
             "--replace-in-metadata", "uploader,channel", KANAL_ZUSATZ, "",
+            # Aus "Rammstein - Du Hast (Official 4K Video)" wird "Du Hast".
+            "--replace-in-metadata", "title,track", VIDEO_ZUSATZ, "",
+            "--parse-metadata", TITEL_INTERPRET,
             "--output", os.path.join(ordner, "%(artist,uploader,channel)s - %(track,title)s.%(ext)s"),
             *_cookies("--cookies"),
             "--", quelle,
