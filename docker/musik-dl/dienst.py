@@ -76,6 +76,9 @@ HOECHSTENS_BYTES = 80 * 1024 * 1024  # eine MP3 vom Helfer
 
 ERLAUBTE_SEITEN = YOUTUBE_SEITEN + ("open.spotify.com",)
 
+# Zusaetze am Ende eines Kanalnamens, die nicht zum Interpreten gehoeren.
+KANAL_ZUSATZ = r"(?i)(?:\s*-\s*Topic|\s*VEVO|\s+Official(?:\s+(?:Channel|Music))?)$"
+
 _auftraege = []
 _sperre = threading.Lock()
 _schlange = queue.Queue()
@@ -210,8 +213,12 @@ def befehl_fuer(quelle, ordner):
         return [
             "yt-dlp", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "0",
             "--embed-metadata", "--no-progress",
-            # Offizielle Tonspuren heissen "<Interpret> - Topic".
-            "--replace-in-metadata", "uploader,channel", r" - Topic$", "",
+            # Ohne eigenes Interpreten-Feld nimmt yt-dlp den Kanal. Der heisst
+            # oft "<Interpret> - Topic", "<Interpret> Official" oder
+            # "<Interpret>VEVO" -- sonst steht derselbe Interpret zweimal in
+            # der Sammlung (Rammstein und "Rammstein Official", 08.11.2026).
+            # Gleicher Ausdruck im Helfer (pjc-docker, matrix-yt-dl/fwv-musik.js).
+            "--replace-in-metadata", "uploader,channel", KANAL_ZUSATZ, "",
             "--output", os.path.join(ordner, "%(artist,uploader,channel)s - %(track,title)s.%(ext)s"),
             *_cookies("--cookies"),
             "--", quelle,
