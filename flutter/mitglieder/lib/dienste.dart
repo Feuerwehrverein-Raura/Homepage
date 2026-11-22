@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Rect;
 import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:fwv_anlass/fwv_anlass.dart';
+import 'package:fwv_anlass/fwv_anlass.dart' as fwv_anlass show dateiAnsehen;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_lager/fwv_lager.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
@@ -62,7 +63,7 @@ class Dienste {
     Future<String> Function()? appVersion,
     Future<bool> Function(Uri adresse)? linkOeffnen,
     DateiTeilen? dateiTeilen,
-    this.pdfAnzeigen,
+    this.dateiAnzeigen,
     DateTime Function()? jetzt,
     Plattform? plattform,
     Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
@@ -161,10 +162,11 @@ class Dienste {
           ? DesktopAppUpdate(appVersion: _appVersionAusPaket)
           : const KeinAppUpdate(),
       dateiTeilen: istDesktop ? dateiSpeichernUndOeffnen : null,
-      pdfAnzeigen: (context, bytes, name) => pdfImViewer(
+      dateiAnzeigen: (context, bytes, name, typ) => dateiImViewer(
         context,
         bytes,
         name,
+        typ,
         istDesktop ? dateiSpeichernUndOeffnen : _teilenMitSharePlus,
       ),
       schopfPruefTakt: const Duration(minutes: 10),
@@ -242,9 +244,28 @@ class Dienste {
   /// dem Desktop: unter "Downloads" speichern und oeffnen.
   final DateiTeilen dateiTeilen;
 
-  /// PDF im Viewer der App zeigen (pdf/pdf_ansicht.dart). Ohne (Tests) geht
-  /// «ansehen» wie bisher ins Teilen-Menue.
-  final Future<void> Function(BuildContext context, Uint8List bytes, String dateiname)? pdfAnzeigen;
+  /// PDF oder Foto im Viewer der App zeigen (pdf/pdf_ansicht.dart,
+  /// pdf/bild_ansicht.dart). Ohne (Tests) geht «ansehen» wie bisher ins
+  /// Teilen-Menue. Aufrufen ueber [dateiAnsehen].
+  final DateiAnzeigen? dateiAnzeigen;
+
+  /// Datei «ansehen» (Beleg, Arbeitsplan): PDF und Fotos im Viewer der App,
+  /// anderes ins Teilen-Menue - derselbe Weg wie im Vorstand
+  /// (fwv_anlass [dateiAnsehen]).
+  Future<void> dateiAnsehen(
+    BuildContext context,
+    Uint8List bytes,
+    String dateiname,
+    String? mimeTyp, {
+    Rect? ursprung,
+  }) => fwv_anlass.dateiAnsehen(
+    context,
+    _verwaltungsUmgebung,
+    bytes,
+    dateiname,
+    mimeTyp,
+    ursprung: ursprung,
+  );
 
   /// "Jetzt" (in Tests fest, z.B. fuer den Monat im Kalender).
   final DateTime Function() jetzt;
@@ -371,7 +392,7 @@ class Dienste {
     pdfWaehlen: pdfWaehlen,
     bildWaehlen: bildWaehlen,
     anhangWaehlen: _anhangMitFilePicker,
-    pdfAnzeigen: pdfAnzeigen,
+    dateiAnzeigen: dateiAnzeigen,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.

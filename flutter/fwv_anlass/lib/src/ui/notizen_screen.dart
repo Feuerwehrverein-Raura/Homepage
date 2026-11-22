@@ -115,7 +115,16 @@ class _NotizenAnsichtState extends State<NotizenAnsicht> {
     final ursprung = stelleVon(knopf);
     try {
       final bytes = await _dienst.anhang(_id, n.id, a.id);
-      await widget.verwaltung.umgebung.dateiTeilen(bytes, a.dateiname, a.typ, ursprung: ursprung);
+      // Fotos und PDFs im Viewer der App, anderes ins Teilen-Menue.
+      if (!mounted) return;
+      await dateiAnsehen(
+        context,
+        widget.verwaltung.umgebung,
+        bytes,
+        a.dateiname,
+        a.typ,
+        ursprung: ursprung,
+      );
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
     }

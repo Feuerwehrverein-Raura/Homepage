@@ -46,11 +46,9 @@ class _SpesenScreenState extends State<SpesenScreen> {
   Future<void> _beleg(Spesen s) async {
     try {
       final bytes = await _spesen.meinBeleg(s.id);
-      await widget.dienste.dateiTeilen(
-        bytes,
-        s.belegName ?? 'Beleg',
-        s.belegTyp ?? 'application/octet-stream',
-      );
+      // PDF und Foto im Viewer der App (Teilen dort oben in der Leiste).
+      if (!mounted) return;
+      await widget.dienste.dateiAnsehen(context, bytes, s.belegName ?? 'Beleg', s.belegTyp);
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
     }

@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fwv_anlass/fwv_anlass.dart' show DateiAnzeigen;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/dienste.dart';
 import 'package:fwv_mitglieder/einstellungen/app_update.dart';
@@ -274,6 +275,7 @@ void main() {
     GeraeteAngabenLesen? geraeteAngaben,
     AppUpdate update = const KeinAppUpdate(),
     DateTime Function()? jetzt,
+    DateiAnzeigen? dateiAnzeigen,
   }) async {
     // Ohne nativen Kontakt-Abgleich (wie heute): der Kanal meldet
     // MissingPluginException — sofort, nicht erst ueber die echte Engine.
@@ -317,6 +319,7 @@ void main() {
       geraeteAngaben: geraeteAngaben,
       update: update,
       jetzt: jetzt,
+      dateiAnzeigen: dateiAnzeigen,
     );
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
@@ -625,6 +628,22 @@ void main() {
       expect(find.textContaining('auf CH93 0076 2011 6238 5295 7'), findsOneWidget);
       await tippen(tester, find.byKey(const Key('spesen-beleg')));
       expect(geteilt.single, ('Quittung.jpg', 'JPEGBELEG'));
+    });
+
+    testWidgets('Beleg ansehen: Foto im Viewer der App, nicht im Teilen-Menue', (tester) async {
+      final angezeigt = <(String, String, String)>[];
+      await starten(
+        tester,
+        dateiAnzeigen: (context, bytes, name, typ) async =>
+            angezeigt.add((name, typ, utf8.decode(bytes))),
+      );
+      await reiter(tester, 'Profil');
+      await sichtbar(tester, find.byKey(const Key('profil-spesen')));
+      await tippen(tester, find.byKey(const Key('profil-spesen')));
+      await tippen(tester, find.text('Klebeband Chilbi'));
+      await tippen(tester, find.byKey(const Key('spesen-beleg')));
+      expect(angezeigt.single, ('Quittung.jpg', 'image/jpeg', 'JPEGBELEG'));
+      expect(geteilt, isEmpty);
     });
 
     testWidgets('Mit IBAN: Betrag, Zweck, Kategorie, Foto-Beleg, einreichen', (tester) async {

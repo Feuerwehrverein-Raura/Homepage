@@ -233,6 +233,10 @@ abstract class AnlassVerwaltungZugang {
       throw const NichtErlaubt();
 }
 
+/// Zeigt eine Datei im Viewer der App: `(context, bytes, dateiname, mimeTyp)`.
+typedef DateiAnzeigen =
+    Future<void> Function(BuildContext context, Uint8List bytes, String dateiname, String mimeTyp);
+
 /// Was die Oberflaeche vom Geraet braucht (Teilen-Menue, Kamera, Links) —
 /// von der App mitgegeben, damit das Paket ohne Plattform-Plugins auskommt
 /// und sich testen laesst.
@@ -245,13 +249,15 @@ class VerwaltungsUmgebung {
     this.pdfWaehlen,
     this.bildWaehlen,
     this.anhangWaehlen,
-    this.pdfAnzeigen,
+    this.dateiAnzeigen,
   });
 
-  /// PDF in einem eigenen Viewer der App zeigen (Blaettern, Zoomen, von dort
-  /// Drucken oder Teilen). Ohne diese Funktion geht ein PDF direkt ins
-  /// Teilen-Menue - so in den Tests und wo die App keinen Viewer hat.
-  final Future<void> Function(BuildContext context, Uint8List bytes, String dateiname)? pdfAnzeigen;
+  /// PDF oder Bild in einem eigenen Viewer der App zeigen (Blaettern,
+  /// Zoomen, von dort Teilen; PDF auch Drucken). Aufgerufen nur fuer Typen,
+  /// die [inAppAnzeigbar] sind (ueber [dateiAnsehen]). Ohne diese Funktion
+  /// geht die Datei direkt ins Teilen-Menue - so in den Tests und wo die App
+  /// keinen Viewer hat.
+  final DateiAnzeigen? dateiAnzeigen;
 
   /// Eigenen Anhang fuer eine Nachricht waehlen (PDF, JPG, PNG, bis 10 MB);
   /// null bei Abbruch. Ohne diese Funktion fehlt «Datei anhängen».
