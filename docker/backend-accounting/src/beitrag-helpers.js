@@ -28,22 +28,48 @@ function formatQRReference(qrRef27) {
         r.slice(12, 17) + ' ' + r.slice(17, 22) + ' ' + r.slice(22, 27);
 }
 
+/** "Hauptstrasse 12a" -> { strasse: 'Hauptstrasse', nummer: '12a' } (wie qr-zahlung.js). */
+function strasseTeilen(s) {
+    const t = String(s || '').trim().replace(/\s+/g, ' ');
+    const m = /^(.*\D)\s+(\d+(?:\s?[a-zA-Z])?(?:\s?[/-]\s?\d+[a-zA-Z]?)?)$/.exec(t);
+    if (!m) return { strasse: t, nummer: '' };
+    return { strasse: m[1].trim(), nummer: m[2].replace(/ /g, '') };
+}
+
+/**
+ * Zahler fuer QR und Druck — nur wenn Name, PLZ und Ort da sind. Fehlt etwas,
+ * bleibt er im QR leer und gedruckt steht das leere Feld zum Ausfuellen
+ * (SIX: Druck und QR-Inhalt muessen uebereinstimmen).
+ */
+function zahlerAus(member) {
+    const name = `${member?.nachname || ''} ${member?.vorname || ''}`.trim();
+    const plz = String(member?.plz || '').trim();
+    const ort = String(member?.ort || '').trim();
+    if (!name || !plz || !ort) return null;
+    return { name, strasse: String(member?.strasse || '').trim(), plz, ort };
+}
+
 /**
  * Baut den SPC-Payload fuer den Swiss QR-Bill (v0200).
  * Feldreihenfolge nach SIX Implementation Guidelines: 31 Zeilen.
+ * Adressen strukturiert (S): Strasse und Hausnummer in eigenen Feldern.
  */
 function buildSwissQRPayload({ iban, amount, reference, debtorName, debtorStreet, debtorPlz, debtorOrt, message }) {
+    const zahler = debtorName && debtorPlz && debtorOrt;
+    const { strasse, nummer } = strasseTeilen(debtorStreet);
     return [
         'SPC', '0200', '1',
         iban,
         // Creditor (Feuerwehrverein Raura)
-        'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
+        'S', 'Feuerwehrverein Raura', 'Marksteinweg', '12', '4304', 'Giebenach', 'CH',
         // Ultimate Creditor (leer)
         '', '', '', '', '', '', '',
         // Betrag + Waehrung
         amount, 'CHF',
-        // Ultimate Debtor
-        'S', debtorName || '', debtorStreet || '', '', debtorPlz || '', debtorOrt || '', 'CH',
+        // Ultimate Debtor (leer, wenn unvollstaendig)
+        ...(zahler
+            ? ['S', debtorName, strasse, nummer, debtorPlz, debtorOrt, 'CH']
+            : ['', '', '', '', '', '', '']),
         // Zahlungsreferenz
         'QRR', reference, message || '',
         // Trailer
@@ -51,13 +77,41 @@ function buildSwissQRPayload({ iban, amount, reference, debtorName, debtorStreet
     ].join('\n');
 }
 
-/** Generiert das QR-Code-Bild als Data-URI (PNG). */
+/**
+ * QR-Code als SVG-Data-URI mit Schweizerkreuz in der Mitte (SIX 6.4.2.6:
+ * Kreuz 7 x 7 mm auf 46 x 46 mm, schwarzes Quadrat mit weissem Rand und
+ * weissem Kreuz), Fehlerkorrektur M. Ohne Kreuz sah der Code nicht aus wie
+ * eine QR-Rechnung, und manche Banking-Apps lehnen ihn ab.
+ * Gleich gebaut wie backend-dispatch/src/qr-zahlung.js (svg).
+ */
 async function renderQRDataUri(payload) {
-    return await QRCode.toDataURL(payload, {
-        errorCorrectionLevel: 'M',
-        margin: 0,
-        width: 600
-    });
+    const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
+    const n = qr.modules.size;
+    let pfad = '';
+    for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) if (qr.modules.get(y, x)) pfad += `M${x} ${y}h1v1h-1z`;
+    }
+    const k = n * 7 / 46;
+    const o = (n - k) / 2;
+    const r = k * 0.06;
+    const b = k * 0.18;
+    const l = b * (1 + 2 * 7 / 6);
+    const m = n / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges">`
+        + `<rect width="${n}" height="${n}" fill="#fff"/><path d="${pfad}" fill="#000"/>`
+        + `<rect x="${o}" y="${o}" width="${k}" height="${k}" fill="#fff"/>`
+        + `<rect x="${o + r}" y="${o + r}" width="${k - 2 * r}" height="${k - 2 * r}" fill="#000"/>`
+        + `<rect x="${m - b / 2}" y="${m - l / 2}" width="${b}" height="${l}" fill="#fff"/>`
+        + `<rect x="${m - l / 2}" y="${m - b / 2}" width="${l}" height="${b}" fill="#fff"/></svg>`;
+    return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+}
+
+/** Zahler gedruckt: "Name<br>Strasse<br>PLZ Ort", oder '' wenn unbekannt. */
+function zahlerHtml(member) {
+    const z = zahlerAus(member);
+    if (!z) return '';
+    const e = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return [z.name, z.strasse, `${z.plz} ${z.ort}`].filter(Boolean).map(e).join('<br>');
 }
 
 /** Kassier-Daten aus members-Liste extrahieren (analog vorstand.html getKassier). */
@@ -183,7 +237,7 @@ function generateBeitragEmailHTML({ member, payment, settings, kassier, qrImgSrc
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:2px;">Referenz</div>
                 <div style="font-size:7pt;margin-bottom:6px;">${refFormatted}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:2px;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:160px;height:50px;margin-bottom:8px;"></div>
+                ${zahlerHtml(member) ? `<div style="font-size:7pt;margin-bottom:8px;">${zahlerHtml(member)}</div>` : `<div style="border:1px solid #000;width:160px;height:50px;margin-bottom:8px;"></div>`}
                 <table width="160"><tr>
                     <td><div style="font-size:6pt;font-weight:bold;">Währung</div><div>CHF</div></td>
                     <td align="right"><div style="font-size:6pt;font-weight:bold;">Betrag</div><div>${betragFormatted}</div></td>
@@ -214,7 +268,7 @@ function generateBeitragEmailHTML({ member, payment, settings, kassier, qrImgSrc
                 <div style="margin-bottom:2px;">Mitgliederbeitrag ${jahr}</div>
                 <div style="margin-bottom:8px;">Ref. ${refShort} - ${name}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:2px;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:100%;height:60px;"></div>
+                ${zahlerHtml(member) ? `<div style="font-size:8pt;">${zahlerHtml(member)}</div>` : `<div style="border:1px solid #000;width:100%;height:60px;"></div>`}
             </td>
         </tr>
     </table>
@@ -392,7 +446,7 @@ ${de ? `
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:1mm;">Referenz</div>
                 <div style="font-size:7pt;margin-bottom:2mm;">${refFormatted}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:1mm;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:50mm;height:15mm;margin-bottom:3mm;"></div>
+                ${zahlerHtml(member) ? `<div style="font-size:7pt;margin-bottom:3mm;">${zahlerHtml(member)}</div>` : `<div style="border:1px solid #000;width:50mm;height:15mm;margin-bottom:3mm;"></div>`}
                 <div style="display:flex;justify-content:space-between;width:50mm;">
                     <div><div style="font-size:6pt;font-weight:bold;">Währung</div><div style="font-size:8pt;">CHF</div></div>
                     <div><div style="font-size:6pt;font-weight:bold;">Betrag</div><div style="font-size:8pt;">${betragFormatted}</div></div>
@@ -427,7 +481,7 @@ ${de ? `
                 <div style="font-size:8pt;margin-bottom:1mm;">Mitgliederbeitrag ${jahr}</div>
                 <div style="font-size:8pt;margin-bottom:3mm;">Ref. ${refShort} - ${name}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:1mm;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:100%;height:18mm;margin-bottom:1mm;"></div>
+                ${zahlerHtml(member) ? `<div style="font-size:8pt;margin-bottom:1mm;">${zahlerHtml(member)}</div>` : `<div style="border:1px solid #000;width:100%;height:18mm;margin-bottom:1mm;"></div>`}
             </div>
         </div>
 
@@ -507,6 +561,9 @@ module.exports = {
     BEITRAG_IBAN,
     buildQRReference,
     formatQRReference,
+    strasseTeilen,
+    zahlerAus,
+    zahlerHtml,
     buildSwissQRPayload,
     renderQRDataUri,
     getKassier,
