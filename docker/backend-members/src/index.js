@@ -324,7 +324,9 @@ const corsOptions = {
                         origin === 'http://localhost:8080';
         callback(null, allowed);
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    // PATCH: Spesen bezahlt/abgelehnt (PATCH /members/spesen/:id) - ohne
+    // scheiterte im Browser schon die Vorabfrage, der Knopf tat nichts.
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
     optionsSuccessStatus: 200
