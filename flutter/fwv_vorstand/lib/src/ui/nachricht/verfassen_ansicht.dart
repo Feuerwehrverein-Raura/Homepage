@@ -194,7 +194,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
 
   Future<void> _briefVorschau(VorstandMitglied probe) async {
     setState(() => _vorschauLaedt = true);
-    await pdfTeilen(
+    await pdfAnsehen(
       context,
       widget.dienste.umgebung,
       () => _dienst.briefVorschau(
