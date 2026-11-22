@@ -13,6 +13,7 @@ import 'package:fwv_mitglieder/einstellungen/geraet_meldung.dart';
 import 'package:fwv_mitglieder/einstellungen/kontakte_abgleich.dart';
 import 'package:fwv_mitglieder/main.dart';
 import 'package:fwv_mitglieder/push/push_dienst.dart';
+import 'package:fwv_vorstand/fwv_vorstand.dart' show SwissQrBild;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
@@ -119,6 +120,7 @@ class _Backend {
       'quelle': 'mitglied',
     },
   ];
+  List<Map<String, Object?>> beitraege = [];
   List<Map<String, Object?>> vpn = [
     {'name': 'ma1b2c3d4-laptop', 'geraet': 'laptop', 'adresse': '10.20.0.7', 'zuletzt': null},
   ];
@@ -145,6 +147,8 @@ class _Backend {
           'success': true,
           'message': 'Austritts-Antrag wurde an den Vorstand gesendet.',
         });
+      case 'GET /members/me/beitraege':
+        return json(beitraege);
       case 'GET /members/me/notifications':
         return json(prefs);
       case 'GET /members/me/spesen':
@@ -357,6 +361,49 @@ void main() {
       final foto = tester.widget<Image>(find.byType(Image).first);
       expect((foto.image as NetworkImage).url, 'https://api.fwv-raura.ch/uploads/photo-1.jpg');
       expect((foto.image as NetworkImage).headers, {'Authorization': 'Bearer jwt'});
+    });
+
+    testWidgets('ohne offene Beitraege keine Karte', (tester) async {
+      await starten(tester);
+      await reiter(tester, 'Profil');
+      expect(backend.gab('GET', '/members/me/beitraege'), isTrue);
+      expect(find.byKey(const Key('offene-beitraege')), findsNothing);
+    });
+
+    testWidgets('offener Beitrag: Karte, Einzahlungsschein mit QR-Code und Referenz', (tester) async {
+      backend.beitraege = [
+        {
+          'id': 'p1',
+          'jahr': 2026,
+          'betrag': 50,
+          'faellig': '2026-03-31',
+          'iban': 'CH64 3076 9442 4924 3200 1',
+          'empfaenger': ['Feuerwehrverein Raura', 'Marksteinweg 12', '4304 Giebenach'],
+          'referenz': '00 00000 00000 00000 00000 12345',
+          'mitteilung': 'Mitgliederbeitrag 2026//Ref. 12345 - Muster Erika',
+          'qr_inhalt': 'SPC\n0200\n1\nCH6430769442492432001\nEPD',
+        },
+        {'id': 'p2', 'jahr': 2025, 'betrag': '50.00', 'iban': 'CH64 3076 9442 4924 3200 1'},
+      ];
+      await starten(tester);
+      await reiter(tester, 'Profil');
+
+      expect(find.byKey(const Key('offene-beitraege')), findsOneWidget);
+      expect(find.text('Offene Mitgliederbeiträge'), findsOneWidget);
+      expect(find.text('Mitgliederbeitrag 2026 – CHF 50.00'), findsOneWidget);
+      expect(find.textContaining('31.03.2026'), findsOneWidget);
+
+      await tippen(tester, find.byKey(const Key('beitrag-2026')));
+      expect(find.byKey(const Key('einzahlungsschein')), findsOneWidget);
+      expect(find.byType(SwissQrBild), findsOneWidget);
+      expect(find.text('00 00000 00000 00000 00000 12345'), findsOneWidget);
+      await tester.tap(find.text('Schliessen'));
+      await tester.pumpAndSettle();
+
+      // Ohne Referenz: kein QR-Code, nur Hinweis.
+      await tippen(tester, find.byKey(const Key('beitrag-2025')));
+      expect(find.byType(SwissQrBild), findsNothing);
+      expect(find.byKey(const Key('einzahlungsschein-ohne-referenz')), findsOneWidget);
     });
 
     testWidgets('Bearbeiten prueft Pflichtfelder und E-Mail', (tester) async {

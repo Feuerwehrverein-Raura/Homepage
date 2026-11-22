@@ -19,6 +19,7 @@ export 'src/auth/qr_login_code.dart';
 export 'src/auth/sitzung.dart';
 export 'src/auth/sitzungs_verwaltung.dart';
 export 'src/bild/foto_verkleinern.dart';
+export 'src/mitglied/beitraege.dart';
 export 'src/mitglied/benachrichtigungen.dart';
 export 'src/mitglied/json_lesen.dart';
 export 'src/mitglied/mitglieder_dienst.dart';

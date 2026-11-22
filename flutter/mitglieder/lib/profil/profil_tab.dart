@@ -1,6 +1,9 @@
-// Reiter "Profil": eigene Angaben aus `GET members/me`, Bearbeiten, Meine
+// Reiter "Profil": eigene Angaben aus `GET members/me`, offene
+// Mitgliederbeitraege mit Einzahlungsschein, Bearbeiten, Meine
 // Anmeldungen, Spesen, Konto (Benachrichtigungen, Zugaenge, VPN) und Austritt. Wie members-android ProfileFragment und
 // members-ios ProfileView.
+
+import 'dart:async';
 
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
@@ -14,6 +17,7 @@ import '../einstellungen/benachrichtigungen_screen.dart';
 import '../einstellungen/vpn_screen.dart';
 import '../einstellungen/zugaenge_screen.dart';
 import 'austritt_screen.dart';
+import 'beitraege_teil.dart';
 import 'profil_bearbeiten_screen.dart';
 import 'spesen_screen.dart';
 
@@ -28,6 +32,7 @@ class ProfilTab extends StatefulWidget {
 
 class _ProfilTabState extends State<ProfilTab> {
   MitgliedProfil? _profil;
+  List<OffenerBeitrag> _beitraege = const [];
   String? _fehler;
   bool _laedt = true;
 
@@ -45,10 +50,22 @@ class _ProfilTabState extends State<ProfilTab> {
     try {
       final p = await widget.dienste.mitglieder.profil();
       if (mounted) setState(() => _profil = p);
+      unawaited(_beitraegeLaden());
     } on Object catch (e) {
       if (mounted) setState(() => _fehler = fehlerText(e));
     } finally {
       if (mounted) setState(() => _laedt = false);
+    }
+  }
+
+  /// Offene Beitraege: Fehler bleiben still (aeltere Backends kennen den
+  /// Aufruf nicht) - das Profil selbst soll deswegen nicht scheitern.
+  Future<void> _beitraegeLaden() async {
+    try {
+      final b = await widget.dienste.mitglieder.offeneBeitraege();
+      if (mounted) setState(() => _beitraege = b);
+    } on Object {
+      if (mounted) setState(() => _beitraege = const []);
     }
   }
 
@@ -126,6 +143,7 @@ class _ProfilTabState extends State<ProfilTab> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
+        OffeneBeitraegeTeil(beitraege: _beitraege),
         const Abschnitt('Kontakt'),
         _zeile(Icons.mail_outline, 'E-Mail', p.email),
         _zeile(Icons.smartphone, 'Mobile', p.mobile),

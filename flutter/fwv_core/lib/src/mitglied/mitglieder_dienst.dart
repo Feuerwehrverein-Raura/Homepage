@@ -3,6 +3,7 @@
 // Vorstand-App dieselben verwenden kann.
 
 import '../api/api_client.dart';
+import 'beitraege.dart';
 import 'benachrichtigungen.dart';
 import 'json_lesen.dart';
 import 'profil.dart';
@@ -59,6 +60,11 @@ class MitgliederDienst {
     return (antwort is Map ? jsonText(antwort['message']) : null) ??
         'Austritts-Antrag wurde an den Vorstand gesendet.';
   }
+
+  /// Offene Mitgliederbeitraege mit Einzahlungsschein (leer, wenn alles
+  /// bezahlt ist).
+  Future<List<OffenerBeitrag>> offeneBeitraege() async =>
+      jsonListe(await api.get('members/me/beitraege'), OffenerBeitrag.ausJson);
 
   // ---------------------------------------------------------------------
   // Zugaenge
