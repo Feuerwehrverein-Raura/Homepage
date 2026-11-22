@@ -2463,6 +2463,12 @@ app.get('/members', authenticateAny, requireRole('vorstand', 'admin'), async (re
         if (status) {
             params.push(status);
             query += ` AND status = $${params.length}`;
+        } else if (!ids) {
+            // Testkonten (z. B. die Pruefkonten fuer Play Store und App Store) gehoeren
+            // nicht in die Mitgliederliste - nur wer ausdruecklich nach
+            // "Testkonto" filtert, sieht sie. Wie /members/directory und die
+            // Statistik (status IS DISTINCT FROM 'Testkonto').
+            query += ` AND COALESCE(status, '') <> 'Testkonto'`;
         }
 
         if (search) {
