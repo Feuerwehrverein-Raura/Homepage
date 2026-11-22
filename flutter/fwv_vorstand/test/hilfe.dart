@@ -25,6 +25,11 @@ class FalschesBackend {
   /// Ueber das Teilen-Menue weitergegebene Dateien (Name, Groesse).
   final geteilt = <(String, int)>[];
 
+  /// Mit Viewer ([VerwaltungsUmgebung.pdfAnzeigen]) wie in der App; vor dem
+  /// ersten Zugriff auf [dienste] setzen. Dort gezeigte PDFs (Name, Groesse).
+  bool mitViewer = false;
+  final angezeigt = <(String, int)>[];
+
   /// Was der PDF-Waehler liefert (null = Abbruch).
   ({Uint8List bytes, String dateiname})? pdf;
 
@@ -57,6 +62,9 @@ class FalschesBackend {
     anhangVerkleinern: (roh) async => roh,
     pdfWaehlen: () async => pdf,
     anhangWaehlen: () async => anhang,
+    pdfAnzeigen: mitViewer
+        ? (context, bytes, name) async => angezeigt.add((name, bytes.length))
+        : null,
   );
 
   late final dienste = VorstandDienste(

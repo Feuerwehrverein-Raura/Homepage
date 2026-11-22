@@ -92,7 +92,7 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
 
   Future<void> _allePdf(BeitragsJahr daten) async {
     setState(() => _druckt = true);
-    await pdfTeilen(
+    await pdfAnsehen(
       context,
       widget.dienste.umgebung,
       () => _dienst.allePdf(daten.jahr),
@@ -285,7 +285,7 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
           neuLaden,
         );
       case ZahlungsAktion.briefAnsehen:
-        await pdfTeilen(
+        await pdfAnsehen(
           context,
           widget.dienste.umgebung,
           () => _dienst.briefPdf(z.id),

@@ -131,16 +131,16 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
     final u = _v.umgebung;
     switch (wahl) {
       case 'teilnehmerliste':
-        await pdfTeilen(
+        await pdfAnsehen(
           context,
           u,
           () => _z.teilnehmerlistePdf(id),
           pdfName('Teilnehmerliste', titel),
         );
       case 'arbeitsplan':
-        await pdfTeilen(context, u, () => _z.arbeitsplanPdf(id), pdfName('Arbeitsplan', titel));
+        await pdfAnsehen(context, u, () => _z.arbeitsplanPdf(id), pdfName('Arbeitsplan', titel));
       case 'aushang':
-        await pdfTeilen(
+        await pdfAnsehen(
           context,
           u,
           () => _z.aushangPdf(id),

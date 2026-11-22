@@ -58,6 +58,9 @@ dependencies:
   package_info_plus: ^10.2.2
   url_launcher: ^6.3.3
   share_plus: ^13.3.1
+  # PDF in der App ansehen und drucken (Beitragsbriefe im Vorstand), statt
+  # gleich ins Teilen-Menue (https://pub.dev/packages/printing, 5.15.1).
+  printing: ^5.15.1
   web: ^1.1.1
   file_picker: ^13.1.0
   # Desktop: PKCE (SHA-256) fuer die Loopback-Anmeldung, Downloads-Ordner.

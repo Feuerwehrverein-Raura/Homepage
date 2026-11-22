@@ -27,6 +27,7 @@ import 'einstellungen/app_update.dart';
 import 'einstellungen/geraet_meldung.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
+import 'pdf/pdf_ansicht.dart';
 import 'roterschopf/schopf_pruefung.dart';
 import 'push/desktop_push.dart';
 import 'push/push_dienst.dart';
@@ -61,6 +62,7 @@ class Dienste {
     Future<String> Function()? appVersion,
     Future<bool> Function(Uri adresse)? linkOeffnen,
     DateiTeilen? dateiTeilen,
+    this.pdfAnzeigen,
     DateTime Function()? jetzt,
     Plattform? plattform,
     Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
@@ -159,6 +161,12 @@ class Dienste {
           ? DesktopAppUpdate(appVersion: _appVersionAusPaket)
           : const KeinAppUpdate(),
       dateiTeilen: istDesktop ? dateiSpeichernUndOeffnen : null,
+      pdfAnzeigen: (context, bytes, name) => pdfImViewer(
+        context,
+        bytes,
+        name,
+        istDesktop ? dateiSpeichernUndOeffnen : _teilenMitSharePlus,
+      ),
       schopfPruefTakt: const Duration(minutes: 10),
       geraeteAngaben: geraeteAngabenAusSystem,
     );
@@ -233,6 +241,10 @@ class Dienste {
   /// — von dort laesst sie sich oeffnen, speichern oder verschicken. Auf
   /// dem Desktop: unter "Downloads" speichern und oeffnen.
   final DateiTeilen dateiTeilen;
+
+  /// PDF im Viewer der App zeigen (pdf/pdf_ansicht.dart). Ohne (Tests) geht
+  /// «ansehen» wie bisher ins Teilen-Menue.
+  final Future<void> Function(BuildContext context, Uint8List bytes, String dateiname)? pdfAnzeigen;
 
   /// "Jetzt" (in Tests fest, z.B. fuer den Monat im Kalender).
   final DateTime Function() jetzt;
@@ -359,6 +371,7 @@ class Dienste {
     pdfWaehlen: pdfWaehlen,
     bildWaehlen: bildWaehlen,
     anhangWaehlen: _anhangMitFilePicker,
+    pdfAnzeigen: pdfAnzeigen,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.

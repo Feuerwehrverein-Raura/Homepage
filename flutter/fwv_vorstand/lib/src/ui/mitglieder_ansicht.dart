@@ -331,7 +331,7 @@ class _ExportMenue extends StatelessWidget {
         ? _csv(context, wahl)
         : wahl == 'vollexport'
         ? _vollExport(context)
-        : pdfTeilen(
+        : pdfAnsehen(
             context,
             dienste.umgebung,
             dienste.export.telefonliste,
