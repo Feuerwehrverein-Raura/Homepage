@@ -2508,6 +2508,15 @@ spesen.spesenRouten(app, {
     log: (text, daten) => console.log('[SPESEN]', text, JSON.stringify(daten || {}))
 });
 
+// Offene Mitgliederbeitraege mit Einzahlungsschein (src/beitraege.js) fuer
+// das Profil in der Mitglieder-App.
+require('./beitraege').beitraegeRouten(app, {
+    pool,
+    mitgliedAuth: authenticateToken,
+    mitgliedZurAnmeldung,
+    log: (text, daten) => console.log('[BEITRAEGE]', text, JSON.stringify(daten || {}))
+});
+
 app.get('/members/me', authenticateToken, async (req, res) => {
     try {
         const gefunden = await mitgliedZurAnmeldung(req);
