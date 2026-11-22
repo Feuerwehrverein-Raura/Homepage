@@ -1,7 +1,7 @@
 // Bausteine der Oberflaeche, die Mitglieder-App, Vorstand-App und die
 // Anlass-Verwaltung gleich brauchen: Laden mit Fehler-/Leer-Zustand,
 // Meldungen, Hinweis-Chips, Info-Zeilen, Schicht-Zeile, Knopfleiste unten,
-// Rueckfrage, PDF teilen, Zahl mit Plus/Minus.
+// Rueckfrage, PDF ansehen/teilen, Zahl mit Plus/Minus.
 
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -495,6 +495,25 @@ Future<bool> nachfragen(
     ),
   );
   return antwort ?? false;
+}
+
+/// Laedt ein PDF und zeigt es im Viewer der App ([VerwaltungsUmgebung.pdfAnzeigen]).
+/// Fuer «ansehen»: wer nur nachschauen will, soll nicht im Teilen-Menue
+/// landen. Ohne Viewer bleibt es beim Teilen.
+Future<void> pdfAnsehen(
+  BuildContext context,
+  VerwaltungsUmgebung umgebung,
+  Future<Uint8List> Function() laden,
+  String dateiname,
+) async {
+  final anzeigen = umgebung.pdfAnzeigen;
+  if (anzeigen == null) return pdfTeilen(context, umgebung, laden, dateiname);
+  try {
+    final bytes = await laden();
+    if (context.mounted) await anzeigen(context, bytes, dateiname);
+  } on Object catch (e) {
+    if (context.mounted) meldung(context, fehlerText(e));
+  }
 }
 
 /// Laedt ein PDF und gibt es ueber das Teilen-Menue weiter.

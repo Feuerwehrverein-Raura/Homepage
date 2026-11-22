@@ -76,6 +76,23 @@ void main() {
     expect(b.aenderungen, isEmpty);
   });
 
+  testWidgets('Mit Viewer: Brief und alle Briefe im Viewer, nicht im Teilen-Menue', (tester) async {
+    b.mitViewer = true;
+    await oeffnen(tester);
+    await tippen(tester, find.text('Muster Erika'));
+    await tippen(tester, find.byKey(const Key('brief-ansehen')));
+    expect(b.angezeigt.single.$1, endsWith('.pdf'));
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('alle-briefe-pdf')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tippen(tester, find.byKey(const Key('alle-briefe-pdf')));
+    expect(b.angezeigt.last.$1, 'Beitragsbriefe_2026.pdf');
+    expect(b.geteilt, isEmpty);
+  });
+
   testWidgets('Ein Kassier: keine Auswahl; alle Briefe als PDF fuers Jahr', (tester) async {
     await oeffnen(tester);
     await tester.scrollUntilVisible(

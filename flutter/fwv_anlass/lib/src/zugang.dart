@@ -245,7 +245,13 @@ class VerwaltungsUmgebung {
     this.pdfWaehlen,
     this.bildWaehlen,
     this.anhangWaehlen,
+    this.pdfAnzeigen,
   });
+
+  /// PDF in einem eigenen Viewer der App zeigen (Blaettern, Zoomen, von dort
+  /// Drucken oder Teilen). Ohne diese Funktion geht ein PDF direkt ins
+  /// Teilen-Menue - so in den Tests und wo die App keinen Viewer hat.
+  final Future<void> Function(BuildContext context, Uint8List bytes, String dateiname)? pdfAnzeigen;
 
   /// Eigenen Anhang fuer eine Nachricht waehlen (PDF, JPG, PNG, bis 10 MB);
   /// null bei Abbruch. Ohne diese Funktion fehlt «Datei anhängen».
