@@ -2,8 +2,11 @@
 // Teilen-Menue zu geben: wer nur nachschauen will, ob der Brief stimmt,
 // braucht kein Teilen. Drucken und Teilen gibt es oben in der Leiste.
 //
-// Anzeige mit PdfPreview aus package:printing (Android, iOS, Web, Desktop;
-// Seiten als Bilder gerastert, Zoomen mit zwei Fingern). Teilen geht ueber
+// Anzeige mit pdfrx (PDFium): Zoomen mit zwei Fingern bzw. Ctrl+Mausrad,
+// beim Vergroessern scharf neu gezeichnet, Seiten erst beim Hinscrollen.
+// Vorher PdfPreview aus package:printing - das zoomte nur nach einem
+// Doppeltipp auf eine Seite, was niemand fand. printing bleibt fuers
+// Drucken (Systemdialog). Teilen geht ueber
 // dieselbe dateiTeilen-Funktion wie bisher (Desktop: Downloads), nicht ueber
 // das Teilen von printing - so verhalten sich alle Teilen-Knoepfe der App
 // gleich.
@@ -11,6 +14,7 @@
 import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 
 import '../dienste.dart';
@@ -63,16 +67,12 @@ class PdfAnsicht extends StatelessWidget {
           ),
         ],
       ),
-      body: PdfPreview(
-        build: (_) async => bytes,
-        pdfFileName: dateiname,
-        // Fertiges PDF vom Backend: Format und Ausrichtung stehen fest, und
-        // Drucken/Teilen sitzen schon oben in der Leiste.
-        useActions: false,
-        canChangePageFormat: false,
-        canChangeOrientation: false,
-        canDebug: false,
-        maxPageWidth: 900,
+      body: PdfViewer.data(
+        bytes,
+        sourceName: dateiname,
+        params: PdfViewerParams(
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        ),
       ),
     );
   }
