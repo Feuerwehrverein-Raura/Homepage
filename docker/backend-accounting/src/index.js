@@ -414,6 +414,7 @@ app.get('/membership-fees/payments', vorstand, async (req, res) => {
             FROM membership_fee_payments p
             JOIN members m ON p.member_id = m.id
             WHERE p.year = $1
+              AND COALESCE(m.status, '') <> 'Testkonto'   -- Pruefkonten (Play Store, App Store) zahlen nichts
             ORDER BY m.nachname, m.vorname
         `, [year]);
 
@@ -431,7 +432,8 @@ app.post('/membership-fees/payments/generate', vorstand, async (req, res) => {
             return res.status(400).json({ error: 'year und amount sind erforderlich' });
         }
 
-        // Alle zahlenden Mitglieder holen (Ehrenmitglieder sind beitragsbefreit)
+        // Alle zahlenden Mitglieder holen (Ehrenmitglieder sind beitragsbefreit,
+        // Testkonten wie die Pruefkonten fuer Play Store und App Store ebenso)
         // Ref.-Nr. wird pro Jahr von der Bank neu zugewiesen und muss vom User manuell eingetragen werden
         const membersResult = await pool.query(
             "SELECT id FROM members WHERE status IN ('Aktivmitglied', 'Passivmitglied')"
@@ -534,7 +536,7 @@ async function runFeeReminders() {
           AND s.due_date IS NOT NULL
           AND s.due_date <= CURRENT_DATE
           AND (p.last_reminder_at IS NULL OR p.last_reminder_at <= CURRENT_DATE - INTERVAL '30 days')
-          AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+          AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt', 'Testkonto')
     `);
     let pushed = 0, emailed = 0;
     for (const r of rows.rows) {
@@ -673,6 +675,7 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
                 FROM membership_fee_payments p
                 JOIN members m ON p.member_id = m.id
                 WHERE p.year = $1
+                  AND COALESCE(m.status, '') <> 'Testkonto'
             `, [year]),
             kassierFuer(req.body?.kassier_id)
         ]);
@@ -834,6 +837,7 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
                 FROM membership_fee_payments p
                 JOIN members m ON p.member_id = m.id
                 WHERE p.year = $1
+                  AND COALESCE(m.status, '') <> 'Testkonto'
             `, [year]),
             kassierFuer(req.body?.kassier_id)
         ]);
@@ -965,6 +969,7 @@ app.get('/membership-fees/briefe.pdf', vorstand, async (req, res) => {
             SELECT p.*, m.vorname, m.nachname, m.strasse, m.plz, m.ort, m.status AS member_status
             FROM membership_fee_payments p JOIN members m ON p.member_id = m.id
             WHERE p.year = $1 AND p.status = 'offen'
+              AND COALESCE(m.status, '') <> 'Testkonto'
             ORDER BY m.nachname, m.vorname`, [year])).rows
             .filter(r => (r.member_status || '') !== 'Ehrenmitglied' &&
                 referenzGueltig(r.reference_nr));
