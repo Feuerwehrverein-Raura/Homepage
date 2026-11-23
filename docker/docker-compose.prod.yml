@@ -156,7 +156,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/events`) || PathPrefix(`/shifts`) || PathPrefix(`/calendar`) || PathPrefix(`/arbeitsplan`) || PathPrefix(`/registrations`) || PathPrefix(`/event-groups`) || PathPrefix(`/reminders`) || PathPrefix(`/teilnehmerliste`) || PathPrefix(`/push`))
+      - traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/events`) || PathPrefix(`/shifts`) || PathPrefix(`/calendar`) || PathPrefix(`/arbeitsplan`) || PathPrefix(`/registrations`) || PathPrefix(`/event-groups`) || PathPrefix(`/event-optionen`) || PathPrefix(`/reminders`) || PathPrefix(`/teilnehmerliste`) || PathPrefix(`/push`))
       - traefik.http.routers.api-events.entrypoints=https
       - traefik.http.routers.api-events.tls=true
       - traefik.http.routers.api-events.tls.certresolver=letsencrypt
@@ -395,6 +395,12 @@ services:
   # DEUTSCH: Wiki / Dokumentation — Interne Vereinsdokumentation mit Docusaurus
   # Erreichbar unter: wiki.fwv-raura.ch
   wiki:
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:80]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-wiki:latest
     container_name: fwv-wiki
     restart: unless-stopped
@@ -411,32 +417,33 @@ services:
       - com.centurylinklabs.watchtower.enable=true
 
   # ============================================
-  # DEUTSCH: ONLYOFFICE — Dokumentenbearbeitung (Word, Excel, PowerPoint) in Nextcloud
+  # DEUTSCH: EURO-OFFICE — Dokumentenbearbeitung (Word, Excel, PowerPoint) in Nextcloud
   # Erreichbar unter: office.fwv-raura.ch
+  # Loeste am 16.08.2026 OnlyOffice ab. Gleiche Adresse, gleicher Zweck;
+  # die Nextcloud-App dazu heisst "eurooffice".
   # ============================================
-  onlyoffice:
-    image: onlyoffice/documentserver:latest
-    container_name: onlyoffice
+  eurooffice:
+    image: ghcr.io/euro-office/documentserver:latest
+    container_name: eurooffice
     restart: unless-stopped
     environment:
-      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
       JWT_ENABLED: "true"
-      JWT_HEADER: Authorization
+      JWT_SECRET: ${EUROOFFICE_JWT_SECRET}
     volumes:
-      - /opt/docker/data/onlyoffice/logs:/var/log/onlyoffice
-      - /opt/docker/data/onlyoffice/data:/var/www/onlyoffice/Data
+      - /opt/docker/data/eurooffice/data:/var/lib/euro-office/documentserver
+      - /opt/docker/data/eurooffice/logs:/var/log/euro-office/documentserver
     networks:
       - proxy
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.onlyoffice.rule=Host(`office.fwv-raura.ch`)
-      - traefik.http.routers.onlyoffice.entrypoints=https
-      - traefik.http.routers.onlyoffice.tls=true
-      - traefik.http.routers.onlyoffice.tls.certresolver=letsencrypt
-      - traefik.http.services.onlyoffice.loadbalancer.server.port=80
-      - traefik.http.middlewares.onlyoffice-headers.headers.customrequestheaders.X-Forwarded-Proto=https
-      - traefik.http.routers.onlyoffice.middlewares=onlyoffice-headers
+      - traefik.http.routers.eurooffice.rule=Host(`office.fwv-raura.ch`)
+      - traefik.http.routers.eurooffice.entrypoints=https
+      - traefik.http.routers.eurooffice.tls=true
+      - traefik.http.routers.eurooffice.tls.certresolver=letsencrypt
+      - traefik.http.services.eurooffice.loadbalancer.server.port=80
+      - traefik.http.middlewares.eurooffice-headers.headers.customrequestheaders.X-Forwarded-Proto=https
+      - traefik.http.routers.eurooffice.middlewares=eurooffice-headers
       - com.centurylinklabs.watchtower.enable=true
 
   # DEUTSCH: Spam Manager — Verwaltung von Spam-Meldungen und Sperrlisten
@@ -504,6 +511,47 @@ services:
       - com.centurylinklabs.watchtower.enable=true
 
 # DEUTSCH: Externes Docker-Netzwerk — wird von Traefik verwaltet
+
+  # ============================================
+  # DEUTSCH: TUNNEL — Einwahlpunkt fuer Rechner hinter NAT
+  #
+  # Der T400 im Roten Schopf hat nur eine private Adresse und ist von aussen
+  # nicht erreichbar. Er waehlt sich deshalb hier ein und legt dabei eine
+  # Rueckwaerts-Weiterleitung auf seinen eigenen SSH-Zugang:
+  #
+  #   T400:  ssh -N -R 0.0.0.0:22022:localhost:22 tunnel@<host> -p 2222
+  #   hier:  ssh -p 22022 stefan@127.0.0.1   (nur ueber den Docker-Host)
+  #
+  # Bewusst ein eigener Container statt des Host-SSH: Der Dienst, ueber den
+  # wir alle auf den Server kommen, bleibt unberuehrt. Port 22022 ist an
+  # 127.0.0.1 gebunden — der T400 haengt also nie im offenen Netz.
+  # ============================================
+  tunnel:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: fwv-tunnel
+    hostname: tunnel
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Zurich
+      USER_NAME: tunnel
+      SUDO_ACCESS: "false"
+      PASSWORD_ACCESS: "false"
+      LOG_STDOUT: "true"
+      PUBLIC_KEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFaLwOR/hj0QBY/OLYcXoLxuAFVH5brk0ccO1kLg+5Ai t400-tunnel"
+    volumes:
+      - /opt/docker/data/tunnel/config:/config
+    ports:
+      - "2222:2222"                 # hier waehlt sich der T400 ein
+      - "127.0.0.1:22022:22022"     # sein SSH-Zugang, nur lokal erreichbar
+    networks:
+      - proxy
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+# DEUTSCH: Externes Docker-Netzwerk — wird von Traefik verwaltet
+
 networks:
   proxy:
     external: true   # DEUTSCH: Muss vorher existieren (docker network create proxy)
