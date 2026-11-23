@@ -38,29 +38,21 @@ test('Inhalt: Tabelle, Beschreibung, Link, Unterschriften, QR; escaped', () => {
     assert.match(html, /Wir freuen uns über zahlreiches Erscheinen/);
 });
 
-test('Beschreibung schon im Text (App): nicht doppelt, «Im Namen des Vorstandes» bleibt', () => {
-    const L = require('../src/nachricht-layout');
-    const anlass = { ...JASS, description: 'Liebe Mitglieder\n\nWir jassen & lachen <3.' };
-    const mitText = E.einladungHtml({ anlass, introHtml: L.textZuHtml(anlass.description) });
-    assert.equal(mitText.split('Wir jassen &amp; lachen &lt;3.').length - 1, 1, 'nur einmal');
-    assert.match(mitText, /Im Namen des Vorstandes\./);
-    assert.match(mitText, /Was:<\/td>/);
-    const ohne = E.einladungHtml({ anlass, introHtml: '<p>Hallo</p>' });
-    assert.match(ohne, /Wir jassen &amp; lachen &lt;3\./, 'eigener Text: Beschreibung kommt dazu');
-});
-
-test('Beschreibung angepasst im Text (Weihnachtshock 23.11.2026): trotzdem nicht doppelt', () => {
-    const L = require('../src/nachricht-layout');
-    const beschreibung = 'Liebe Mitglieder des Feuerwehrvereins Raura\n\nDas Jahr neigt sich dem Ende zu.\n\n' +
-        'Bei Kerzenschein lassen wir das Jahr ausklingen.\n\nMeldet euch bis 6. Dezember an.\n\nEuer Vorstand';
-    // Anrede oben und Gruss unten gestrichen, sonst gleich
-    const text = 'Das Jahr neigt sich dem Ende zu.\n\nBei Kerzenschein lassen wir das Jahr ausklingen.\n\n' +
-        'Meldet euch bis 6. Dezember an.';
-    assert.ok(E.enthaeltText(L.textZuHtml(text), beschreibung));
-    const html = E.einladungHtml({ anlass: { ...JASS, description: beschreibung }, introHtml: L.textZuHtml(text) });
-    assert.equal(html.split('Bei Kerzenschein').length - 1, 1, 'nur einmal');
-    // Ganz anderer Text: Beschreibung kommt dazu
-    assert.ok(!E.enthaeltText('<p>Hallo zusammen</p>', beschreibung));
+test('text_vollstaendig (App): nur der Text, dazu Titel, Gruss, Unterschriften, QR', () => {
+    const anlass = { ...JASS, description: 'Beschreibung vom Anlass.' };
+    const app = E.einladungHtml({ anlass, introHtml: '<p>Mein ganzer Text</p><p>Was: Jass</p>',
+        textVollstaendig: true, praesident: 'Pia Präsi', aktuar: 'Anna Aktuar', qr: 'data:image/png;base64,AA' });
+    assert.match(app, /Mein ganzer Text/);
+    assert.doesNotMatch(app, /Beschreibung vom Anlass/);
+    assert.doesNotMatch(app, /Die wichtigsten Daten/);
+    assert.doesNotMatch(app, /Im Namen des Vorstandes/);
+    assert.match(app, /Mit freundlichen Grüssen/);
+    assert.match(app, /Pia Präsi<\/div><div>Präsident/);
+    assert.match(app, /<img src="data:image\/png;base64,AA"/);
+    // Website (ohne Schalter): wie bisher
+    const web = E.einladungHtml({ anlass, introHtml: '<p>Hallo</p>' });
+    assert.match(web, /Beschreibung vom Anlass/);
+    assert.match(web, /Im Namen des Vorstandes\./);
 });
 
 test('Helferaufruf nur bei Dorffest mit Schichten, nach Tag sortiert', () => {

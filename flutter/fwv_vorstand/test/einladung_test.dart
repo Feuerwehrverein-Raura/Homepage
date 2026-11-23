@@ -23,18 +23,30 @@ Anlass _anlass([Map<String, Object?> mehr = const {}]) => Anlass.ausJson({
 
 void main() {
   group('einladungsEntwurf', () {
-    test('Text ist die Beschreibung des Anlasses', () {
+    test('Ganze Einladung im Text: Beschreibung, Daten, Link, Im Namen des Vorstandes', () {
       final e = einladungsEntwurf(_anlass());
       expect(e.betreff, 'Einladung: Chilbi 2026');
-      expect(e.text, 'Grill und Bar.');
       expect(e.anlassId, 'e1');
+      expect(
+        e.text,
+        'Grill und Bar.\n\n'
+        'Die wichtigsten Daten nochmals zusammengefasst:\n'
+        'Was: Chilbi 2026\n'
+        'Wo: Roter Schopf\n'
+        'Wann: Sa 17.10.2026, 10:00–02:00\n'
+        'Anmeldung: Zwingend\n'
+        'Kosten: gratis\n\n'
+        'Anmeldung und alle Infos: https://www.fwv-raura.ch/events.html?event=chilbi-2026\n\n'
+        'Wir freuen uns über zahlreiches Erscheinen.\n'
+        'Im Namen des Vorstandes.',
+      );
       expect(unbekanntePlatzhalter(e.text), isEmpty);
     });
 
     test('Ohne Beschreibung: Einleitung, mit Schichten ein Helferaufruf', () {
       expect(
         einladungsEntwurf(_anlass({'description': null})).text,
-        'Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.',
+        startsWith('Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.\n\n'),
       );
       final e = einladungsEntwurf(
         _anlass({
@@ -45,6 +57,7 @@ void main() {
         }),
       );
       expect(e.text, contains('suchen wir Helferinnen und Helfer'));
+      expect(e.text, contains('herzlichen Dank fürs Mitmachen'));
     });
   });
 
@@ -64,7 +77,7 @@ void main() {
       for (final f in tester.widgetList<EditableText>(find.byType(EditableText))) f.controller.text,
     ];
     expect(felder, contains('Einladung: Chilbi 2026'));
-    expect(felder, contains('Grill und Bar.'));
+    expect(felder.any((f) => f.startsWith('Grill und Bar.')), isTrue);
     expect(find.byKey(const Key('versand-einladung')), findsOneWidget);
     // Ohne PDF am Anlass kein Hinweis.
     expect(find.byKey(const Key('versand-anhang')), findsNothing);

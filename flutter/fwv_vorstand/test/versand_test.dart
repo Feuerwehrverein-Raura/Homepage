@@ -402,6 +402,9 @@ void main() {
       expect(d.posts('/email/bulk').map((m) => m['event_id']).toSet(), {'e1'});
       expect(d.posts('/dispatch/send-post').map((m) => m['event_id']).toSet(), {'e1'});
       expect(d.posts('/email/bulk').map((m) => m['layout']).toSet(), {'einladung'});
+      // Der Text im Editor ist die ganze Einladung - das Layout haengt nichts an.
+      expect(d.posts('/email/bulk').map((m) => m['text_vollstaendig']).toSet(), {true});
+      expect(d.posts('/dispatch/brief').map((m) => m['text_vollstaendig']).toSet(), {true});
       expect(d.posts('/dispatch/brief').map((m) => (m['vorlage'], m['event_id'])).toSet(), {
         ('einladung', 'e1'),
       });

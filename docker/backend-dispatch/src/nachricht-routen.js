@@ -31,7 +31,8 @@ async function absenderLaden(pool) {
 /** Einladung fuer ein Mitglied: Einleitung (Platzhalter von Mitglied und
  *  Anlass ersetzt) im Einladungs-Layout. [laden] = E.einladungDaten, in Tests
  *  ersetzbar. Wirft, wenn der Anlass fehlt. */
-async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten, textHtml = null) {
+async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten, textHtml = null,
+    textVollstaendig = false) {
     const daten = await laden(pool, eventId);
     if (!daten) throw Object.assign(new Error('Anlass nicht gefunden'), { status: 404 });
     // Einleitung aus dem Editor der Website (HTML) oder reiner Text (App).
@@ -39,7 +40,7 @@ async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladun
         ? E.anlassPlatzhalter(L.editorHtml(textHtml, mitglied), Object.fromEntries(
             Object.entries(daten.anlass).map(([k, v]) => [k, typeof v === 'string' ? L.escapeHtml(v) : v])))
         : L.textZuHtml(E.anlassPlatzhalter(L.platzhalterErsetzen(text, mitglied), daten.anlass));
-    return E.einladungHtml({ ...daten, introHtml });
+    return E.einladungHtml({ ...daten, introHtml, textVollstaendig });
 }
 
 /** Handler fuer POST /dispatch/brief. [vorschauPdf](html, rand, zonen) -> Buffer. */
@@ -49,7 +50,8 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
             // vorlage 'einladung' + event_id: Inhalt im Einladungs-Layout
             // (einladung-layout.js), body ist dann die Einleitung.
             // body_html: Text aus dem Editor der Website (L.editorHtml).
-            const { subject, body, body_html, member_id, vorschau = false, zonen = false, vorlage, event_id } = req.body || {};
+            const { subject, body, body_html, member_id, vorschau = false, zonen = false, vorlage, event_id,
+                text_vollstaendig } = req.body || {};
             const textHtml = typeof body_html === 'string' && body_html.trim() ? body_html : null;
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
@@ -70,7 +72,8 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
                 absender: await absenderLaden(pool),
                 textHtml,
                 inhaltHtml: vorlage === 'einladung'
-                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml)
+                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml,
+                        text_vollstaendig === true)
                     : null
             });
             const antwort = {
@@ -96,7 +99,7 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
 function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
     return async (req, res) => {
         try {
-            const { subject, body, body_html, member_id, layout, event_id } = req.body || {};
+            const { subject, body, body_html, member_id, layout, event_id, text_vollstaendig } = req.body || {};
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
             }
@@ -111,7 +114,8 @@ function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
                 absender: await absenderLaden(pool),
                 textHtml,
                 inhaltHtml: layout === 'einladung' && event_id
-                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml)
+                    ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml,
+                        text_vollstaendig === true)
                     : null
             });
             res.json({

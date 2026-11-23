@@ -445,7 +445,7 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                             textHtml: bodyHtml,
                             inhaltHtml: einladung
                                 ? await einladungInhalt(pool, req.body.event_id, req.body.body, member,
-                                    async () => einladungsDaten, bodyHtml)
+                                    async () => einladungsDaten, bodyHtml, req.body.text_vollstaendig === true)
                                 : null
                         })
                         : req.body.html,
