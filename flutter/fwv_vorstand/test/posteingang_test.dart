@@ -184,6 +184,17 @@ void main() {
       expect(find.text('Anna Muster'), findsNothing, reason: 'Liste neu geladen');
     });
 
+    testWidgets('Anhang (PDF-Beleg) mit Viewer: angezeigt statt geteilt', (tester) async {
+      final p = Postfach();
+      p.backend.mitViewer = true;
+      await zeigen(tester, PosteingangAnsicht(dienste: p.backend.dienste));
+      await tippen(tester, find.byKey(const Key('mail-7')));
+      await tippen(tester, find.byKey(const Key('mail-anhang-0')));
+      expect(p.backend.angezeigt.single.$1, 'Plan.pdf');
+      expect(p.backend.angezeigteTypen.single, 'application/pdf');
+      expect(p.backend.geteilt, isEmpty);
+    });
+
     testWidgets('Neue Mail: Adressbuch schlaegt vor', (tester) async {
       final p = Postfach();
       await zeigen(tester, PosteingangAnsicht(dienste: p.backend.dienste));

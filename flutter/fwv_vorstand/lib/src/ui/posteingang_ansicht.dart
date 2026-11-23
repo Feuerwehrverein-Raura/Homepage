@@ -433,7 +433,7 @@ class _MailScreenState extends State<MailScreen> {
                   key: Key('mail-anhang-${a.index}'),
                   avatar: const Icon(Icons.attach_file, size: 18),
                   label: Text('${a.name} (${(a.groesse / 1024).ceil()} KB)'),
-                  onPressed: () => _anhangTeilen(context, m, a),
+                  onPressed: () => _anhangAnsehen(context, m, a),
                 ),
             ],
           ),
@@ -444,14 +444,19 @@ class _MailScreenState extends State<MailScreen> {
     );
   }
 
-  Future<void> _anhangTeilen(BuildContext context, Mail m, MailAnhang a) async {
+  /// PDF und Fotos (z.B. der Beleg in der Spesen-Mail) im Viewer der App,
+  /// anderes ins Teilen-Menue - wie «Beleg ansehen» bei den Spesen.
+  Future<void> _anhangAnsehen(BuildContext context, Mail m, MailAnhang a) async {
     final ursprung = stelleVon(context);
     try {
       final bytes = await _dienst.anhang(widget.konto, widget.ordner, m.uid, a.index);
-      await widget.dienste.umgebung.dateiTeilen(
+      if (!context.mounted) return;
+      await dateiAnsehen(
+        context,
+        widget.dienste.umgebung,
         bytes,
         a.name,
-        a.typ ?? 'application/octet-stream',
+        a.typ,
         ursprung: ursprung,
       );
     } on Object catch (e) {
