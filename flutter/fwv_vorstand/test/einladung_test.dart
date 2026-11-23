@@ -22,6 +22,8 @@ Anlass _anlass([Map<String, Object?> mehr = const {}]) => Anlass.ausJson({
 });
 
 void main() {
+  setUpAll(() => vorschauVerzoegerung = Duration.zero);
+
   group('einladungsEntwurf', () {
     test('Ganze Einladung im Text: Beschreibung, Daten, Link, Im Namen des Vorstandes', () {
       final e = einladungsEntwurf(_anlass());

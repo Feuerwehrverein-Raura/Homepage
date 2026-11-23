@@ -4,7 +4,6 @@
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../mitglieder/modelle.dart';
 import '../../versand/versand.dart';
 import '../../versand/versand_dienst.dart';
 
@@ -101,55 +100,6 @@ class VersandZahlen extends StatelessWidget {
         if (plan.ohne.isNotEmpty)
           HinweisChip('${plan.ohne.length} nicht erreichbar', art: HinweisArt.schlecht),
       ],
-    );
-  }
-}
-
-/// So kommt die E-Mail beim ersten Empfaenger an (Text; das HTML-Layout
-/// mit Kopf und Gruss baut das Backend).
-class EmailVorschau extends StatelessWidget {
-  const EmailVorschau({super.key, required this.probe, required this.betreff, required this.text});
-
-  final VorstandMitglied? probe;
-  final String betreff;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final m = probe;
-    final leise = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline);
-    final b = m == null ? betreff : platzhalterErsetzen(betreff, m);
-    final x = m == null ? text : platzhalterErsetzen(text, m);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: t.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            m == null
-                ? 'Kein Empfänger gewählt'
-                : 'An: ${mitgliedName(m)}${hatEmail(m) ? ' <${m.versandEmail ?? m.email}>' : ''}',
-            style: leise,
-          ),
-          const SizedBox(height: 4),
-          Text(b.trim().isEmpty ? '(ohne Betreff)' : b.trim(), style: t.textTheme.titleSmall),
-          const Divider(height: 16),
-          Text(
-            x.trim().isEmpty ? 'Der Text erscheint hier.' : x.trim(),
-            style: x.trim().isEmpty ? leise : t.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Mit freundlichen Grüssen\nFeuerwehrverein Raura, Kaiseraugst\nDer Vorstand',
-            style: leise,
-          ),
-        ],
-      ),
     );
   }
 }

@@ -253,13 +253,28 @@ class Dispatch {
     return (404, {'error': 'nicht gefunden: $weg'});
   }
 
+  /// POSTs an [pfad] - ohne die Vorschau-Bilder ([vorschauen]).
   List<Map<String, dynamic>> posts(String pfad) => [
+    for (final m in _alle(pfad))
+      if (m['bild'] != true) m,
+  ];
+
+  /// Vorschau-Abrufe (bild: true) an [pfad].
+  List<Map<String, dynamic>> vorschauen(String pfad) => [
+    for (final m in _alle(pfad))
+      if (m['bild'] == true) m,
+  ];
+
+  List<Map<String, dynamic>> _alle(String pfad) => [
     for (final a in backend.anfragen)
       if (a.method == 'POST' && a.url.path == pfad) jsonDecode(a.body) as Map<String, dynamic>,
   ];
 }
 
 void main() {
+  // Vorschau ohne Wartezeit nach dem Tippen.
+  setUpAll(() => vorschauVerzoegerung = Duration.zero);
+
   group('Empfaenger und Aufteilung', () {
     final alle = mitglieder();
 
@@ -595,14 +610,12 @@ void main() {
       await tester.enterText(find.byKey(const Key('versand-betreff')), 'GV 2027');
       await tester.enterText(find.byKey(const Key('versand-text')), 'Liebe {{vorname}}');
       await tester.pumpAndSettle();
-      // Vorschau mit dem ersten E-Mail-Empfaenger.
+      // Probe: der erste E-Mail-Empfaenger.
       expect(
-        find.descendant(
-          of: find.byKey(const Key('versand-vorschau')),
-          matching: find.text('Liebe Anna'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const Key('versand-vorschau'))).data,
+        startsWith('E-Mail an Anna'),
       );
+      expect(d.vorschauen('/dispatch/email-vorschau').single['body'], 'Liebe {{vorname}}');
 
       await tippen(tester, senden);
       expect(find.textContaining('• 3 E-Mails'), findsOneWidget);
@@ -784,26 +797,38 @@ void main() {
       expect(d.posts('/dispatch/brief').single['member_id'], 'm2');
     });
 
-    testWidgets('Vorschau: E-Mail und Brief zum Umschalten, vom Server gerendert', (tester) async {
+    testWidgets('Vorschau direkt auf der Seite: E-Mail und Brief zum Umschalten', (tester) async {
       await oeffnen(tester);
+      expect(find.byKey(const Key('vorschau-bild-email')), findsNothing, reason: 'noch kein Text');
       await tester.enterText(find.byKey(const Key('versand-text')), 'Hallo');
       await tester.pumpAndSettle();
-      await tippen(tester, find.byKey(const Key('versand-vorschau-zeigen')));
       expect(find.byKey(const Key('vorschau-bild-email')), findsOneWidget);
-      final mail = d.posts('/dispatch/email-vorschau').single;
-      expect(mail['bild'], true);
+      final mail = d.vorschauen('/dispatch/email-vorschau').single;
       expect(mail['body'], 'Hallo');
 
-      await tester.tap(find.text('Brief'));
-      await tester.pumpAndSettle();
+      await tippen(tester, find.text('Brief').last);
       expect(find.byKey(const Key('vorschau-bild-brief')), findsOneWidget);
-      expect(d.posts('/dispatch/brief').single['bild'], true);
-      expect(find.byKey(const Key('vorschau-brief-pdf')), findsOneWidget);
+      expect(d.vorschauen('/dispatch/brief'), hasLength(1));
 
       // Zurueck zur E-Mail: nicht nochmals geladen.
-      await tester.tap(find.text('E-Mail'));
+      await tippen(tester, find.text('E-Mail').last);
+      expect(find.byKey(const Key('vorschau-bild-email')), findsOneWidget);
+      expect(d.vorschauen('/dispatch/email-vorschau'), hasLength(1));
+
+      // Antippen: gross zum Zoomen. (Das Testbild ist im Widget-Test noch
+      // nicht dekodiert und hat keine Groesse - darum onTap direkt.)
+      tester
+          .widget<GestureDetector>(
+            find
+                .ancestor(
+                  of: find.byKey(const Key('vorschau-bild-email')),
+                  matching: find.byType(GestureDetector),
+                )
+                .first,
+          )
+          .onTap!();
       await tester.pumpAndSettle();
-      expect(d.posts('/dispatch/email-vorschau'), hasLength(1));
+      expect(find.byType(InteractiveViewer), findsOneWidget);
     });
 
     testWidgets('Desktop: Einstellungen und Inhalt nebeneinander', (tester) async {
