@@ -182,6 +182,32 @@ class VersandDienst {
     return pdf;
   }
 
+  /// Die E-Mail fuer [mitgliedId] genau so, wie der Versand sie baut
+  /// (`POST dispatch/email-vorschau`, gleiche Bausteine wie `/email/bulk`) -
+  /// als Text. Mit [anlassId] im Einladungs-Layout.
+  Future<({String? an, String betreff, String text})> emailVorschau({
+    required String mitgliedId,
+    required String betreff,
+    required String text,
+    String? anlassId,
+  }) async {
+    final j = await api.post(
+      'dispatch/email-vorschau',
+      daten: {
+        'member_id': mitgliedId,
+        'subject': betreff.trim(),
+        'body': text,
+        if (anlassId != null) ...{'layout': 'einladung', 'event_id': anlassId},
+      },
+    );
+    final m = j is Map ? j : const {};
+    return (
+      an: jsonText(m['to']),
+      betreff: jsonText(m['subject']) ?? betreff.trim(),
+      text: htmlZuText(jsonText(m['html']) ?? ''),
+    );
+  }
+
   Future<Brief> _brief(
     String id,
     String betreff,

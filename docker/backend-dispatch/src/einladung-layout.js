@@ -80,10 +80,22 @@ function nurText(html) {
         .trim();
 }
 
-/** Steht [text] (ohne Ruecksicht auf Leerraum) schon in [html]? */
+/**
+ * Steht [text] schon in [html]? Nicht nur wortwoertlich: die App startet die
+ * Einladung mit der Beschreibung, und wer daran etwas aendert (Anrede oben
+ * weg, Gruss unten anders), hatte sie am 23.11.2026 trotzdem doppelt in der
+ * Einladung. Darum zeilenweise: steht mindestens die Haelfte der Zeilen der
+ * Beschreibung (ohne Leerraum-Unterschiede) im Text, gilt sie als drin.
+ */
 function enthaeltText(html, text) {
-    const t = nurText(text);
-    return t.length > 0 && nurText(html).includes(t);
+    const ganz = nurText(text);
+    if (!ganz) return false;
+    const inhalt = nurText(html);
+    if (inhalt.includes(ganz)) return true;
+    const zeilen = String(text).split(/\r?\n/).map(nurText).filter(z => z.length >= 3);
+    if (!zeilen.length) return false;
+    const drin = zeilen.filter(z => inhalt.includes(z)).length;
+    return drin * 2 >= zeilen.length;
 }
 
 const ZELLE = 'font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;';
@@ -197,5 +209,5 @@ async function einladungDaten(pool, eventId) {
 
 module.exports = {
     HELFER_KATEGORIEN, zeitpunkt, wannText, schlussText, anlassSeite, anlassPlatzhalter,
-    schichtBlock, einladungHtml, einladungDaten
+    schichtBlock, einladungHtml, einladungDaten, enthaeltText
 };

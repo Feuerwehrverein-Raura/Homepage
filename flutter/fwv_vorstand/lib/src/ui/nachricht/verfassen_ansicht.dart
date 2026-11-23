@@ -208,6 +208,51 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     if (mounted) setState(() => _vorschauLaedt = false);
   }
 
+  /// Die E-Mail so, wie sie rausgeht (vom Server gebaut) - die Box darueber
+  /// zeigt nur das Textfeld. Bei Einladungen kommen Anlass-Daten,
+  /// Beschreibung und Gruss dazu; am 23.11.2026 ging eine Einladung mit
+  /// doppeltem Text raus, weil das nirgends zu sehen war.
+  Future<void> _emailVorschau(VorstandMitglied probe) async {
+    final laden = _dienst.emailVorschau(
+      mitgliedId: probe.id,
+      betreff: _betreff.text,
+      text: _text.text,
+      anlassId: widget.entwurf?.anlassId,
+    );
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (c) => Scaffold(
+          appBar: AppBar(title: const Text('E-Mail wie sie rausgeht')),
+          body: FutureBuilder(
+            future: laden,
+            builder: (c, s) => switch (s) {
+              AsyncSnapshot(:final error?) => Center(
+                child: Padding(padding: const EdgeInsets.all(24), child: Text(fehlerText(error))),
+              ),
+              AsyncSnapshot(:final data?) => SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'An: ${mitgliedName(probe)}${data.an == null ? '' : ' <${data.an}>'}',
+                      style: Theme.of(c).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(data.betreff, style: Theme.of(c).textTheme.titleMedium),
+                    const Divider(height: 24),
+                    SelectableText(data.text, key: const Key('versand-email-vorschau-text')),
+                  ],
+                ),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _senden(Versandplan plan) async {
     if (!_vollstaendig || plan.leer) return;
     final mitPost = plan.post.isNotEmpty;
@@ -613,6 +658,19 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
           probe: probe,
           betreff: _betreff.text,
           text: _text.text,
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('versand-email-vorschau'),
+          onPressed: probe == null || _text.text.trim().isEmpty
+              ? null
+              : () => _emailVorschau(probe),
+          icon: const Icon(Icons.mark_email_read_outlined),
+          label: Text(
+            widget.entwurf?.anlassId != null
+                ? 'Ganze Einladung ansehen (wie sie rausgeht)'
+                : 'E-Mail ansehen (wie sie rausgeht)',
+          ),
         ),
         if (_art != Versandart.email) ...[
           const SizedBox(height: 8),

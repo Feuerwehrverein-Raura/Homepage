@@ -49,6 +49,20 @@ test('Beschreibung schon im Text (App): nicht doppelt, «Im Namen des Vorstandes
     assert.match(ohne, /Wir jassen &amp; lachen &lt;3\./, 'eigener Text: Beschreibung kommt dazu');
 });
 
+test('Beschreibung angepasst im Text (Weihnachtshock 23.11.2026): trotzdem nicht doppelt', () => {
+    const L = require('../src/nachricht-layout');
+    const beschreibung = 'Liebe Mitglieder des Feuerwehrvereins Raura\n\nDas Jahr neigt sich dem Ende zu.\n\n' +
+        'Bei Kerzenschein lassen wir das Jahr ausklingen.\n\nMeldet euch bis 6. Dezember an.\n\nEuer Vorstand';
+    // Anrede oben und Gruss unten gestrichen, sonst gleich
+    const text = 'Das Jahr neigt sich dem Ende zu.\n\nBei Kerzenschein lassen wir das Jahr ausklingen.\n\n' +
+        'Meldet euch bis 6. Dezember an.';
+    assert.ok(E.enthaeltText(L.textZuHtml(text), beschreibung));
+    const html = E.einladungHtml({ anlass: { ...JASS, description: beschreibung }, introHtml: L.textZuHtml(text) });
+    assert.equal(html.split('Bei Kerzenschein').length - 1, 1, 'nur einmal');
+    // Ganz anderer Text: Beschreibung kommt dazu
+    assert.ok(!E.enthaeltText('<p>Hallo zusammen</p>', beschreibung));
+});
+
 test('Helferaufruf nur bei Dorffest mit Schichten, nach Tag sortiert', () => {
     const schichten = [
         { date: '2026-08-02', start_time: '10:00:00', end_time: '12:00:00', bereich: 'Bar', needed: 2 },
