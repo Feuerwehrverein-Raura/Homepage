@@ -32,7 +32,7 @@ async function absenderLaden(pool) {
  *  Anlass ersetzt) im Einladungs-Layout. [laden] = E.einladungDaten, in Tests
  *  ersetzbar. Wirft, wenn der Anlass fehlt. */
 async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladungDaten, textHtml = null,
-    textVollstaendig = false) {
+    textVollstaendig = false, fuerEmail = false) {
     const daten = await laden(pool, eventId);
     if (!daten) throw Object.assign(new Error('Anlass nicht gefunden'), { status: 404 });
     // Einleitung aus dem Editor der Website (HTML) oder reiner Text (App).
@@ -40,18 +40,21 @@ async function einladungInhalt(pool, eventId, text, mitglied, laden = E.einladun
         ? E.anlassPlatzhalter(L.editorHtml(textHtml, mitglied), Object.fromEntries(
             Object.entries(daten.anlass).map(([k, v]) => [k, typeof v === 'string' ? L.escapeHtml(v) : v])))
         : L.textZuHtml(E.anlassPlatzhalter(L.platzhalterErsetzen(text, mitglied), daten.anlass));
-    return E.einladungHtml({ ...daten, introHtml, textVollstaendig });
+    // E-Mail ohne QR: dort klickt man den Link; eingebettete Bilder zeigten
+    // Mailprogramme ohnehin nicht an ("QR-Code Anlass", 23.11.2026).
+    const qr = fuerEmail ? '' : daten.qr;
+    return E.einladungHtml({ ...daten, qr, introHtml, textVollstaendig });
 }
 
 /** Handler fuer POST /dispatch/brief. [vorschauPdf](html, rand, zonen) -> Buffer. */
-function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }) {
+function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten, bildRendern = null }) {
     return async (req, res) => {
         try {
             // vorlage 'einladung' + event_id: Inhalt im Einladungs-Layout
             // (einladung-layout.js), body ist dann die Einleitung.
             // body_html: Text aus dem Editor der Website (L.editorHtml).
             const { subject, body, body_html, member_id, vorschau = false, zonen = false, vorlage, event_id,
-                text_vollstaendig } = req.body || {};
+                text_vollstaendig, bild } = req.body || {};
             const textHtml = typeof body_html === 'string' && body_html.trim() ? body_html : null;
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
@@ -86,6 +89,8 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
                 const pdf = await vorschauPdf(html, L.BRIEF_RAND, zonen === true, L.istDeutscherEmpfaenger(mitglied));
                 antwort.pdf_base64 = Buffer.from(pdf).toString('base64');
             }
+            // bild=true (App): der Brief als Bild (A4-Breite) fuer die Vorschau.
+            if (bild === true && bildRendern) antwort.bild_base64 = (await bildRendern(html, 794)).toString('base64');
             res.json(antwort);
         } catch (error) {
             res.status(error.status || 500).json({ error: error.message });
@@ -96,10 +101,10 @@ function briefErstellen({ pool, vorschauPdf, einladungDaten = E.einladungDaten }
 /** Handler fuer POST /dispatch/email-vorschau {member_id, subject, body,
  *  body_html?, layout?, event_id?}: die E-Mail genau so, wie /email/bulk sie
  *  fuer dieses Mitglied baut - fuer die Vorschau auf der Website. */
-function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
+function emailVorschau({ pool, einladungDaten = E.einladungDaten, bildRendern = null }) {
     return async (req, res) => {
         try {
-            const { subject, body, body_html, member_id, layout, event_id, text_vollstaendig } = req.body || {};
+            const { subject, body, body_html, member_id, layout, event_id, text_vollstaendig, bild } = req.body || {};
             if (!member_id || !UUID.test(String(member_id))) {
                 return res.status(400).json({ error: 'member_id erforderlich' });
             }
@@ -115,14 +120,17 @@ function emailVorschau({ pool, einladungDaten = E.einladungDaten }) {
                 textHtml,
                 inhaltHtml: layout === 'einladung' && event_id
                     ? await einladungInhalt(pool, event_id, body, mitglied, einladungDaten, textHtml,
-                        text_vollstaendig === true)
+                        text_vollstaendig === true, true)
                     : null
             });
-            res.json({
+            const antwort = {
                 html,
                 to: mitglied.versand_email || mitglied.email || null,
                 subject: L.platzhalterErsetzen(subject, mitglied).trim()
-            });
+            };
+            // bild=true (App): die Mail als Bild, so wie ein Mailprogramm sie zeigt.
+            if (bild === true && bildRendern) antwort.bild_base64 = (await bildRendern(html, 700)).toString('base64');
+            res.json(antwort);
         } catch (error) {
             res.status(error.status || 500).json({ error: error.message });
         }

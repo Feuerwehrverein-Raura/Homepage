@@ -445,7 +445,7 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                             textHtml: bodyHtml,
                             inhaltHtml: einladung
                                 ? await einladungInhalt(pool, req.body.event_id, req.body.body, member,
-                                    async () => einladungsDaten, bodyHtml, req.body.text_vollstaendig === true)
+                                    async () => einladungsDaten, bodyHtml, req.body.text_vollstaendig === true, true)
                                 : null
                         })
                         : req.body.html,
@@ -2231,6 +2231,20 @@ async function vorschauPdfRendern(html, pdf_margin, showZones, links = false) {
     return pdfBuffer;
 }
 
+/** HTML als PNG (ganze Seite, [breite] px) - Vorschau in der App, die kein
+ *  HTML darstellen kann. Bilder (QR) werden mitgeladen. */
+async function htmlAlsBild(html, breite = 700) {
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: breite, height: 800, deviceScaleFactor: 2 });
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20000 });
+        return Buffer.from(await page.screenshot({ fullPage: true, type: 'png' }));
+    } finally {
+        await browser.close();
+    }
+}
+
 const { sammelPdfRendern } = require('./sammel-pdf');
 
 // Sammel-PDF aus mehreren Brief-HTMLs (nur Vorstand bzw. interne Dienste).
@@ -2271,10 +2285,11 @@ app.post('/dispatch/preview-pdf', authenticateAny, requireRole('vorstand', 'admi
 // Brief fuer ein Mitglied im offiziellen Layout bauen (Flutter-App): HTML +
 // Empfaenger fuer /dispatch/send-post, mit vorschau=true auch als PDF (base64).
 app.post('/dispatch/brief', authenticateAny, requireRole('vorstand', 'admin'),
-    briefErstellen({ pool, vorschauPdf: vorschauPdfRendern }));
+    briefErstellen({ pool, vorschauPdf: vorschauPdfRendern, bildRendern: htmlAlsBild }));
 
 // E-Mail fuer ein Mitglied genau wie /email/bulk sie baut (Vorschau Website).
-app.post('/dispatch/email-vorschau', authenticateAny, requireRole('vorstand', 'admin'), emailVorschau({ pool }));
+app.post('/dispatch/email-vorschau', authenticateAny, requireRole('vorstand', 'admin'),
+    emailVorschau({ pool, bildRendern: htmlAlsBild }));
 
 // ============================================
 // SCHEDULED JOBS — zeitgesteuerter Hintergrund-Worker

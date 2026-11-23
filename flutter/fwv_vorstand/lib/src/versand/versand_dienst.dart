@@ -75,6 +75,9 @@ class VersandErgebnis {
 }
 
 /// Brief fuer ein Mitglied, fertig fuer /dispatch/send-post.
+/// Was die Vorschau zeigt.
+enum VorschauArt { email, brief }
+
 class Brief {
   const Brief({
     required this.html,
@@ -182,34 +185,33 @@ class VersandDienst {
     return pdf;
   }
 
-  /// Die E-Mail fuer [mitgliedId] genau so, wie der Versand sie baut
-  /// (`POST dispatch/email-vorschau`, gleiche Bausteine wie `/email/bulk`) -
-  /// als Text. Mit [anlassId] im Einladungs-Layout.
-  Future<({String? an, String betreff, String text})> emailVorschau({
+  /// E-Mail oder Brief fuer [mitgliedId] als Bild, genau so, wie der
+  /// Versand sie baut (vom Server gerendert, mit Layout, Links und beim Brief
+  /// dem QR-Code) - die App kann selbst kein HTML anzeigen.
+  Future<Uint8List> vorschauBild({
+    required VorschauArt art,
     required String mitgliedId,
     required String betreff,
     required String text,
     String? anlassId,
   }) async {
     final j = await api.post(
-      'dispatch/email-vorschau',
+      art == VorschauArt.email ? 'dispatch/email-vorschau' : 'dispatch/brief',
       daten: {
         'member_id': mitgliedId,
         'subject': betreff.trim(),
         'body': text,
+        'bild': true,
         if (anlassId != null) ...{
-          'layout': 'einladung',
+          if (art == VorschauArt.email) 'layout': 'einladung' else 'vorlage': 'einladung',
           'event_id': anlassId,
           'text_vollstaendig': true,
         },
       },
     );
-    final m = j is Map ? j : const {};
-    return (
-      an: jsonText(m['to']),
-      betreff: jsonText(m['subject']) ?? betreff.trim(),
-      text: htmlZuText(jsonText(m['html']) ?? ''),
-    );
+    final bild = j is Map ? jsonText(j['bild_base64']) : null;
+    if (bild == null) throw const ApiFehler('Der Server hat keine Vorschau geliefert.');
+    return base64Decode(bild);
   }
 
   Future<Brief> _brief(
