@@ -306,6 +306,8 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
         automaticallyImplyLeading: !widget.eingebettet,
         title: Text(a?.anlass.titel ?? _z.bezeichnung),
         actions: [
+          // Direktlink auf die Website-Seite des Anlasses (zum Weitergeben).
+          if (a != null) DirektlinkKnopf(anlass: a.anlass),
           if (a != null && _z.rechte(a).anlassBearbeiten)
             IconButton(
               onPressed: () => _oeffnen(

@@ -14,8 +14,7 @@ import 'package:fwv_core/fwv_core.dart';
 typedef NachrichtEntwurf = ({String betreff, String text, String? anlassId, String? anhang});
 
 /// Seite des Anlasses auf der Website (wie der QR in vorstand.html).
-Uri anlassSeite(Anlass a) =>
-    Uri.https('www.fwv-raura.ch', '/events.html', {'event': a.slug ?? a.id});
+Uri anlassSeite(Anlass a) => a.webseite;
 
 NachrichtEntwurf einladungsEntwurf(Anlass a) {
   // Der Text des Anlasses (seine Beschreibung) steht gleich im Feld - so
