@@ -85,6 +85,14 @@ class Postfach {
         return 'PDF';
       case 'POST /imap/send':
         return {'success': true};
+      case 'POST /imap/messages/7/spam':
+        return {
+          'gemeldet': true,
+          'entfernt': [
+            {'konto': 'aktuar@fwv-raura.ch', 'anzahl': 1},
+            {'konto': 'kassier@fwv-raura.ch', 'anzahl': 2},
+          ],
+        };
       case 'DELETE /imap/messages/7':
         mails = [...mails.where((m) => m['uid'] != 7)];
         return {'success': true};
@@ -193,6 +201,20 @@ void main() {
       expect(p.backend.angezeigt.single.$1, 'Plan.pdf');
       expect(p.backend.angezeigteTypen.single, 'application/pdf');
       expect(p.backend.geteilt, isEmpty);
+    });
+
+    testWidgets('Als Spam melden: Rueckfrage, Meldung, zurueck zur Liste', (tester) async {
+      final p = Postfach();
+      await zeigen(tester, PosteingangAnsicht(dienste: p.backend.dienste));
+      await tippen(tester, find.byKey(const Key('mail-7')));
+      await tippen(tester, find.byKey(const Key('mail-spam')));
+      expect(find.text('Als Spam melden?'), findsOneWidget);
+      await tippen(tester, find.widgetWithText(FilledButton, 'Als Spam melden'));
+
+      final a = p.backend.anfragen.lastWhere((a) => a.url.path == '/imap/messages/7/spam');
+      expect(jsonDecode(a.body), {'account': 'aktuar@fwv-raura.ch', 'folder': 'INBOX'});
+      expect(find.text('Als Spam gemeldet und aus 2 Postfächern entfernt.'), findsOneWidget);
+      expect(find.byKey(const Key('mail-spam')), findsNothing, reason: 'zurueck in der Liste');
     });
 
     testWidgets('Neue Mail: Adressbuch schlaegt vor', (tester) async {
