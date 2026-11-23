@@ -16,7 +16,10 @@ void main() {
     expect(anzeigeTyp(null, 'Beleg'), 'application/octet-stream');
     expect(inAppAnzeigbar('application/pdf'), isTrue);
     expect(inAppAnzeigbar('image/png'), isTrue);
-    expect(inAppAnzeigbar('text/plain'), isFalse);
+    expect(anzeigeTyp('text/plain; charset=utf-8', 'x'), 'text/plain');
+    expect(anzeigeTyp(null, 'Pingen.txt'), 'text/plain');
+    expect(inAppAnzeigbar('text/plain'), isTrue);
+    expect(inAppAnzeigbar('application/vnd.ms-word'), isFalse);
   });
 
   late List<(String, String)> geteilt;
@@ -51,13 +54,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Mit Viewer: Foto und PDF in der App, anderes geteilt', (tester) async {
+  testWidgets('Mit Viewer: Foto, PDF und Text in der App, anderes geteilt', (tester) async {
     final u = umgebung(mitViewer: true);
     await ansehen(tester, u, 'Quittung.jpg', 'image/jpeg');
     await ansehen(tester, u, 'Beleg.pdf', null);
     await ansehen(tester, u, 'Pingen.txt', 'text/plain');
-    expect(angezeigt, [('Quittung.jpg', 'image/jpeg'), ('Beleg.pdf', 'application/pdf')]);
-    expect(geteilt, [('Pingen.txt', 'text/plain')]);
+    await ansehen(tester, u, 'Abrechnung.docx', 'application/vnd.ms-word');
+    expect(angezeigt, [
+      ('Quittung.jpg', 'image/jpeg'),
+      ('Beleg.pdf', 'application/pdf'),
+      ('Pingen.txt', 'text/plain'),
+    ]);
+    expect(geteilt, [('Abrechnung.docx', 'application/vnd.ms-word')]);
   });
 
   testWidgets('Ohne Viewer: Teilen-Menue', (tester) async {

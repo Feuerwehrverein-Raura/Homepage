@@ -19,10 +19,11 @@ import 'package:printing/printing.dart';
 
 import '../dienste.dart';
 import 'bild_ansicht.dart';
+import 'text_ansicht.dart';
 
-/// Datei im Viewer der App: PDF in [PdfAnsicht], Fotos in [BildAnsicht];
-/// andere Typen gehen ueber [teilen] weiter. Teilen sonst nur ueber den
-/// Knopf oben im Viewer ([teilen]; Desktop: Downloads speichern und oeffnen).
+/// Datei im Viewer der App: PDF in [PdfAnsicht], Fotos in [BildAnsicht],
+/// Text (Pingen-Abrechnung) in [TextAnsicht]; andere Typen gehen ueber
+/// [teilen] weiter. Teilen sonst nur ueber den Knopf oben im Viewer ([teilen]; Desktop: Downloads speichern und oeffnen).
 Future<void> dateiImViewer(
   BuildContext context,
   Uint8List bytes,
@@ -34,6 +35,7 @@ Future<void> dateiImViewer(
   if (mimeTyp.startsWith('image/')) {
     return bildImViewer(context, bytes, dateiname, mimeTyp, teilen);
   }
+  if (mimeTyp == 'text/plain') return textImViewer(context, bytes, dateiname, teilen);
   return teilen(bytes, dateiname, mimeTyp);
 }
 

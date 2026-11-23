@@ -501,7 +501,8 @@ Future<bool> nachfragen(
 /// [dateiname] geraten (aeltere Belege ohne Typ); unbekannt:
 /// `application/octet-stream`.
 String anzeigeTyp(String? mimeTyp, String dateiname) {
-  final t = mimeTyp?.trim().toLowerCase() ?? '';
+  // "text/plain; charset=utf-8" (Mail-Anhaenge) -> "text/plain".
+  final t = (mimeTyp ?? '').split(';').first.trim().toLowerCase();
   if (t.isNotEmpty && t != 'application/octet-stream') return t == 'image/jpg' ? 'image/jpeg' : t;
   final endung = dateiname.toLowerCase().split('.').last;
   return switch (endung) {
@@ -510,14 +511,17 @@ String anzeigeTyp(String? mimeTyp, String dateiname) {
     'png' => 'image/png',
     'gif' => 'image/gif',
     'webp' => 'image/webp',
+    'txt' => 'text/plain',
     _ => 'application/octet-stream',
   };
 }
 
-/// PDFs und Fotos (JPG, PNG, GIF, WebP) zeigt die App selbst an; alles
-/// andere (Word, .ics, ...) geht weiter ins Teilen-Menue.
+/// PDFs, Fotos (JPG, PNG, GIF, WebP) und reiner Text (die Pingen-Abrechnung
+/// als Beleg der Porto-Spesen) zeigt die App selbst an; alles andere (Word,
+/// .ics, ...) geht weiter ins Teilen-Menue.
 bool inAppAnzeigbar(String mimeTyp) =>
     mimeTyp == 'application/pdf' ||
+    mimeTyp == 'text/plain' ||
     const {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}.contains(mimeTyp);
 
 /// Datei «ansehen»: PDF und Fotos im Viewer der App

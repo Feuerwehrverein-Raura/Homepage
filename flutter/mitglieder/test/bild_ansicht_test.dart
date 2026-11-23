@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_mitglieder/pdf/bild_ansicht.dart';
 import 'package:fwv_mitglieder/pdf/pdf_ansicht.dart';
+import 'package:fwv_mitglieder/pdf/text_ansicht.dart';
 import 'package:material_ui/material_ui.dart';
 
 // 1x1 Pixel, PNG.
@@ -23,13 +24,13 @@ void main() {
 
   setUp(() => geteilt = []);
 
-  Future<void> oeffnen(WidgetTester tester, String name, String typ) async {
+  Future<void> oeffnen(WidgetTester tester, String name, String typ, [Uint8List? inhalt]) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => dateiImViewer(context, _png, name, typ, teilen),
+              onPressed: () => dateiImViewer(context, inhalt ?? _png, name, typ, teilen),
               child: const Text('Ansehen'),
             ),
           ),
@@ -55,6 +56,19 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(BildAnsicht), findsNothing);
+  });
+
+  testWidgets('Text (Pingen-Abrechnung): eigene Ansicht, Umlaute, Teilen-Knopf', (tester) async {
+    final text = utf8.encode('Pingen November 2026\n\n3 Briefe à CHF 1.20\nTotal CHF 3.60\n');
+    await oeffnen(tester, 'Pingen_November_2026.txt', 'text/plain', Uint8List.fromList(text));
+    expect(find.byType(TextAnsicht), findsOneWidget);
+    expect(find.text('Pingen November 2026'), findsOneWidget, reason: 'Titel');
+    expect(find.textContaining('3 Briefe à CHF 1.20'), findsOneWidget);
+    expect(geteilt, isEmpty, reason: 'ansehen teilt nicht');
+
+    await tester.tap(find.byKey(const Key('text-teilen')));
+    await tester.pumpAndSettle();
+    expect(geteilt.single.$2, 'text/plain');
   });
 
   testWidgets('Unbekannter Typ: direkt ins Teilen-Menue', (tester) async {
