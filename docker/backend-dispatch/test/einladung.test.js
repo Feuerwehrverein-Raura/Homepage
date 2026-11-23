@@ -38,6 +38,17 @@ test('Inhalt: Tabelle, Beschreibung, Link, Unterschriften, QR; escaped', () => {
     assert.match(html, /Wir freuen uns über zahlreiches Erscheinen/);
 });
 
+test('Beschreibung schon im Text (App): nicht doppelt, «Im Namen des Vorstandes» bleibt', () => {
+    const L = require('../src/nachricht-layout');
+    const anlass = { ...JASS, description: 'Liebe Mitglieder\n\nWir jassen & lachen <3.' };
+    const mitText = E.einladungHtml({ anlass, introHtml: L.textZuHtml(anlass.description) });
+    assert.equal(mitText.split('Wir jassen &amp; lachen &lt;3.').length - 1, 1, 'nur einmal');
+    assert.match(mitText, /Im Namen des Vorstandes\./);
+    assert.match(mitText, /Was:<\/td>/);
+    const ohne = E.einladungHtml({ anlass, introHtml: '<p>Hallo</p>' });
+    assert.match(ohne, /Wir jassen &amp; lachen &lt;3\./, 'eigener Text: Beschreibung kommt dazu');
+});
+
 test('Helferaufruf nur bei Dorffest mit Schichten, nach Tag sortiert', () => {
     const schichten = [
         { date: '2026-08-02', start_time: '10:00:00', end_time: '12:00:00', bereich: 'Bar', needed: 2 },

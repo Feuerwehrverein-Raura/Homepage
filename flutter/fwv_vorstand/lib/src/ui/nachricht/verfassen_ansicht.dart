@@ -555,9 +555,9 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             key: Key('versand-einladung'),
             art: HinweisArt.neutral,
             text:
-                'Einladungs-Layout: Daten des Anlasses, Beschreibung, Unterschriften und QR-Code '
-                'kommen automatisch dazu – hier nur die Einleitung schreiben. Wie es aussieht, '
-                'zeigt die Brief-Vorschau.',
+                'Einladungs-Layout: Der Text oben ist die Beschreibung des Anlasses. Was, Wo, Wann, '
+                'Anmeldung, «Im Namen des Vorstandes» mit Unterschriften und QR-Code kommen '
+                'automatisch dazu. Wie es aussieht, zeigt die Brief-Vorschau.',
           ),
         ],
         if (widget.entwurf?.anhang case final anhang?) ...[
