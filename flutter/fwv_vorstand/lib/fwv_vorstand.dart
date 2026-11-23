@@ -44,6 +44,7 @@ export 'src/ui/nachricht/push_ansicht.dart';
 export 'src/ui/nachricht/push_oeffnen_feld.dart';
 export 'src/ui/nachricht/verfassen_ansicht.dart';
 export 'src/ui/nachricht/verlauf_ansicht.dart';
+export 'src/ui/nachricht/vorschau_seite.dart' show vorschauVerzoegerung;
 export 'src/ui/nachricht_ansicht.dart';
 export 'src/ui/posteingang_ansicht.dart';
 export 'src/ui/qr_zahlteil.dart' show SwissQrBild;

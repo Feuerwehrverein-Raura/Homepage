@@ -78,9 +78,14 @@ class FalschesBackend {
   );
 
   /// "PATCH /membership-fees/payments/p1/pay" ohne GET-Aufrufe.
+  /// Was der Server aendern wuerde - ohne die Vorschau (E-Mail/Brief als
+  /// Bild, aendert nichts).
   List<String> get aenderungen => [
     for (final a in anfragen)
-      if (a.method != 'GET') '${a.method} ${a.url.path}',
+      if (a.method != 'GET' &&
+          a.url.path != '/dispatch/email-vorschau' &&
+          !(a.url.path == '/dispatch/brief' && a.body.contains('"bild":true')))
+        '${a.method} ${a.url.path}',
   ];
 
   Object? body(String weg) {

@@ -11,6 +11,8 @@ import 'hilfe.dart';
 const _chilbi = '00000000-0000-0000-0000-e00000000001';
 
 void main() {
+  setUpAll(() => vorschauVerzoegerung = Duration.zero);
+
   late FalschesBackend backend;
 
   setUp(() {

@@ -209,23 +209,6 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     if (mounted) setState(() => _vorschauLaedt = false);
   }
 
-  /// Vorschau E-Mail und Brief zum Umschalten, vom Server gebaut
-  /// (vorschau_seite.dart) - die Box darueber zeigt nur das Textfeld.
-  Future<void> _vorschauZeigen(VorstandMitglied? emailProbe, VorstandMitglied? briefProbe) =>
-      Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => VorschauSeite(
-            dienst: _dienst,
-            betreff: _betreff.text,
-            text: _text.text,
-            anlassId: widget.entwurf?.anlassId,
-            emailProbe: emailProbe,
-            briefProbe: briefProbe,
-            briefAlsPdf: briefProbe == null ? null : () => _briefVorschau(briefProbe),
-          ),
-        ),
-      );
-
   Future<void> _senden(Versandplan plan) async {
     if (!_vollstaendig || plan.leer) return;
     final mitPost = plan.post.isNotEmpty;
@@ -575,7 +558,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             text:
                 'Einladung: Was oben steht, geht genau so raus. Dazu kommen nur der Titel, '
                 '«Mit freundlichen Grüssen» mit den Unterschriften und im Brief der QR-Code. '
-                'Ansehen: «Ganze Einladung ansehen».',
+                'Wie es aussieht, zeigt die Vorschau unten.',
           ),
         ],
         if (widget.entwurf?.anhang case final anhang?) ...[
@@ -628,24 +611,15 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     return Karte(
       titel: 'Vorschau',
       kinder: [
-        EmailVorschau(
-          key: const Key('versand-vorschau'),
-          probe: probe,
+        // Die echte Vorschau, E-Mail und Brief zum Umschalten (vom Server
+        // gebaut, laedt kurz nach dem Tippen neu) - vorschau_seite.dart.
+        VorschauAnsicht(
+          dienst: _dienst,
           betreff: _betreff.text,
           text: _text.text,
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          key: const Key('versand-vorschau-zeigen'),
-          onPressed: _text.text.trim().isEmpty || (emailProbe == null && briefProbe == null)
-              ? null
-              : () => _vorschauZeigen(emailProbe, briefProbe),
-          icon: const Icon(Icons.visibility_outlined),
-          label: Text(
-            widget.entwurf?.anlassId != null
-                ? 'Ganze Einladung ansehen (E-Mail / Brief)'
-                : 'Vorschau ansehen (E-Mail / Brief)',
-          ),
+          anlassId: widget.entwurf?.anlassId,
+          emailProbe: emailProbe,
+          briefProbe: briefProbe,
         ),
         if (_art != Versandart.email) ...[
           const SizedBox(height: 8),
