@@ -23,17 +23,22 @@ Anlass _anlass([Map<String, Object?> mehr = const {}]) => Anlass.ausJson({
 
 void main() {
   group('einladungsEntwurf', () {
-    test('Betreff und Einleitung, Rest setzt das Einladungs-Layout', () {
+    test('Text ist die Beschreibung des Anlasses', () {
       final e = einladungsEntwurf(_anlass());
       expect(e.betreff, 'Einladung: Chilbi 2026');
-      expect(e.text, 'Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.');
+      expect(e.text, 'Grill und Bar.');
       expect(e.anlassId, 'e1');
       expect(unbekanntePlatzhalter(e.text), isEmpty);
     });
 
-    test('Mit Schichten wird es ein Helferaufruf', () {
+    test('Ohne Beschreibung: Einleitung, mit Schichten ein Helferaufruf', () {
+      expect(
+        einladungsEntwurf(_anlass({'description': null})).text,
+        'Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.',
+      );
       final e = einladungsEntwurf(
         _anlass({
+          'description': '  ',
           'shifts': [
             {'id': 's1', 'name': 'Bar', 'needed': 2},
           ],
@@ -59,7 +64,7 @@ void main() {
       for (final f in tester.widgetList<EditableText>(find.byType(EditableText))) f.controller.text,
     ];
     expect(felder, contains('Einladung: Chilbi 2026'));
-    expect(felder, contains('Hiermit möchte der Vorstand euch zum Anlass «Chilbi 2026» einladen.'));
+    expect(felder, contains('Grill und Bar.'));
     expect(find.byKey(const Key('versand-einladung')), findsOneWidget);
     // Ohne PDF am Anlass kein Hinweis.
     expect(find.byKey(const Key('versand-anhang')), findsNothing);

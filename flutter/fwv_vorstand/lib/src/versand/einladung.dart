@@ -1,6 +1,7 @@
-// Einladung zu einem Anlass: Betreff und Einleitung fuer "Verfassen". Den
-// Rest - Titel, Beschreibung, Datentabelle, Schichten, Unterschriften und
-// QR-Code - setzt das Backend im Einladungs-Layout dazu
+// Einladung zu einem Anlass: Betreff und Text (die Beschreibung des
+// Anlasses) fuer "Verfassen". Den Rest - Titel, Datentabelle (Was, Wo,
+// Wann, Anmeldung, Kosten), Schichten, «Im Namen des Vorstandes» mit
+// Unterschriften und QR-Code - setzt das Backend im Einladungs-Layout dazu
 // (docker/backend-dispatch/src/einladung-layout.js, dasselbe wie die
 // Website), und das PDF des Anlasses kommt als Anhang mit.
 
@@ -17,9 +18,15 @@ Uri anlassSeite(Anlass a) =>
     Uri.https('www.fwv-raura.ch', '/events.html', {'event': a.slug ?? a.id});
 
 NachrichtEntwurf einladungsEntwurf(Anlass a) {
-  // Nur die Einleitung: Titel, Beschreibung, Datentabelle, Schichten, Gruss
-  // und QR setzt das Backend (einladung-layout.js, wie die Website).
-  final text = a.hatSchichten
+  // Der Text des Anlasses (seine Beschreibung) steht gleich im Feld - so
+  // sieht man vor dem Senden, was rausgeht, und kann es anpassen. Das
+  // Backend setzt die Beschreibung dann nicht noch einmal dazu, nur Titel,
+  // Was/Wo/Wann-Tabelle, Schichten, «Im Namen des Vorstandes» mit
+  // Unterschriften und QR (einladung-layout.js, wie die Website).
+  final beschreibung = a.beschreibung?.trim() ?? '';
+  final text = beschreibung.isNotEmpty
+      ? beschreibung
+      : a.hatSchichten
       ? 'Für unseren Anlass «${a.titel}» suchen wir Helferinnen und Helfer – bitte tragt euch '
             'für eine Schicht ein.'
       : 'Hiermit möchte der Vorstand euch zum Anlass «${a.titel}» einladen.';

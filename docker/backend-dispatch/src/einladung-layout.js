@@ -70,6 +70,22 @@ function anlassPlatzhalter(text, anlass) {
         .replace(/\{\{\s*event_location\s*\}\}/g, () => anlass.location || '');
 }
 
+/** Reiner Text aus HTML, Leerraum zusammengefasst (fuer Vergleiche). */
+function nurText(html) {
+    return String(html || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/** Steht [text] (ohne Ruecksicht auf Leerraum) schon in [html]? */
+function enthaeltText(html, text) {
+    const t = nurText(text);
+    return t.length > 0 && nurText(html).includes(t);
+}
+
 const ZELLE = 'font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;';
 
 /** Schichten nach Tag (Helferaufruf), leer ohne Schichten oder bei anderen Arten. */
@@ -122,7 +138,9 @@ function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, akt
         schluss ? `<tr><td style="${ZELLE}color:#c00;">Anmeldeschluss:</td><td style="color:#c00;font-weight:bold;">${e(schluss)}</td></tr>` : '',
         anlass.cost ? `<tr><td style="${ZELLE}">Kosten:</td><td>${e(anlass.cost)}</td></tr>` : ''
     ].filter(Boolean).join('');
-    const beschreibung = anlass.description
+    // Die App startet die Einladung mit der Beschreibung als Text - steht
+    // sie schon im Text, nicht ein zweites Mal darunter.
+    const beschreibung = anlass.description && !enthaeltText(introHtml, anlass.description)
         ? `<div style="margin:0 0 3mm 0;white-space:pre-wrap;">${e(anlass.description)}</div>`
         : '';
     const schichtHtml = schichtBlock(anlass, schichten);
