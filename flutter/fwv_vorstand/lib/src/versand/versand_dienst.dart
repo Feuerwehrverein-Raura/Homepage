@@ -182,6 +182,36 @@ class VersandDienst {
     return pdf;
   }
 
+  /// Die E-Mail fuer [mitgliedId] genau so, wie der Versand sie baut
+  /// (`POST dispatch/email-vorschau`, gleiche Bausteine wie `/email/bulk`) -
+  /// als Text. Mit [anlassId] im Einladungs-Layout.
+  Future<({String? an, String betreff, String text})> emailVorschau({
+    required String mitgliedId,
+    required String betreff,
+    required String text,
+    String? anlassId,
+  }) async {
+    final j = await api.post(
+      'dispatch/email-vorschau',
+      daten: {
+        'member_id': mitgliedId,
+        'subject': betreff.trim(),
+        'body': text,
+        if (anlassId != null) ...{
+          'layout': 'einladung',
+          'event_id': anlassId,
+          'text_vollstaendig': true,
+        },
+      },
+    );
+    final m = j is Map ? j : const {};
+    return (
+      an: jsonText(m['to']),
+      betreff: jsonText(m['subject']) ?? betreff.trim(),
+      text: htmlZuText(jsonText(m['html']) ?? ''),
+    );
+  }
+
   Future<Brief> _brief(
     String id,
     String betreff,
@@ -195,7 +225,11 @@ class VersandDienst {
         'member_id': id,
         'subject': betreff.trim(),
         'body': text,
-        if (anlassId != null) ...{'vorlage': 'einladung', 'event_id': anlassId},
+        if (anlassId != null) ...{
+          'vorlage': 'einladung',
+          'event_id': anlassId,
+          'text_vollstaendig': true,
+        },
         if (vorschau) ...{'vorschau': true, 'zonen': true},
       },
     );
@@ -237,6 +271,9 @@ class VersandDienst {
             'body': text,
             'layout': anlassId == null ? 'standard' : 'einladung',
             'event_id': ?anlassId,
+            // Einladung: der Text im Feld ist die ganze Einladung (einladung.dart);
+            // das Layout setzt nur Titel, Gruss, Unterschriften und QR dazu.
+            if (anlassId != null) 'text_vollstaendig': true,
             // Versandart E-Mail: auch an Mitglieder, die Post wuenschen.
             if (plan.art == Versandart.email) 'praeferenz_ignorieren': true,
             if (mailAnhaenge.isNotEmpty) 'attachments': mailAnhaenge,

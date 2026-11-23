@@ -70,22 +70,6 @@ function anlassPlatzhalter(text, anlass) {
         .replace(/\{\{\s*event_location\s*\}\}/g, () => anlass.location || '');
 }
 
-/** Reiner Text aus HTML, Leerraum zusammengefasst (fuer Vergleiche). */
-function nurText(html) {
-    return String(html || '')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-/** Steht [text] (ohne Ruecksicht auf Leerraum) schon in [html]? */
-function enthaeltText(html, text) {
-    const t = nurText(text);
-    return t.length > 0 && nurText(html).includes(t);
-}
-
 const ZELLE = 'font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;';
 
 /** Schichten nach Tag (Helferaufruf), leer ohne Schichten oder bei anderen Arten. */
@@ -126,7 +110,7 @@ function schichtBlock(anlass, schichten) {
  * schon als HTML (L.textZuHtml) und mit Mitglieder-Platzhaltern ersetzt.
  * [qr] ist ein data:-Bild oder leer.
  */
-function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, aktuar, qr = '' }) {
+function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, aktuar, qr = '', textVollstaendig = false }) {
     const e = L.escapeHtml;
     const wann = wannText(anlass);
     const schluss = schlussText(anlass);
@@ -138,9 +122,11 @@ function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, akt
         schluss ? `<tr><td style="${ZELLE}color:#c00;">Anmeldeschluss:</td><td style="color:#c00;font-weight:bold;">${e(schluss)}</td></tr>` : '',
         anlass.cost ? `<tr><td style="${ZELLE}">Kosten:</td><td>${e(anlass.cost)}</td></tr>` : ''
     ].filter(Boolean).join('');
-    // Die App startet die Einladung mit der Beschreibung als Text - steht
-    // sie schon im Text, nicht ein zweites Mal darunter.
-    const beschreibung = anlass.description && !enthaeltText(introHtml, anlass.description)
+    // textVollstaendig (App): Der Text im Editor ist die ganze Einladung -
+    // Beschreibung, Was/Wo/Wann, Link und «Im Namen des Vorstandes» stehen
+    // schon drin, so wie der Vorstand sie angepasst hat. Dazu kommen nur
+    // Titel, Schichten, Gruss mit Unterschriften und QR-Code.
+    const beschreibung = !textVollstaendig && anlass.description
         ? `<div style="margin:0 0 3mm 0;white-space:pre-wrap;">${e(anlass.description)}</div>`
         : '';
     const schichtHtml = schichtBlock(anlass, schichten);
@@ -151,7 +137,7 @@ function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, akt
                 ${untertitel ? `<div style="font-size:10pt;margin-bottom:3mm;">${e(untertitel)}</div>` : ''}
                 <hr style="border:none;border-top:1px solid #000;margin:0 0 3mm 0;">
                 ${introHtml ? `<div style="margin-bottom:3mm;">${introHtml}</div>` : ''}
-                ${beschreibung}
+                ${textVollstaendig ? schichtHtml : `${beschreibung}
                 <p style="margin:0 0 2mm 0;">Die wichtigsten Daten nochmals zusammengefasst:</p>
                 <table style="margin:0 0 3mm 0;border-collapse:collapse;">${zeilen}</table>
                 ${schichtHtml}
@@ -159,7 +145,7 @@ function einladungHtml({ anlass, schichten = [], introHtml = '', praesident, akt
                 <p style="margin:0;">${schichtHtml
         ? 'Ohne Helferinnen und Helfer geht es nicht — herzlichen Dank fürs Mitmachen.'
         : 'Wir freuen uns über zahlreiches Erscheinen.'}</p>
-                <p style="margin:0 0 3mm 0;">Im Namen des Vorstandes.</p>
+                <p style="margin:0 0 3mm 0;">Im Namen des Vorstandes.</p>`}
                 <p style="margin:0 0 6mm 0;">Mit freundlichen Grüssen</p>
                 <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;">
                     <tr>

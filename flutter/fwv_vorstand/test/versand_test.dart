@@ -184,6 +184,13 @@ class Dispatch {
           'failed': 0,
           'skipped': 0,
         };
+      case 'POST /dispatch/email-vorschau':
+        return {
+          'html':
+              '<html><body><p>${body['body']}</p><p>Was: Anlass</p><p>Im Namen des Vorstandes.</p></body></html>',
+          'to': 'beat@example.ch',
+          'subject': body['subject'],
+        };
       case 'POST /dispatch/brief':
         final id = body['member_id'] as String;
         return {
@@ -395,6 +402,9 @@ void main() {
       expect(d.posts('/email/bulk').map((m) => m['event_id']).toSet(), {'e1'});
       expect(d.posts('/dispatch/send-post').map((m) => m['event_id']).toSet(), {'e1'});
       expect(d.posts('/email/bulk').map((m) => m['layout']).toSet(), {'einladung'});
+      // Der Text im Editor ist die ganze Einladung - das Layout haengt nichts an.
+      expect(d.posts('/email/bulk').map((m) => m['text_vollstaendig']).toSet(), {true});
+      expect(d.posts('/dispatch/brief').map((m) => m['text_vollstaendig']).toSet(), {true});
       expect(d.posts('/dispatch/brief').map((m) => (m['vorlage'], m['event_id'])).toSet(), {
         ('einladung', 'e1'),
       });
@@ -766,6 +776,20 @@ void main() {
       await tippen(tester, find.byKey(const Key('versand-brief-vorschau')));
       expect(d.backend.geteilt, [('Vorschau_Beat_Brief.pdf', 8)]);
       expect(d.posts('/dispatch/brief').single['member_id'], 'm2');
+    });
+
+    testWidgets('E-Mail-Vorschau: so, wie der Server sie baut', (tester) async {
+      await oeffnen(tester);
+      await tester.enterText(find.byKey(const Key('versand-text')), 'Hallo');
+      await tester.pumpAndSettle();
+      await tippen(tester, find.byKey(const Key('versand-email-vorschau')));
+      final text = tester
+          .widget<SelectableText>(find.byKey(const Key('versand-email-vorschau-text')))
+          .data!;
+      expect(text, contains('Hallo'));
+      expect(text, contains('Im Namen des Vorstandes.'));
+      expect(find.textContaining('<beat@example.ch>'), findsOneWidget);
+      expect(d.posts('/dispatch/email-vorschau').single['body'], 'Hallo');
     });
 
     testWidgets('Desktop: Einstellungen und Inhalt nebeneinander', (tester) async {
