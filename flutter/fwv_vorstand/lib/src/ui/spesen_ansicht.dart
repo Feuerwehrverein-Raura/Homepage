@@ -35,18 +35,14 @@ class _SpesenAnsichtState extends State<SpesenAnsicht> {
     final ursprung = stelleVon(context);
     try {
       final bytes = await _dienst.beleg(s.id);
-      // PDF-Beleg im Viewer der App, wie die Beitragsbriefe; Fotos weiter
-      // ueber das Teilen-Menue (dort oeffnet sie die Galerie).
-      final umgebung = widget.dienste.umgebung;
-      final anzeigen = umgebung.pdfAnzeigen;
-      if (anzeigen != null && s.belegTyp == 'application/pdf') {
-        if (context.mounted) await anzeigen(context, bytes, s.belegName ?? 'Beleg.pdf');
-        return;
-      }
-      await umgebung.dateiTeilen(
+      // PDF und Foto im Viewer der App (Teilen dort oben in der Leiste).
+      if (!context.mounted) return;
+      await dateiAnsehen(
+        context,
+        widget.dienste.umgebung,
         bytes,
         s.belegName ?? 'Beleg',
-        s.belegTyp ?? 'application/octet-stream',
+        s.belegTyp,
         ursprung: ursprung,
       );
     } on Object catch (e) {

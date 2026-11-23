@@ -18,6 +18,24 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 
 import '../dienste.dart';
+import 'bild_ansicht.dart';
+
+/// Datei im Viewer der App: PDF in [PdfAnsicht], Fotos in [BildAnsicht];
+/// andere Typen gehen ueber [teilen] weiter. Teilen sonst nur ueber den
+/// Knopf oben im Viewer ([teilen]; Desktop: Downloads speichern und oeffnen).
+Future<void> dateiImViewer(
+  BuildContext context,
+  Uint8List bytes,
+  String dateiname,
+  String mimeTyp,
+  DateiTeilen teilen,
+) {
+  if (mimeTyp == 'application/pdf') return pdfImViewer(context, bytes, dateiname, teilen);
+  if (mimeTyp.startsWith('image/')) {
+    return bildImViewer(context, bytes, dateiname, mimeTyp, teilen);
+  }
+  return teilen(bytes, dateiname, mimeTyp);
+}
 
 /// Oeffnet [bytes] als ganze Seite; zurueck mit dem Pfeil.
 Future<void> pdfImViewer(

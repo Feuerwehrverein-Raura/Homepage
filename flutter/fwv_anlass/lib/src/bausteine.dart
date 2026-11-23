@@ -497,20 +497,63 @@ Future<bool> nachfragen(
   return antwort ?? false;
 }
 
-/// Laedt ein PDF und zeigt es im Viewer der App ([VerwaltungsUmgebung.pdfAnzeigen]).
-/// Fuer «ansehen»: wer nur nachschauen will, soll nicht im Teilen-Menue
-/// landen. Ohne Viewer bleibt es beim Teilen.
+/// MIME-Typ fuer die Anzeige: [mimeTyp], sonst aus der Endung von
+/// [dateiname] geraten (aeltere Belege ohne Typ); unbekannt:
+/// `application/octet-stream`.
+String anzeigeTyp(String? mimeTyp, String dateiname) {
+  final t = mimeTyp?.trim().toLowerCase() ?? '';
+  if (t.isNotEmpty && t != 'application/octet-stream') return t == 'image/jpg' ? 'image/jpeg' : t;
+  final endung = dateiname.toLowerCase().split('.').last;
+  return switch (endung) {
+    'pdf' => 'application/pdf',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'png' => 'image/png',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+    _ => 'application/octet-stream',
+  };
+}
+
+/// PDFs und Fotos (JPG, PNG, GIF, WebP) zeigt die App selbst an; alles
+/// andere (Word, .ics, ...) geht weiter ins Teilen-Menue.
+bool inAppAnzeigbar(String mimeTyp) =>
+    mimeTyp == 'application/pdf' ||
+    const {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}.contains(mimeTyp);
+
+/// Datei «ansehen»: PDF und Fotos im Viewer der App
+/// ([VerwaltungsUmgebung.dateiAnzeigen]) - wer nur nachschauen will, soll
+/// nicht im Teilen-Menue landen; geteilt wird dort ueber den Knopf oben.
+/// Andere Typen und ohne Viewer (Tests): Teilen-Menue wie bisher
+/// ([ursprung] fuer das iPad). Fehler wirft es weiter.
+Future<void> dateiAnsehen(
+  BuildContext context,
+  VerwaltungsUmgebung umgebung,
+  Uint8List bytes,
+  String dateiname,
+  String? mimeTyp, {
+  Rect? ursprung,
+}) async {
+  final typ = anzeigeTyp(mimeTyp, dateiname);
+  final anzeigen = umgebung.dateiAnzeigen;
+  if (anzeigen != null && inAppAnzeigbar(typ)) {
+    if (context.mounted) await anzeigen(context, bytes, dateiname, typ);
+    return;
+  }
+  await umgebung.dateiTeilen(bytes, dateiname, typ, ursprung: ursprung);
+}
+
+/// Laedt ein PDF und zeigt es im Viewer der App ([dateiAnsehen]). Ohne
+/// Viewer bleibt es beim Teilen.
 Future<void> pdfAnsehen(
   BuildContext context,
   VerwaltungsUmgebung umgebung,
   Future<Uint8List> Function() laden,
   String dateiname,
 ) async {
-  final anzeigen = umgebung.pdfAnzeigen;
-  if (anzeigen == null) return pdfTeilen(context, umgebung, laden, dateiname);
+  if (umgebung.dateiAnzeigen == null) return pdfTeilen(context, umgebung, laden, dateiname);
   try {
     final bytes = await laden();
-    if (context.mounted) await anzeigen(context, bytes, dateiname);
+    if (context.mounted) await dateiAnsehen(context, umgebung, bytes, dateiname, 'application/pdf');
   } on Object catch (e) {
     if (context.mounted) meldung(context, fehlerText(e));
   }

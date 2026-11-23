@@ -126,4 +126,14 @@ void main() {
     expect(k.backend.anfragen.last.url.queryParameters.containsKey('status'), isFalse);
     expect(find.textContaining('Schon bezahlt'), findsOneWidget);
   });
+
+  testWidgets('Mit Viewer: Foto-Beleg in der App, nicht im Teilen-Menue', (tester) async {
+    final k = _Kasse();
+    k.backend.mitViewer = true;
+    await zeigen(tester, SpesenAnsicht(dienste: k.backend.dienste));
+    await tippen(tester, find.byKey(const Key('spesen-beleg-s1')));
+    expect(k.backend.angezeigt.single.$1, 'Quittung.jpg');
+    expect(k.backend.angezeigteTypen.single, 'image/jpeg');
+    expect(k.backend.geteilt, isEmpty);
+  });
 }

@@ -36,7 +36,10 @@ class _ArbeitsplanScreenState extends State<ArbeitsplanScreen> {
     try {
       final bytes = await widget.dienste.anlaesse.arbeitsplanPdf(widget.anlassId);
       final name = widget.titel.replaceAll(RegExp(r'[^A-Za-z0-9ÄÖÜäöü ]'), '').trim();
-      await widget.dienste.dateiTeilen(
+      if (!mounted) return;
+      // Im PDF-Viewer der App; Teilen und Drucken dort oben in der Leiste.
+      await widget.dienste.dateiAnsehen(
+        context,
         bytes,
         'Arbeitsplan_${name.isEmpty ? 'Anlass' : name.replaceAll(' ', '_')}.pdf',
         'application/pdf',
