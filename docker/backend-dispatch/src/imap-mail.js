@@ -10,6 +10,7 @@
  */
 
 const { vorstandsRollen } = require('./vorstand-rolle');
+const { spamMelden } = require('./spam-melden');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const nodemailer = require('nodemailer');
@@ -592,6 +593,48 @@ function mountImap(app, pool, authVorstand) {
             res.status(500).json({ error: err.message });
         } finally {
             if (client) await client.logout().catch(() => {});
+        }
+    });
+
+    // «Als Spam melden» (src/spam-melden.js): an spam@, eigenes Postfach nach
+    // Junk, dieselbe Mail (Message-ID) in allen Funktions-Postfaechern nach Junk.
+    app.post('/imap/messages/:uid/spam', authVorstand, async (req, res) => {
+        const account = (req.query.account || req.body?.account || '').toLowerCase();
+        const folder = req.query.folder || req.body?.folder || 'INBOX';
+        const uid = parseInt(req.params.uid, 10);
+        if (!allowedAccounts(req).includes(account)) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Postfach' });
+        }
+        if (!uid) return res.status(400).json({ error: 'uid erforderlich' });
+        try {
+            const ergebnis = await spamMelden({
+                konto: account,
+                ordner: folder,
+                uid,
+                verbinden: (konto) => connectImap(pool, konto),
+                senden: async ({ from, to, raw }) => {
+                    const password = await getAccountPassword(from);
+                    const transporter = nodemailer.createTransport({
+                        host: SMTP_HOST, port: SMTP_PORT, secure: false, requireTLS: true,
+                        auth: { user: from, pass: password }
+                    });
+                    await transporter.sendMail({ envelope: { from, to }, raw });
+                },
+                alleKonten: async () =>
+                    (await pool.query('SELECT email FROM shared_mailbox_passwords')).rows.map(r => r.email),
+                log: (text, daten) => console.warn('[IMAP] spam:', text, JSON.stringify(daten || {}))
+            });
+            if (ergebnis.absender) {
+                await pool.query('DELETE FROM discovered_contacts WHERE email = $1', [ergebnis.absender])
+                    .catch(() => {});
+            }
+            console.log('[IMAP] Spam gemeldet', JSON.stringify({
+                von: account, absender: ergebnis.absender, entfernt: ergebnis.entfernt
+            }));
+            res.json(ergebnis);
+        } catch (err) {
+            console.error('[IMAP] /spam failed:', err.message);
+            res.status(err.status || 500).json({ error: err.message });
         }
     });
 

@@ -341,6 +341,26 @@ class _MailScreenState extends State<MailScreen> {
     }
   }
 
+  Future<void> _spam() async {
+    final ok = await nachfragen(
+      context,
+      titel: 'Als Spam melden?',
+      text:
+          'Die Mail geht an spam@fwv-raura.ch und wird hier sowie in allen '
+          'Funktions-Postfächern, die sie auch bekommen haben, in den Spam-Ordner verschoben.',
+      ja: 'Als Spam melden',
+    );
+    if (!ok || !mounted) return;
+    try {
+      final r = await _dienst.alsSpamMelden(widget.konto, widget.ordner, widget.uid);
+      if (!mounted) return;
+      meldung(context, r.text);
+      Navigator.of(context).pop(true);
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    }
+  }
+
   Future<void> _loeschen() async {
     final papierkorb = RegExp('trash|papierkorb', caseSensitive: false).hasMatch(widget.ordner);
     if (papierkorb) {
@@ -370,6 +390,13 @@ class _MailScreenState extends State<MailScreen> {
           title: const Text('Mail'),
           actions: [
             if (m != null) ...[
+              if (!RegExp('junk|spam', caseSensitive: false).hasMatch(widget.ordner))
+                IconButton(
+                  key: const Key('mail-spam'),
+                  tooltip: 'Als Spam melden',
+                  icon: const Icon(Icons.report_outlined),
+                  onPressed: _spam,
+                ),
               IconButton(
                 key: const Key('mail-antworten'),
                 tooltip: 'Antworten',

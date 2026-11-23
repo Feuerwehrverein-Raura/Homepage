@@ -302,6 +302,14 @@ class PosteingangDienst {
     },
   );
 
+  /// Als Spam melden: an spam@fwv-raura.ch, hier nach Junk und dieselbe
+  /// Mail in allen Funktions-Postfaechern nach Junk (backend-dispatch,
+  /// src/spam-melden.js).
+  Future<SpamMeldung> alsSpamMelden(String konto, String ordner, int uid) async {
+    final j = await api.post('imap/messages/$uid/spam', daten: _wo(konto, ordner));
+    return SpamMeldung.ausJson(j is Map ? Map<String, dynamic>.from(j) : const {});
+  }
+
   /// In den Papierkorb (im Papierkorb: endgueltig).
   Future<void> loeschen(String konto, String ordner, int uid) => api.delete(
     'imap/messages/$uid?account=${Uri.encodeQueryComponent(konto)}'
@@ -346,5 +354,35 @@ class PosteingangDienst {
                 quelle: jsonText(k['source']) ?? teil,
               ),
     ];
+  }
+}
+
+/// Antwort von «Als Spam melden».
+class SpamMeldung {
+  const SpamMeldung({required this.gemeldet, this.postfaecher = 0, this.mails = 0});
+
+  factory SpamMeldung.ausJson(Map<String, dynamic> j) {
+    final entfernt = j['entfernt'] is List ? j['entfernt'] as List : const [];
+    return SpamMeldung(
+      gemeldet: j['gemeldet'] != false,
+      postfaecher: entfernt.length,
+      mails: entfernt.fold<int>(0, (n, e) => n + (e is Map ? jsonZahl(e['anzahl']) ?? 0 : 0)),
+    );
+  }
+
+  /// An spam@ gegangen (sonst nur aufgeraeumt).
+  final bool gemeldet;
+
+  /// In wie vielen Postfaechern die Mail nach Junk verschoben wurde.
+  final int postfaecher;
+  final int mails;
+
+  String get text {
+    final wo = postfaecher <= 1
+        ? 'in den Spam-Ordner verschoben'
+        : 'aus $postfaecher Postfächern entfernt';
+    return gemeldet
+        ? 'Als Spam gemeldet und $wo.'
+        : 'Nach Spam verschoben ($wo) – Meldung an spam@ fehlgeschlagen.';
   }
 }
