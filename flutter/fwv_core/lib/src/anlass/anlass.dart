@@ -65,6 +65,12 @@ class Anlass {
 
   final String id;
   final String? slug;
+
+  /// Direktlink auf die Seite des Anlasses (www.fwv-raura.ch/events.html,
+  /// derselbe wie der QR-Code der Einladung) - zum Weitergeben.
+  Uri get webseite =>
+      Uri.https('www.fwv-raura.ch', '/events.html', {'event': slug ?? id});
+
   final String titel;
   final String? untertitel;
   final String? kategorie;

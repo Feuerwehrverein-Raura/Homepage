@@ -6,7 +6,7 @@
 
 import 'dart:convert';
 
-import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
+import 'package:fwv_anlass/fwv_anlass.dart' show DirektlinkKnopf, mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -98,6 +98,7 @@ class _AnlassDetailScreenState extends State<AnlassDetailScreen> {
       appBar: AppBar(
         title: Text(a?.titel ?? 'Anlass'),
         actions: [
+          if (a != null) DirektlinkKnopf(anlass: a),
           // Ideen ohne Datum: nichts fuer den Kalender.
           if (a != null && !a.app.datumOffen)
             Builder(

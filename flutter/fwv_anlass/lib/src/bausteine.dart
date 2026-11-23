@@ -4,7 +4,8 @@
 // Rueckfrage, PDF ansehen/teilen, Zahl mit Plus/Minus.
 
 import 'dart:math' as math;
-import 'dart:typed_data';
+
+import 'package:flutter/services.dart';
 
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
@@ -282,6 +283,26 @@ HinweisArt hinweisArtFuer(StatusFarbe f) => switch (f) {
 };
 
 /// Zeile mit Symbol und Text (Datum, Ort, Kosten ...).
+/// Knopf fuer die Titelleiste: kopiert den Direktlink auf die Website-Seite
+/// des Anlasses ([Anlass.webseite]) - zum Weitergeben per WhatsApp, Mail usw.
+class DirektlinkKnopf extends StatelessWidget {
+  const DirektlinkKnopf({super.key, required this.anlass});
+
+  final Anlass anlass;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: const Key('anlass-link-kopieren'),
+    tooltip: 'Direktlink kopieren',
+    icon: const Icon(Icons.link),
+    onPressed: () async {
+      final link = anlass.webseite.toString();
+      await Clipboard.setData(ClipboardData(text: link));
+      if (context.mounted) meldung(context, 'Direktlink kopiert: $link');
+    },
+  );
+}
+
 class InfoZeile extends StatelessWidget {
   const InfoZeile({super.key, required this.symbol, required this.text, this.titel});
 
