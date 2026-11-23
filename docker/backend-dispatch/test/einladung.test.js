@@ -55,6 +55,16 @@ test('text_vollstaendig (App): nur der Text, dazu Titel, Gruss, Unterschriften, 
     assert.match(web, /Im Namen des Vorstandes\./);
 });
 
+test('E-Mail ohne QR, Brief mit QR', async () => {
+    const R = require('../src/nachricht-routen');
+    const laden = async () => ({ anlass: JASS, schichten: [], qr: 'data:image/png;base64,AA' });
+    const mitglied = { vorname: 'Pia' };
+    const mail = await R.einladungInhalt(null, 'e1', 'Hallo', mitglied, laden, null, true, true);
+    assert.doesNotMatch(mail, /<img /);
+    const brief = await R.einladungInhalt(null, 'e1', 'Hallo', mitglied, laden, null, true, false);
+    assert.match(brief, /<img src="data:image\/png;base64,AA"/);
+});
+
 test('Helferaufruf nur bei Dorffest mit Schichten, nach Tag sortiert', () => {
     const schichten = [
         { date: '2026-08-02', start_time: '10:00:00', end_time: '12:00:00', bereich: 'Bar', needed: 2 },

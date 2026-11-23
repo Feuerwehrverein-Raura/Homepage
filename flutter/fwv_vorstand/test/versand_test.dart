@@ -49,6 +49,10 @@ Map<String, Object?> mitgliedJson(
   'ort': adresse ? 'Kaiseraugst' : null,
 };
 
+// 1x1 Pixel, PNG - Vorschau-Bild vom nachgebauten Server.
+const _pngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 final mitgliederStart = [
   mitgliedJson('m1', 'Anna', 'Aktiv'),
   mitgliedJson('m2', 'Beat', 'Brief', zEmail: false, zPost: true),
@@ -190,6 +194,7 @@ class Dispatch {
               '<html><body><p>${body['body']}</p><p>Was: Anlass</p><p>Im Namen des Vorstandes.</p></body></html>',
           'to': 'beat@example.ch',
           'subject': body['subject'],
+          if (body['bild'] == true) 'bild_base64': _pngBase64,
         };
       case 'POST /dispatch/brief':
         final id = body['member_id'] as String;
@@ -199,6 +204,7 @@ class Dispatch {
           'recipient': {'name': 'Name $id', 'country': 'CH'},
           'subject': body['subject'],
           if (body['vorschau'] == true) 'pdf_base64': base64Encode(utf8.encode('%PDF-1.4')),
+          if (body['bild'] == true) 'bild_base64': _pngBase64,
         };
       case 'POST /dispatch/send-post':
         if (briefFehler.contains(body['member_id'])) {
@@ -778,18 +784,26 @@ void main() {
       expect(d.posts('/dispatch/brief').single['member_id'], 'm2');
     });
 
-    testWidgets('E-Mail-Vorschau: so, wie der Server sie baut', (tester) async {
+    testWidgets('Vorschau: E-Mail und Brief zum Umschalten, vom Server gerendert', (tester) async {
       await oeffnen(tester);
       await tester.enterText(find.byKey(const Key('versand-text')), 'Hallo');
       await tester.pumpAndSettle();
-      await tippen(tester, find.byKey(const Key('versand-email-vorschau')));
-      final text = tester
-          .widget<SelectableText>(find.byKey(const Key('versand-email-vorschau-text')))
-          .data!;
-      expect(text, contains('Hallo'));
-      expect(text, contains('Im Namen des Vorstandes.'));
-      expect(find.textContaining('<beat@example.ch>'), findsOneWidget);
-      expect(d.posts('/dispatch/email-vorschau').single['body'], 'Hallo');
+      await tippen(tester, find.byKey(const Key('versand-vorschau-zeigen')));
+      expect(find.byKey(const Key('vorschau-bild-email')), findsOneWidget);
+      final mail = d.posts('/dispatch/email-vorschau').single;
+      expect(mail['bild'], true);
+      expect(mail['body'], 'Hallo');
+
+      await tester.tap(find.text('Brief'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('vorschau-bild-brief')), findsOneWidget);
+      expect(d.posts('/dispatch/brief').single['bild'], true);
+      expect(find.byKey(const Key('vorschau-brief-pdf')), findsOneWidget);
+
+      // Zurueck zur E-Mail: nicht nochmals geladen.
+      await tester.tap(find.text('E-Mail'));
+      await tester.pumpAndSettle();
+      expect(d.posts('/dispatch/email-vorschau'), hasLength(1));
     });
 
     testWidgets('Desktop: Einstellungen und Inhalt nebeneinander', (tester) async {

@@ -22,6 +22,7 @@ import '../../versand/versand_dienst.dart';
 import '../../zeit.dart';
 import 'empfaenger_auswahl.dart';
 import 'versand_bausteine.dart';
+import 'vorschau_seite.dart';
 import 'vorlagen_screen.dart';
 
 class VerfassenAnsicht extends StatefulWidget {
@@ -208,50 +209,22 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     if (mounted) setState(() => _vorschauLaedt = false);
   }
 
-  /// Die E-Mail so, wie sie rausgeht (vom Server gebaut) - die Box darueber
-  /// zeigt nur das Textfeld. Bei Einladungen kommen Anlass-Daten,
-  /// Beschreibung und Gruss dazu; am 23.11.2026 ging eine Einladung mit
-  /// doppeltem Text raus, weil das nirgends zu sehen war.
-  Future<void> _emailVorschau(VorstandMitglied probe) async {
-    final laden = _dienst.emailVorschau(
-      mitgliedId: probe.id,
-      betreff: _betreff.text,
-      text: _text.text,
-      anlassId: widget.entwurf?.anlassId,
-    );
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (c) => Scaffold(
-          appBar: AppBar(title: const Text('E-Mail wie sie rausgeht')),
-          body: FutureBuilder(
-            future: laden,
-            builder: (c, s) => switch (s) {
-              AsyncSnapshot(:final error?) => Center(
-                child: Padding(padding: const EdgeInsets.all(24), child: Text(fehlerText(error))),
-              ),
-              AsyncSnapshot(:final data?) => SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'An: ${mitgliedName(probe)}${data.an == null ? '' : ' <${data.an}>'}',
-                      style: Theme.of(c).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(data.betreff, style: Theme.of(c).textTheme.titleMedium),
-                    const Divider(height: 24),
-                    SelectableText(data.text, key: const Key('versand-email-vorschau-text')),
-                  ],
-                ),
-              ),
-              _ => const Center(child: CircularProgressIndicator()),
-            },
+  /// Vorschau E-Mail und Brief zum Umschalten, vom Server gebaut
+  /// (vorschau_seite.dart) - die Box darueber zeigt nur das Textfeld.
+  Future<void> _vorschauZeigen(VorstandMitglied? emailProbe, VorstandMitglied? briefProbe) =>
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => VorschauSeite(
+            dienst: _dienst,
+            betreff: _betreff.text,
+            text: _text.text,
+            anlassId: widget.entwurf?.anlassId,
+            emailProbe: emailProbe,
+            briefProbe: briefProbe,
+            briefAlsPdf: briefProbe == null ? null : () => _briefVorschau(briefProbe),
           ),
         ),
-      ),
-    );
-  }
+      );
 
   Future<void> _senden(Versandplan plan) async {
     if (!_vollstaendig || plan.leer) return;
@@ -601,7 +574,7 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
             art: HinweisArt.neutral,
             text:
                 'Einladung: Was oben steht, geht genau so raus. Dazu kommen nur der Titel, '
-                '«Mit freundlichen Grüssen» mit den Unterschriften und der QR-Code. '
+                '«Mit freundlichen Grüssen» mit den Unterschriften und im Brief der QR-Code. '
                 'Ansehen: «Ganze Einladung ansehen».',
           ),
         ],
@@ -650,6 +623,8 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
     final t = Theme.of(context);
     final probe = plan.email.firstOrNull ?? empfaenger.firstOrNull;
     final briefProbe = plan.post.firstOrNull;
+    // Fuer die Vorschau: wer die E-Mail bekommt, sonst irgendein Empfaenger.
+    final emailProbe = _art == Versandart.post ? null : probe;
     return Karte(
       titel: 'Vorschau',
       kinder: [
@@ -661,15 +636,15 @@ class _VerfassenAnsichtState extends State<VerfassenAnsicht> {
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
-          key: const Key('versand-email-vorschau'),
-          onPressed: probe == null || _text.text.trim().isEmpty
+          key: const Key('versand-vorschau-zeigen'),
+          onPressed: _text.text.trim().isEmpty || (emailProbe == null && briefProbe == null)
               ? null
-              : () => _emailVorschau(probe),
-          icon: const Icon(Icons.mark_email_read_outlined),
+              : () => _vorschauZeigen(emailProbe, briefProbe),
+          icon: const Icon(Icons.visibility_outlined),
           label: Text(
             widget.entwurf?.anlassId != null
-                ? 'Ganze Einladung ansehen (wie sie rausgeht)'
-                : 'E-Mail ansehen (wie sie rausgeht)',
+                ? 'Ganze Einladung ansehen (E-Mail / Brief)'
+                : 'Vorschau ansehen (E-Mail / Brief)',
           ),
         ),
         if (_art != Versandart.email) ...[
