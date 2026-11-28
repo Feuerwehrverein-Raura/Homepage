@@ -241,3 +241,12 @@ TabBar reiterAufRot({
   indicatorColor: FwvFarben.aufRot,
   dividerColor: const Color(0x00000000),
 );
+
+/// Stil fuer Textknoepfe in der roten Titelleiste (Speichern, Fertig,
+/// Uebernehmen). Das [fwvThema] faerbt Textknoepfe rot - in der roten
+/// Leiste waeren sie damit unsichtbar.
+ButtonStyle titelleistenKnopf() => TextButton.styleFrom(
+  foregroundColor: FwvFarben.aufRot,
+  // Ausgegraut sonst dunkelrot auf Rot - kaum zu sehen.
+  disabledForegroundColor: FwvFarben.aufRot.withValues(alpha: 0.5),
+);

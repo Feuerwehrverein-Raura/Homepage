@@ -5,7 +5,7 @@
 // Speichern sitzt oben in der Titelleiste und ist damit auch bei offener
 // Tastatur sichtbar.
 
-import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste, titelleistenKnopf;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -168,6 +168,7 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
                   )
                 : TextButton(
                     key: const Key('profil-speichern'),
+                    style: titelleistenKnopf(),
                     onPressed: beschaeftigt ? null : _speichern,
                     child: const Text('Speichern'),
                   ),

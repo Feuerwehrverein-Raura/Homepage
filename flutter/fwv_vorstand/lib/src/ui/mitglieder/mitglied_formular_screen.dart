@@ -185,6 +185,7 @@ class _MitgliedFormularScreenState extends State<MitgliedFormularScreen> {
                   )
                 : TextButton(
                     key: const Key('mitglied-speichern'),
+                    style: titelleistenKnopf(),
                     onPressed: _speichern,
                     child: const Text('Speichern'),
                   ),

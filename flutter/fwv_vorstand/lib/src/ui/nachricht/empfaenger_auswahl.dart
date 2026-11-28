@@ -95,6 +95,7 @@ class _EmpfaengerAuswahlScreenState extends State<EmpfaengerAuswahlScreen> {
         actions: [
           TextButton(
             key: const Key('auswahl-fertig'),
+            style: titelleistenKnopf(),
             onPressed: () => Navigator.of(context).pop(_ids),
             child: Text('Fertig (${_ids.length})'),
           ),
