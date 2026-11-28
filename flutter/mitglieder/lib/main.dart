@@ -6,7 +6,8 @@
 // package:flutter/material.dart — die eingebauten Importe werden ab November
 // 2026 abgekuendigt.
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben, fwvThema;
 import 'package:just_audio_background/just_audio_background.dart';
@@ -23,14 +24,23 @@ Future<void> main() async {
   // in der Benachrichtigung und auf dem Sperrbildschirm (fwv_roterschopf,
   // musik/player.dart). Muss vor dem ersten Player stehen.
   // Im Browser gibt es keine Benachrichtigung dafuer; just_audio spielt dort
-  // ohne.
-  if (!kIsWeb) {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'ch.fwvraura.fwv_app.musik',
-      androidNotificationChannelName: 'Musik',
-      androidNotificationOngoing: true,
-      androidNotificationIcon: 'drawable/ic_benachrichtigung',
-    );
+  // ohne. audio_service (darunter) gibt es nur fuer Android, iOS und macOS:
+  // unter Windows und Linux warf init eine MissingPluginException, main brach
+  // vor runApp ab und das Fenster blieb schwarz. Ein Fehler hier darf den
+  // Start nie verhindern.
+  if (!kIsWeb &&
+      const [TargetPlatform.android, TargetPlatform.iOS, TargetPlatform.macOS]
+          .contains(defaultTargetPlatform)) {
+    try {
+      await JustAudioBackground.init(
+        androidNotificationChannelId: 'ch.fwvraura.fwv_app.musik',
+        androidNotificationChannelName: 'Musik',
+        androidNotificationOngoing: true,
+        androidNotificationIcon: 'drawable/ic_benachrichtigung',
+      );
+    } catch (e) {
+      debugPrint('Musik im Hintergrund nicht verfuegbar: $e');
+    }
   }
   runApp(FwvApp(dienste: Dienste.echt()));
 }
