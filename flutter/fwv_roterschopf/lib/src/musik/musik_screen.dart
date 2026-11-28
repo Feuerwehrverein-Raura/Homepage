@@ -16,7 +16,8 @@ import 'package:fwv_anlass/fwv_anlass.dart'
         meldung,
         nachfragen,
         reiterAufRot,
-        mitSystemleiste;
+        mitSystemleiste,
+        titelleistenKnopf;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
@@ -663,6 +664,7 @@ class _TitelSucheState extends State<TitelSuche> {
         title: const Text('Titel suchen'),
         actions: [
           TextButton(
+            style: titelleistenKnopf(),
             onPressed: _gewaehlt.isEmpty
                 ? null
                 : () => Navigator.of(context).pop(_gewaehlt.values.toList()),
@@ -796,12 +798,7 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
           if (a != null)
             TextButton(
               onPressed: gewaehlt.isEmpty ? null : () => Navigator.of(context).pop(gewaehlt),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                // Ausgegraut sonst dunkelrot auf Rot - kaum zu sehen.
-                disabledForegroundColor: Theme.of(context).colorScheme.onPrimary
-                    .withValues(alpha: 0.5),
-              ),
+              style: titelleistenKnopf(),
               child: Text('Übernehmen (${gewaehlt.length})'),
             ),
         ],
