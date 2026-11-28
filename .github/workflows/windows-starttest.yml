@@ -30,13 +30,20 @@ jobs:
           flutter pub get
           flutter build windows --release
           flutter build windows --debug
+          cd ../musik && flutter pub get && flutter build windows --release
 
       - name: Starten und pruefen
         run: |
           New-Item -ItemType Directory -Force "$env:GITHUB_WORKSPACE\starttest" | Out-Null
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          foreach ($art in 'Release', 'Debug') {
-            $exe = "$PWD\build\windows\x64\runner\$art\fwv_mitglieder.exe"
+          $m = "$PWD\build\windows\x64\runner"
+          $proben = @{
+            'Release' = "$m\Release\fwv_mitglieder.exe"
+            'Debug' = "$m\Debug\fwv_mitglieder.exe"
+            'Musik' = "$PWD\..\musik\build\windows\x64\runner\Release\fwv_musik.exe"
+          }
+          foreach ($art in 'Release', 'Debug', 'Musik') {
+            $exe = $proben[$art]
             $log = "$env:GITHUB_WORKSPACE\starttest\$art"
             Write-Host "=== $art ($exe)"
             $p = Start-Process $exe -PassThru -WorkingDirectory (Split-Path $exe) `
