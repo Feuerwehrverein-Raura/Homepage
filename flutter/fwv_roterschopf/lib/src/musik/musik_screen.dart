@@ -664,16 +664,10 @@ class _TitelSucheState extends State<TitelSuche> {
         title: const Text('Titel suchen'),
         actions: [
           TextButton(
-            style: titelleistenKnopf(),
             onPressed: _gewaehlt.isEmpty
                 ? null
                 : () => Navigator.of(context).pop(_gewaehlt.values.toList()),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              // Ausgegraut sonst dunkelrot auf Rot - kaum zu sehen.
-              disabledForegroundColor: Theme.of(context).colorScheme.onPrimary
-                  .withValues(alpha: 0.5),
-            ),
+            style: titelleistenKnopf(),
             child: Text(_gewaehlt.isEmpty ? 'Übernehmen' : 'Übernehmen (${_gewaehlt.length})'),
           ),
         ],
