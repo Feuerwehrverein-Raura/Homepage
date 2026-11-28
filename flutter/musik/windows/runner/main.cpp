@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
@@ -21,6 +22,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
+
+  // Impeller zeichnet unter Windows ueber OpenGL ES (ANGLE); auf manchen
+  // Rechnern (Grafiktreiber, VM, Remotedesktop) blieb das Fenster damit
+  // schwarz. Darum der bewaehrte Skia-Renderer; mit --impeller beim Start
+  // laesst sich Impeller zum Testen wieder einschalten.
+  if (std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--impeller") == command_line_arguments.end()) {
+    project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
+  }
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
